@@ -333,6 +333,55 @@ export const EXAMPLES: Record<string, unknown> = {
     "masterId": 0,
     "path": ""
   },
+  "GroupApplyResult": {
+    "affected": 5,
+    "attached": 10,
+    "detached": 2,
+    "updated": 5
+  },
+  "GroupPolicy": {
+    "defaultExpiryTime": 1893456000000,
+    "defaultTotalGB": 107374182400
+  },
+  "GroupSummary": {
+    "assignedInboundIds": [
+      1
+    ],
+    "clientCount": 5,
+    "defaultExpiryTime": 1893456000000,
+    "defaultTotalGB": 107374182400,
+    "description": "Team access profile",
+    "down": 524288,
+    "enable": true,
+    "name": "customer-a",
+    "trafficUsed": 1048576,
+    "up": 524288
+  },
+  "GroupUpdateRequest": {
+    "assignedInboundIds": [
+      1
+    ],
+    "description": "Team access profile",
+    "enable": true,
+    "name": "customer-a",
+    "oldName": "customer-a",
+    "policy": {
+      "defaultExpiryTime": 1893456000000,
+      "defaultTotalGB": 107374182400
+    }
+  },
+  "GroupUpsertRequest": {
+    "assignedInboundIds": [
+      1
+    ],
+    "description": "Team access profile",
+    "enable": true,
+    "name": "customer-a",
+    "policy": {
+      "defaultExpiryTime": 1893456000000,
+      "defaultTotalGB": 107374182400
+    }
+  },
   "HistoryOfSeeders": {
     "id": 0,
     "seederName": ""

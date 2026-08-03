@@ -864,9 +864,7 @@
       "addGroup": "Añadir grupo",
       "createSuccess": "Grupo «{name}» creado.",
       "rename": "Renombrar",
-      "renameTitle": "Renombrar {name}",
       "renameCollision": "Ya existe un grupo llamado «{name}».",
-      "renameSuccess": "Grupo renombrado en {count} cliente(s).",
       "deleteConfirmTitle": "¿Eliminar el grupo {name}?",
       "deleteConfirmContent": "Esto elimina el grupo y limpia su etiqueta de {count} cliente(s). Los clientes en sí no se eliminan.",
       "deleteSuccess": "Grupo limpiado de {count} cliente(s).",
@@ -890,7 +888,15 @@
       "removeFromGroup": "Quitar clientes…",
       "removeFromGroupTitle": "Quitar clientes del grupo «{name}»",
       "removeFromGroupDesc": "Selecciona miembros para quitar de este grupo. Los clientes se conservan (usa «Eliminar clientes del grupo» para eliminarlos por completo).",
-      "removeFromGroupResult": "Quitados {count} cliente(s) de {name}."
+      "removeFromGroupResult": "Quitados {count} cliente(s) de {name}.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "Agregar nodo",

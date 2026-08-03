@@ -864,9 +864,7 @@
       "addGroup": "添加分组",
       "createSuccess": "已创建分组 “{name}”。",
       "rename": "重命名",
-      "renameTitle": "重命名 {name}",
       "renameCollision": "已存在名为 “{name}” 的分组。",
-      "renameSuccess": "已为 {count} 个客户端重命名分组。",
       "deleteConfirmTitle": "删除分组 {name}?",
       "deleteConfirmContent": "这将删除分组并清除 {count} 个客户端的标签。客户端本身不会被删除。",
       "deleteSuccess": "已清除 {count} 个客户端的分组。",
@@ -890,7 +888,15 @@
       "removeFromGroup": "移除客户端…",
       "removeFromGroupTitle": "从分组 “{name}” 移除客户端",
       "removeFromGroupDesc": "选择要从此分组中移除的成员。客户端本身保留(使用 “删除分组中的客户端” 完全移除)。",
-      "removeFromGroupResult": "已从 {name} 移除 {count} 个客户端。"
+      "removeFromGroupResult": "已从 {name} 移除 {count} 个客户端。",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "添加节点",

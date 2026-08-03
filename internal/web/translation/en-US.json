@@ -864,9 +864,7 @@
       "addGroup": "Add Group",
       "createSuccess": "Group \"{name}\" created.",
       "rename": "Rename",
-      "renameTitle": "Rename {name}",
       "renameCollision": "A group named \"{name}\" already exists.",
-      "renameSuccess": "Renamed group on {count} client(s).",
       "deleteConfirmTitle": "Delete group {name}?",
       "deleteConfirmContent": "This removes the group and clears its label from {count} client(s). The clients themselves are not deleted.",
       "deleteSuccess": "Cleared group from {count} client(s).",
@@ -890,7 +888,15 @@
       "removeFromGroup": "Remove clients…",
       "removeFromGroupTitle": "Remove clients from group \"{name}\"",
       "removeFromGroupDesc": "Select members to remove from this group. Clients themselves are kept (use \"Delete clients in group\" to remove them entirely).",
-      "removeFromGroupResult": "Removed {count} client(s) from {name}."
+      "removeFromGroupResult": "Removed {count} client(s) from {name}.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "hosts": {
       "addHost": "Add Host",

@@ -864,9 +864,7 @@
       "addGroup": "Grup ekle",
       "createSuccess": "«{name}» grubu oluşturuldu.",
       "rename": "Yeniden adlandır",
-      "renameTitle": "{name} yeniden adlandır",
       "renameCollision": "«{name}» adında bir grup zaten var.",
-      "renameSuccess": "{count} kullanıcının grubu yeniden adlandırıldı.",
       "deleteConfirmTitle": "{name} Grubunu Sil?",
       "deleteConfirmContent": "Bu işlem grubu siler ve etiketini {count} kullanıcıdan kaldırır. Kullanıcılar silinmez.",
       "deleteSuccess": "{count} kullanıcının grubu temizlendi.",
@@ -890,7 +888,15 @@
       "removeFromGroup": "Kullanıcı Çıkar…",
       "removeFromGroupTitle": "«{name}» Grubundan Kullanıcı Çıkar",
       "removeFromGroupDesc": "Bu gruptan çıkarılacak üyeleri seçin. Kullanıcılar korunur (tamamen kaldırmak için «Gruptaki kullanıcıları sil» kullanın).",
-      "removeFromGroupResult": "{name} grubundan {count} kullanıcı çıkarıldı."
+      "removeFromGroupResult": "{name} grubundan {count} kullanıcı çıkarıldı.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "Düğüm Ekle",

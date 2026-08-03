@@ -864,9 +864,7 @@
       "addGroup": "افزودن گروه",
       "createSuccess": "گروه «{name}» ایجاد شد.",
       "rename": "تغییر نام",
-      "renameTitle": "تغییر نام {name}",
       "renameCollision": "گروهی به نام «{name}» از قبل وجود دارد.",
-      "renameSuccess": "گروه روی {count} کاربر تغییر نام داده شد.",
       "deleteConfirmTitle": "حذف گروه {name}؟",
       "deleteConfirmContent": "این عمل گروه را حذف می‌کند و برچسب آن را از {count} کاربر پاک می‌کند. خود کاربران حذف نمی‌شوند.",
       "deleteSuccess": "گروه از {count} کاربر پاک شد.",
@@ -890,7 +888,15 @@
       "removeFromGroup": "حذف کاربران…",
       "removeFromGroupTitle": "حذف کاربران از گروه «{name}»",
       "removeFromGroupDesc": "اعضایی را برای حذف از این گروه انتخاب کنید. خود کاربران حفظ می‌شوند (برای حذف کامل از «حذف کاربران گروه» استفاده کنید).",
-      "removeFromGroupResult": "{count} کاربر از {name} حذف شد."
+      "removeFromGroupResult": "{count} کاربر از {name} حذف شد.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "افزودن نود",

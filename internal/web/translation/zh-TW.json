@@ -864,9 +864,7 @@
       "addGroup": "新增群組",
       "createSuccess": "已建立群組「{name}」。",
       "rename": "重新命名",
-      "renameTitle": "重新命名 {name}",
       "renameCollision": "已存在名為「{name}」的群組。",
-      "renameSuccess": "已為 {count} 個客戶端重新命名群組。",
       "deleteConfirmTitle": "刪除群組 {name}?",
       "deleteConfirmContent": "這將刪除群組並清除 {count} 個客戶端的標籤。客戶端本身不會被刪除。",
       "deleteSuccess": "已清除 {count} 個客戶端的群組。",
@@ -890,7 +888,15 @@
       "removeFromGroup": "移除客戶端…",
       "removeFromGroupTitle": "從群組「{name}」移除客戶端",
       "removeFromGroupDesc": "選擇要從此群組移除的成員。客戶端本身保留(用「刪除群組中的客戶端」完全移除)。",
-      "removeFromGroupResult": "已從 {name} 移除 {count} 個客戶端。"
+      "removeFromGroupResult": "已從 {name} 移除 {count} 個客戶端。",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "新增節點",

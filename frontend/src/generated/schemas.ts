@@ -1378,6 +1378,196 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "GroupApplyResult": {
+    "properties": {
+      "affected": {
+        "example": 5,
+        "type": "integer"
+      },
+      "attached": {
+        "example": 10,
+        "type": "integer"
+      },
+      "detached": {
+        "example": 2,
+        "type": "integer"
+      },
+      "updated": {
+        "example": 5,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "affected",
+      "attached",
+      "detached",
+      "updated"
+    ],
+    "type": "object"
+  },
+  "GroupPolicy": {
+    "properties": {
+      "defaultExpiryTime": {
+        "example": 1893456000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "defaultTotalGB": {
+        "example": 107374182400,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "defaultExpiryTime",
+      "defaultTotalGB"
+    ],
+    "type": "object"
+  },
+  "GroupSummary": {
+    "properties": {
+      "assignedInboundIds": {
+        "example": [
+          1
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "clientCount": {
+        "example": 5,
+        "type": "integer"
+      },
+      "defaultExpiryTime": {
+        "example": 1893456000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "defaultTotalGB": {
+        "example": 107374182400,
+        "format": "int64",
+        "type": "integer"
+      },
+      "description": {
+        "example": "Team access profile",
+        "type": "string"
+      },
+      "down": {
+        "example": 524288,
+        "format": "int64",
+        "type": "integer"
+      },
+      "enable": {
+        "example": true,
+        "type": "boolean"
+      },
+      "name": {
+        "example": "customer-a",
+        "type": "string"
+      },
+      "trafficUsed": {
+        "example": 1048576,
+        "format": "int64",
+        "type": "integer"
+      },
+      "up": {
+        "example": 524288,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "assignedInboundIds",
+      "clientCount",
+      "defaultExpiryTime",
+      "defaultTotalGB",
+      "description",
+      "down",
+      "enable",
+      "name",
+      "trafficUsed",
+      "up"
+    ],
+    "type": "object"
+  },
+  "GroupUpdateRequest": {
+    "properties": {
+      "assignedInboundIds": {
+        "example": [
+          1
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "description": {
+        "example": "Team access profile",
+        "type": "string"
+      },
+      "enable": {
+        "example": true,
+        "type": "boolean"
+      },
+      "name": {
+        "example": "customer-a",
+        "type": "string"
+      },
+      "oldName": {
+        "example": "customer-a",
+        "type": "string"
+      },
+      "policy": {
+        "$ref": "#/components/schemas/GroupPolicy"
+      }
+    },
+    "required": [
+      "assignedInboundIds",
+      "description",
+      "enable",
+      "name",
+      "oldName",
+      "policy"
+    ],
+    "type": "object"
+  },
+  "GroupUpsertRequest": {
+    "properties": {
+      "assignedInboundIds": {
+        "example": [
+          1
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "description": {
+        "example": "Team access profile",
+        "type": "string"
+      },
+      "enable": {
+        "example": true,
+        "type": "boolean"
+      },
+      "name": {
+        "example": "customer-a",
+        "type": "string"
+      },
+      "policy": {
+        "$ref": "#/components/schemas/GroupPolicy"
+      }
+    },
+    "required": [
+      "assignedInboundIds",
+      "description",
+      "enable",
+      "name",
+      "policy"
+    ],
+    "type": "object"
+  },
   "HistoryOfSeeders": {
     "description": "HistoryOfSeeders tracks which database seeders have been executed to prevent re-running.",
     "properties": {

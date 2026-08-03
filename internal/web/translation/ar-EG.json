@@ -864,9 +864,7 @@
       "addGroup": "إضافة مجموعة",
       "createSuccess": "تم إنشاء المجموعة «{name}».",
       "rename": "إعادة تسمية",
-      "renameTitle": "إعادة تسمية {name}",
       "renameCollision": "مجموعة باسم «{name}» موجودة بالفعل.",
-      "renameSuccess": "تمت إعادة تسمية المجموعة على {count} عميل.",
       "deleteConfirmTitle": "حذف المجموعة {name}؟",
       "deleteConfirmContent": "يحذف المجموعة ويمسح تسميتها من {count} عميل. العملاء أنفسهم لا يُحذفون.",
       "deleteSuccess": "تم مسح المجموعة من {count} عميل.",
@@ -890,7 +888,15 @@
       "removeFromGroup": "إزالة عملاء…",
       "removeFromGroupTitle": "إزالة عملاء من المجموعة «{name}»",
       "removeFromGroupDesc": "اختر الأعضاء لإزالتهم من هذه المجموعة. يُحفظ العملاء (استخدم «حذف عملاء المجموعة» للإزالة الكاملة).",
-      "removeFromGroupResult": "تمت إزالة {count} عميل من {name}."
+      "removeFromGroupResult": "تمت إزالة {count} عميل من {name}.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "إضافة نود",

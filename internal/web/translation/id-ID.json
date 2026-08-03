@@ -864,9 +864,7 @@
       "addGroup": "Tambah grup",
       "createSuccess": "Grup «{name}» dibuat.",
       "rename": "Ubah nama",
-      "renameTitle": "Ubah nama {name}",
       "renameCollision": "Grup bernama «{name}» sudah ada.",
-      "renameSuccess": "Grup diubah namanya pada {count} klien.",
       "deleteConfirmTitle": "Hapus grup {name}?",
       "deleteConfirmContent": "Ini menghapus grup dan label-nya dari {count} klien. Klien itu sendiri tidak dihapus.",
       "deleteSuccess": "Grup dihapus dari {count} klien.",
@@ -890,7 +888,15 @@
       "removeFromGroup": "Hapus klien…",
       "removeFromGroupTitle": "Hapus klien dari grup «{name}»",
       "removeFromGroupDesc": "Pilih anggota untuk dihapus dari grup ini. Klien tetap dipertahankan (gunakan «Hapus klien di grup» untuk menghapus sepenuhnya).",
-      "removeFromGroupResult": "{count} klien dihapus dari {name}."
+      "removeFromGroupResult": "{count} klien dihapus dari {name}.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "Tambah Node",

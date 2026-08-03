@@ -145,6 +145,9 @@ func initModels() error {
 	if err := migrateSyncOrphanColumns(); err != nil {
 		return err
 	}
+	if err := migrateClientGroupSquadColumns(); err != nil {
+		return err
+	}
 	if IsPostgres() {
 		if err := resyncPostgresSequences(db, models); err != nil {
 			log.Printf("Error resyncing postgres sequences: %v", err)
@@ -309,6 +312,36 @@ func migrateSyncOrphanColumns() error {
 		return nil
 	}
 	return db.Exec("UPDATE clients SET sync_orphaned_at = 0 WHERE sync_orphaned_at IS NULL").Error
+}
+
+func migrateClientGroupSquadColumns() error {
+	if !db.Migrator().HasColumn(&model.ClientGroup{}, "assigned_inbound_ids") {
+		return nil
+	}
+	updates := map[string]string{
+		"description":          "",
+		"assigned_inbound_ids": "[]",
+	}
+	for col, value := range updates {
+		if db.Migrator().HasColumn(&model.ClientGroup{}, col) {
+			if err := db.Exec("UPDATE client_groups SET "+col+" = ? WHERE "+col+" IS NULL OR "+col+" = ''", value).Error; err != nil {
+				return err
+			}
+		}
+	}
+	if db.Migrator().HasColumn(&model.ClientGroup{}, "enable") {
+		if err := db.Exec("UPDATE client_groups SET enable = ? WHERE enable IS NULL", true).Error; err != nil {
+			return err
+		}
+	}
+	for _, col := range []string{"default_total_gb", "default_expiry_time"} {
+		if db.Migrator().HasColumn(&model.ClientGroup{}, col) {
+			if err := db.Exec("UPDATE client_groups SET " + col + " = 0 WHERE " + col + " IS NULL").Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func migrateHostVerifyPeerCertByNameColumn() error {

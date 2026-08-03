@@ -864,9 +864,7 @@
       "addGroup": "Thêm nhóm",
       "createSuccess": "Đã tạo nhóm «{name}».",
       "rename": "Đổi tên",
-      "renameTitle": "Đổi tên {name}",
       "renameCollision": "Nhóm có tên «{name}» đã tồn tại.",
-      "renameSuccess": "Đã đổi tên nhóm trên {count} client.",
       "deleteConfirmTitle": "Xóa nhóm {name}?",
       "deleteConfirmContent": "Việc này xóa nhóm và xóa nhãn khỏi {count} client. Bản thân client không bị xóa.",
       "deleteSuccess": "Đã xóa nhóm khỏi {count} client.",
@@ -890,7 +888,15 @@
       "removeFromGroup": "Xóa client…",
       "removeFromGroupTitle": "Xóa client khỏi nhóm «{name}»",
       "removeFromGroupDesc": "Chọn thành viên để xóa khỏi nhóm này. Bản thân client được giữ lại (dùng «Xóa client trong nhóm» để xóa hoàn toàn).",
-      "removeFromGroupResult": "Đã xóa {count} client khỏi {name}."
+      "removeFromGroupResult": "Đã xóa {count} client khỏi {name}.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "Thêm nút",

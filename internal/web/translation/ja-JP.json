@@ -864,9 +864,7 @@
       "addGroup": "グループ追加",
       "createSuccess": "グループ「{name}」を作成しました。",
       "rename": "名前変更",
-      "renameTitle": "{name} の名前を変更",
       "renameCollision": "「{name}」という名前のグループは既に存在します。",
-      "renameSuccess": "{count} クライアントのグループ名を変更しました。",
       "deleteConfirmTitle": "グループ {name} を削除?",
       "deleteConfirmContent": "これはグループを削除し、{count} クライアントのラベルをクリアします。クライアント自体は削除されません。",
       "deleteSuccess": "{count} クライアントのグループをクリアしました。",
@@ -890,7 +888,15 @@
       "removeFromGroup": "クライアントを削除…",
       "removeFromGroupTitle": "グループ「{name}」からクライアントを削除",
       "removeFromGroupDesc": "このグループから外すメンバーを選択してください。クライアント自体は保持されます (完全に削除するには「グループのクライアントを削除」を使用)。",
-      "removeFromGroupResult": "{count} クライアントを {name} から外しました。"
+      "removeFromGroupResult": "{count} クライアントを {name} から外しました。",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "ノードを追加",

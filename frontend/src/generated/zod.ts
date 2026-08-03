@@ -375,6 +375,53 @@ export const FallbackParentInfoSchema = z.object({
 });
 export type FallbackParentInfo = z.infer<typeof FallbackParentInfoSchema>;
 
+export const GroupApplyResultSchema = z.object({
+  affected: z.number().int(),
+  attached: z.number().int(),
+  detached: z.number().int(),
+  updated: z.number().int(),
+});
+export type GroupApplyResult = z.infer<typeof GroupApplyResultSchema>;
+
+export const GroupPolicySchema = z.object({
+  defaultExpiryTime: z.number().int(),
+  defaultTotalGB: z.number().int(),
+});
+export type GroupPolicy = z.infer<typeof GroupPolicySchema>;
+
+export const GroupSummarySchema = z.object({
+  assignedInboundIds: z.array(z.number().int()),
+  clientCount: z.number().int(),
+  defaultExpiryTime: z.number().int(),
+  defaultTotalGB: z.number().int(),
+  description: z.string(),
+  down: z.number().int(),
+  enable: z.boolean(),
+  name: z.string(),
+  trafficUsed: z.number().int(),
+  up: z.number().int(),
+});
+export type GroupSummary = z.infer<typeof GroupSummarySchema>;
+
+export const GroupUpdateRequestSchema = z.object({
+  assignedInboundIds: z.array(z.number().int()),
+  description: z.string(),
+  enable: z.boolean(),
+  name: z.string(),
+  oldName: z.string(),
+  policy: z.lazy(() => GroupPolicySchema),
+});
+export type GroupUpdateRequest = z.infer<typeof GroupUpdateRequestSchema>;
+
+export const GroupUpsertRequestSchema = z.object({
+  assignedInboundIds: z.array(z.number().int()),
+  description: z.string(),
+  enable: z.boolean(),
+  name: z.string(),
+  policy: z.lazy(() => GroupPolicySchema),
+});
+export type GroupUpsertRequest = z.infer<typeof GroupUpsertRequestSchema>;
+
 export const HistoryOfSeedersSchema = z.object({
   id: z.number().int(),
   seederName: z.string(),

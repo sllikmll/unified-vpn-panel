@@ -349,6 +349,48 @@ export interface FallbackParentInfo {
   path?: string;
 }
 
+export interface GroupApplyResult {
+  affected: number;
+  attached: number;
+  detached: number;
+  updated: number;
+}
+
+export interface GroupPolicy {
+  defaultExpiryTime: number;
+  defaultTotalGB: number;
+}
+
+export interface GroupSummary {
+  assignedInboundIds: number[];
+  clientCount: number;
+  defaultExpiryTime: number;
+  defaultTotalGB: number;
+  description: string;
+  down: number;
+  enable: boolean;
+  name: string;
+  trafficUsed: number;
+  up: number;
+}
+
+export interface GroupUpdateRequest {
+  assignedInboundIds: number[];
+  description: string;
+  enable: boolean;
+  name: string;
+  oldName: string;
+  policy: GroupPolicy;
+}
+
+export interface GroupUpsertRequest {
+  assignedInboundIds: number[];
+  description: string;
+  enable: boolean;
+  name: string;
+  policy: GroupPolicy;
+}
+
 export interface HistoryOfSeeders {
   id: number;
   seederName: string;

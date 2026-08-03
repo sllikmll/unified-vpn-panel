@@ -864,9 +864,7 @@
       "addGroup": "Додати групу",
       "createSuccess": "Групу «{name}» створено.",
       "rename": "Перейменувати",
-      "renameTitle": "Перейменувати {name}",
       "renameCollision": "Група з назвою «{name}» вже існує.",
-      "renameSuccess": "Групу перейменовано на {count} клієнт(ах).",
       "deleteConfirmTitle": "Видалити групу {name}?",
       "deleteConfirmContent": "Це видаляє групу й очищує її мітку у {count} клієнт(ів). Самі клієнти не видаляються.",
       "deleteSuccess": "Групу очищено у {count} клієнт(ів).",
@@ -890,7 +888,15 @@
       "removeFromGroup": "Видалити клієнтів…",
       "removeFromGroupTitle": "Видалити клієнтів з групи «{name}»",
       "removeFromGroupDesc": "Виберіть учасників для видалення з цієї групи. Самі клієнти зберігаються (використовуйте «Видалити клієнтів групи» для повного видалення).",
-      "removeFromGroupResult": "Видалено {count} клієнт(ів) з {name}."
+      "removeFromGroupResult": "Видалено {count} клієнт(ів) з {name}.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "Додати вузол",
