@@ -1,0 +1,9 @@
+[submodule "_upstream/remnawave-backend"]
+	path = _upstream/remnawave-backend
+	url = https://github.com/remnawave/backend.git
+[submodule "_upstream/remnawave-frontend"]
+	path = _upstream/remnawave-frontend
+	url = https://github.com/remnawave/frontend.git
+[submodule "_upstream/remnawave-node"]
+	path = _upstream/remnawave-node
+	url = https://github.com/remnawave/node.git
