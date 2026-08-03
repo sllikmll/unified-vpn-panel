@@ -1,7 +1,7 @@
 # ========================================================
 # Stage: Frontend (Vite)
 # ========================================================
-FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend
+FROM --platform=$BUILDPLATFORM node:24-alpine AS frontend
 WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
@@ -15,6 +15,7 @@ RUN npm run build
 FROM golang:1.26-alpine AS builder
 WORKDIR /app
 ARG TARGETARCH
+ARG XRAY_VERSION=26.6.27
 
 RUN apk --no-cache --update add \
   build-base \
