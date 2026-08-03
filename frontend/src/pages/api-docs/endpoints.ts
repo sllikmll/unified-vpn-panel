@@ -1147,6 +1147,75 @@ export const sections: readonly Section[] = [
   },
 
   {
+    id: 'profiles',
+    title: 'Config Profiles',
+    description:
+      'Reusable protocol/config profile templates. Profiles store canonical JSON documents and never include credentials or per-client secrets. Rollout and node assignment are intentionally out of scope for these endpoints.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/panel/api/profiles/list',
+        summary: 'List every reusable config profile ordered by name.',
+        responseSchema: 'ConfigProfile',
+        responseSchemaArray: true,
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/profiles/get/:id',
+        summary: 'Fetch one config profile by id.',
+        params: [
+          { name: 'id', in: 'path', type: 'number', desc: 'Config profile ID.' },
+        ],
+        responseSchema: 'ConfigProfile',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/profiles/add',
+        summary: 'Create a config profile. The profile JSON is validated, canonicalized, checked for port conflicts, and rejected if it contains secret-like fields.',
+        body: '{\n  "name": "VLESS Reality TCP",\n  "description": "Reusable edge template without credentials",\n  "enabled": true,\n  "version": 1,\n  "profile": "{\\"inbounds\\":[{\\"protocol\\":\\"vless\\",\\"port\\":443}]}"\n}',
+        responseSchema: 'ConfigProfile',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/profiles/update/:id',
+        summary: 'Replace an existing config profile after the same validation and canonicalization used by create.',
+        params: [
+          { name: 'id', in: 'path', type: 'number', desc: 'Config profile ID.' },
+        ],
+        body: '{\n  "name": "VLESS Reality TCP",\n  "description": "Reusable edge template without credentials",\n  "enabled": true,\n  "version": 2,\n  "profile": "{\\"inbounds\\":[{\\"protocol\\":\\"vless\\",\\"port\\":443}]}"\n}',
+        responseSchema: 'ConfigProfile',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/profiles/clone/:id',
+        summary: 'Clone a config profile under a new name.',
+        params: [
+          { name: 'id', in: 'path', type: 'number', desc: 'Source config profile ID.' },
+        ],
+        body: '{\n  "name": "VLESS Reality TCP copy"\n}',
+        responseSchema: 'ConfigProfile',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/profiles/del/:id',
+        summary: 'Delete a config profile. This does not affect inbounds or nodes because rollout is not implemented yet.',
+        params: [
+          { name: 'id', in: 'path', type: 'number', desc: 'Config profile ID.' },
+        ],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/profiles/setEnable/:id',
+        summary: 'Enable or disable a config profile.',
+        params: [
+          { name: 'id', in: 'path', type: 'number', desc: 'Config profile ID.' },
+        ],
+        body: '{\n  "enabled": true\n}',
+      },
+    ],
+  },
+
+  {
     id: 'backup',
     title: 'Backup',
     description: 'Operations that interact with the configured Telegram bot.',

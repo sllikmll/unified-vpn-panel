@@ -26,6 +26,75 @@
       }
     },
     "schemas": {
+      "ConfigProfile": {
+        "properties": {
+          "createdAt": {
+            "type": "integer"
+          },
+          "description": {
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "integer"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "enabled",
+          "version",
+          "profile",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "ConfigProfileNodeAssignment": {
+        "properties": {
+          "createdAt": {
+            "type": "integer"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "nodeId": {
+            "type": "integer"
+          },
+          "profileId": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profileId",
+          "nodeId",
+          "enabled",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
       "AllSetting": {
         "properties": {
           "datepicker": {
@@ -3062,6 +3131,10 @@
     {
       "name": "Hosts",
       "description": "Per-inbound override endpoints. Each enabled host renders one extra subscription link/proxy with its own address/port/TLS, superseding the legacy externalProxy array. All endpoints under /panel/api/hosts."
+    },
+    {
+      "name": "Config Profiles",
+      "description": "Reusable protocol/config profile templates. Profiles store canonical JSON documents and never include credentials or per-client secrets. Rollout and node assignment are intentionally out of scope for these endpoints."
     },
     {
       "name": "Backup",
@@ -9922,6 +9995,411 @@
                   "abc-123",
                   "def-456"
                 ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/list": {
+      "get": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "List every reusable config profile ordered by name.",
+        "operationId": "get_panel_api_profiles_list",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ConfigProfile"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": [
+                    {
+                      "createdAt": 1700000000000,
+                      "description": "Reusable VLESS Reality template without client credentials.",
+                      "enabled": true,
+                      "id": 1,
+                      "name": "VLESS Reality TCP",
+                      "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}",
+                      "updatedAt": 1700000000000,
+                      "version": 1
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/get/{id}": {
+      "get": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "Fetch one config profile by id.",
+        "operationId": "get_panel_api_profiles_get_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Config profile ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/ConfigProfile"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "createdAt": 1700000000000,
+                    "description": "Reusable VLESS Reality template without client credentials.",
+                    "enabled": true,
+                    "id": 1,
+                    "name": "VLESS Reality TCP",
+                    "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}",
+                    "updatedAt": 1700000000000,
+                    "version": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/add": {
+      "post": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "Create a config profile. The profile JSON is validated, canonicalized, checked for port conflicts, and rejected if it contains secret-like fields.",
+        "operationId": "post_panel_api_profiles_add",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "name": "VLESS Reality TCP",
+                "description": "Reusable edge template without credentials",
+                "enabled": true,
+                "version": 1,
+                "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/ConfigProfile"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "createdAt": 1700000000000,
+                    "description": "Reusable VLESS Reality template without client credentials.",
+                    "enabled": true,
+                    "id": 1,
+                    "name": "VLESS Reality TCP",
+                    "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}",
+                    "updatedAt": 1700000000000,
+                    "version": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/update/{id}": {
+      "post": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "Replace an existing config profile after the same validation and canonicalization used by create.",
+        "operationId": "post_panel_api_profiles_update_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Config profile ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "name": "VLESS Reality TCP",
+                "description": "Reusable edge template without credentials",
+                "enabled": true,
+                "version": 2,
+                "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/ConfigProfile"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "createdAt": 1700000000000,
+                    "description": "Reusable VLESS Reality template without client credentials.",
+                    "enabled": true,
+                    "id": 1,
+                    "name": "VLESS Reality TCP",
+                    "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}",
+                    "updatedAt": 1700000000000,
+                    "version": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/clone/{id}": {
+      "post": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "Clone a config profile under a new name.",
+        "operationId": "post_panel_api_profiles_clone_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Source config profile ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "name": "VLESS Reality TCP copy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/ConfigProfile"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "createdAt": 1700000000000,
+                    "description": "Reusable VLESS Reality template without client credentials.",
+                    "enabled": true,
+                    "id": 1,
+                    "name": "VLESS Reality TCP",
+                    "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}",
+                    "updatedAt": 1700000000000,
+                    "version": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/del/{id}": {
+      "post": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "Delete a config profile. This does not affect inbounds or nodes because rollout is not implemented yet.",
+        "operationId": "post_panel_api_profiles_del_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Config profile ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/setEnable/{id}": {
+      "post": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "Enable or disable a config profile.",
+        "operationId": "post_panel_api_profiles_setEnable_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Config profile ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "enabled": true
               }
             }
           }

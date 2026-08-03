@@ -26,6 +26,75 @@
       }
     },
     "schemas": {
+      "ConfigProfile": {
+        "properties": {
+          "createdAt": {
+            "type": "integer"
+          },
+          "description": {
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "integer"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "enabled",
+          "version",
+          "profile",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "ConfigProfileNodeAssignment": {
+        "properties": {
+          "createdAt": {
+            "type": "integer"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "nodeId": {
+            "type": "integer"
+          },
+          "profileId": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profileId",
+          "nodeId",
+          "enabled",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
       "AllSetting": {
         "properties": {
           "datepicker": {
@@ -2372,189 +2441,6 @@
         ],
         "type": "object"
       },
-      "NodePreflightError": {
-        "properties": {
-          "code": {
-            "example": "docker_missing",
-            "type": "string"
-          },
-          "message": {
-            "example": "Docker is not installed",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "message"
-        ],
-        "type": "object"
-      },
-      "NodePreflightRequest": {
-        "properties": {
-          "address": {
-            "example": "node1.example.com",
-            "type": "string"
-          },
-          "authMethod": {
-            "enum": [
-              "password",
-              "privateKey"
-            ],
-            "example": "privateKey",
-            "type": "string"
-          },
-          "hostKeyFingerprint": {
-            "example": "SHA256:abc...",
-            "type": "string"
-          },
-          "hostKeyMode": {
-            "enum": [
-              "known_hosts",
-              "pin",
-              "insecure"
-            ],
-            "example": "known_hosts",
-            "type": "string"
-          },
-          "knownHosts": {
-            "example": "node1.example.com ssh-ed25519 AAAA...",
-            "type": "string"
-          },
-          "password": {
-            "example": "<write-only password>",
-            "nullable": true,
-            "type": "string"
-          },
-          "port": {
-            "example": 22,
-            "maximum": 65535,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "privateKey": {
-            "example": "-----BEGIN OPENSSH PRIVATE KEY-----",
-            "nullable": true,
-            "type": "string"
-          },
-          "privateKeyPassphrase": {
-            "example": "<write-only passphrase>",
-            "nullable": true,
-            "type": "string"
-          },
-          "timeoutSeconds": {
-            "example": 12,
-            "type": "integer"
-          },
-          "username": {
-            "example": "root",
-            "type": "string"
-          }
-        },
-        "required": [
-          "address",
-          "authMethod",
-          "hostKeyFingerprint",
-          "hostKeyMode",
-          "knownHosts",
-          "port",
-          "timeoutSeconds",
-          "username"
-        ],
-        "type": "object"
-      },
-      "NodePreflightResult": {
-        "properties": {
-          "arch": {
-            "example": "amd64",
-            "type": "string"
-          },
-          "docker": {
-            "example": false,
-            "type": "boolean"
-          },
-          "errors": {
-            "items": {
-              "$ref": "#/components/schemas/NodePreflightError"
-            },
-            "type": "array"
-          },
-          "freeDiskBytes": {
-            "example": 10737418240,
-            "format": "int64",
-            "type": "integer"
-          },
-          "hostname": {
-            "example": "edge-1",
-            "type": "string"
-          },
-          "occupiedPorts": {
-            "example": [
-              22,
-              80,
-              443
-            ],
-            "items": {
-              "type": "integer"
-            },
-            "type": "array"
-          },
-          "os": {
-            "example": "ubuntu",
-            "type": "string"
-          },
-          "provisioning": {
-            "$ref": "#/components/schemas/NodeProvisioningPlan"
-          },
-          "root": {
-            "example": true,
-            "type": "boolean"
-          },
-          "sudo": {
-            "example": true,
-            "type": "boolean"
-          },
-          "systemd": {
-            "example": true,
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "arch",
-          "docker",
-          "errors",
-          "freeDiskBytes",
-          "hostname",
-          "occupiedPorts",
-          "os",
-          "provisioning",
-          "root",
-          "sudo",
-          "systemd"
-        ],
-        "type": "object"
-      },
-      "NodeProvisioningPlan": {
-        "properties": {
-          "canInstall": {
-            "example": true,
-            "type": "boolean"
-          },
-          "warnings": {
-            "example": [
-              "Docker will be installed"
-            ],
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "canInstall",
-          "warnings"
-        ],
-        "type": "object"
-      },
       "NodeView": {
         "description": "NodeView is the browser/API read contract for nodes. Credentials are\nwrite-only: responses expose only whether a node has a token configured.",
         "properties": {
@@ -3062,6 +2948,10 @@
     {
       "name": "Hosts",
       "description": "Per-inbound override endpoints. Each enabled host renders one extra subscription link/proxy with its own address/port/TLS, superseding the legacy externalProxy array. All endpoints under /panel/api/hosts."
+    },
+    {
+      "name": "Config Profiles",
+      "description": "Reusable protocol/config profile templates. Profiles store canonical JSON documents and never include credentials or per-client secrets. Rollout and node assignment are intentionally out of scope for these endpoints."
     },
     {
       "name": "Backup",
@@ -8704,87 +8594,6 @@
         }
       }
     },
-    "/panel/api/nodes/preflight": {
-      "post": {
-        "tags": [
-          "Nodes"
-        ],
-        "summary": "Run an ephemeral SSH preflight against a candidate node without saving credentials. Supports write-only password or private-key auth, strict host-key verification by known_hosts or fingerprint pin, and explicit insecure opt-in. Returns OS, arch, hostname, privilege capability, systemd/Docker, free disk, occupied ports, and provisioning readiness.",
-        "operationId": "post_panel_api_nodes_preflight",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              },
-              "example": {
-                "address": "node1.example.com",
-                "port": 22,
-                "username": "root",
-                "authMethod": "privateKey",
-                "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----",
-                "hostKeyMode": "known_hosts",
-                "knownHosts": "node1.example.com ssh-ed25519 AAAA..."
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "msg": {
-                      "type": "string"
-                    },
-                    "obj": {
-                      "$ref": "#/components/schemas/NodePreflightResult"
-                    }
-                  }
-                },
-                "example": {
-                  "success": true,
-                  "obj": {
-                    "arch": "amd64",
-                    "docker": false,
-                    "errors": [
-                      {
-                        "code": "docker_missing",
-                        "message": "Docker is not installed"
-                      }
-                    ],
-                    "freeDiskBytes": 10737418240,
-                    "hostname": "edge-1",
-                    "occupiedPorts": [
-                      22,
-                      80,
-                      443
-                    ],
-                    "os": "ubuntu",
-                    "provisioning": {
-                      "canInstall": true,
-                      "warnings": [
-                        "Docker will be installed"
-                      ]
-                    },
-                    "root": true,
-                    "sudo": true,
-                    "systemd": true
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/panel/api/nodes/certFingerprint": {
       "post": {
         "tags": [
@@ -9922,6 +9731,411 @@
                   "abc-123",
                   "def-456"
                 ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/list": {
+      "get": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "List every reusable config profile ordered by name.",
+        "operationId": "get_panel_api_profiles_list",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ConfigProfile"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": [
+                    {
+                      "createdAt": 1700000000000,
+                      "description": "Reusable VLESS Reality template without client credentials.",
+                      "enabled": true,
+                      "id": 1,
+                      "name": "VLESS Reality TCP",
+                      "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}",
+                      "updatedAt": 1700000000000,
+                      "version": 1
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/get/{id}": {
+      "get": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "Fetch one config profile by id.",
+        "operationId": "get_panel_api_profiles_get_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Config profile ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/ConfigProfile"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "createdAt": 1700000000000,
+                    "description": "Reusable VLESS Reality template without client credentials.",
+                    "enabled": true,
+                    "id": 1,
+                    "name": "VLESS Reality TCP",
+                    "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}",
+                    "updatedAt": 1700000000000,
+                    "version": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/add": {
+      "post": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "Create a config profile. The profile JSON is validated, canonicalized, checked for port conflicts, and rejected if it contains secret-like fields.",
+        "operationId": "post_panel_api_profiles_add",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "name": "VLESS Reality TCP",
+                "description": "Reusable edge template without credentials",
+                "enabled": true,
+                "version": 1,
+                "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/ConfigProfile"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "createdAt": 1700000000000,
+                    "description": "Reusable VLESS Reality template without client credentials.",
+                    "enabled": true,
+                    "id": 1,
+                    "name": "VLESS Reality TCP",
+                    "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}",
+                    "updatedAt": 1700000000000,
+                    "version": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/update/{id}": {
+      "post": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "Replace an existing config profile after the same validation and canonicalization used by create.",
+        "operationId": "post_panel_api_profiles_update_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Config profile ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "name": "VLESS Reality TCP",
+                "description": "Reusable edge template without credentials",
+                "enabled": true,
+                "version": 2,
+                "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/ConfigProfile"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "createdAt": 1700000000000,
+                    "description": "Reusable VLESS Reality template without client credentials.",
+                    "enabled": true,
+                    "id": 1,
+                    "name": "VLESS Reality TCP",
+                    "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}",
+                    "updatedAt": 1700000000000,
+                    "version": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/clone/{id}": {
+      "post": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "Clone a config profile under a new name.",
+        "operationId": "post_panel_api_profiles_clone_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Source config profile ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "name": "VLESS Reality TCP copy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/ConfigProfile"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "createdAt": 1700000000000,
+                    "description": "Reusable VLESS Reality template without client credentials.",
+                    "enabled": true,
+                    "id": 1,
+                    "name": "VLESS Reality TCP",
+                    "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}",
+                    "updatedAt": 1700000000000,
+                    "version": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/del/{id}": {
+      "post": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "Delete a config profile. This does not affect inbounds or nodes because rollout is not implemented yet.",
+        "operationId": "post_panel_api_profiles_del_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Config profile ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/profiles/setEnable/{id}": {
+      "post": {
+        "tags": [
+          "Config Profiles"
+        ],
+        "summary": "Enable or disable a config profile.",
+        "operationId": "post_panel_api_profiles_setEnable_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Config profile ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "enabled": true
               }
             }
           }

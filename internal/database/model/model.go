@@ -1008,6 +1008,31 @@ type InboundFallback struct {
 
 func (InboundFallback) TableName() string { return "inbound_fallbacks" }
 
+type ConfigProfile struct {
+	Id          int    `json:"id" form:"id" gorm:"primaryKey;autoIncrement" example:"1"`
+	Name        string `json:"name" form:"name" gorm:"uniqueIndex;not null" validate:"required,max=128" example:"VLESS Reality TCP"`
+	Description string `json:"description" form:"description" gorm:"type:text" validate:"omitempty,max=1024" example:"Reusable VLESS Reality template without client credentials."`
+	Enabled     bool   `json:"enabled" form:"enabled" gorm:"default:true" example:"true"`
+	Version     int    `json:"version" form:"version" gorm:"default:1" validate:"gte=1" example:"1"`
+	Profile     string `json:"profile" form:"profile" gorm:"type:text;not null" validate:"required" example:"{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}"`
+	CreatedAt   int64  `json:"createdAt" gorm:"autoCreateTime:milli" example:"1700000000000"`
+	UpdatedAt   int64  `json:"updatedAt" gorm:"autoUpdateTime:milli" example:"1700000000000"`
+}
+
+func (ConfigProfile) TableName() string { return "config_profiles" }
+
+type ConfigProfileNodeAssignment struct {
+	ProfileId int   `json:"profileId" gorm:"primaryKey;column:profile_id;index" example:"1"`
+	NodeId    int   `json:"nodeId" gorm:"primaryKey;column:node_id;index" example:"1"`
+	Enabled   bool  `json:"enabled" gorm:"default:true" example:"true"`
+	CreatedAt int64 `json:"createdAt" gorm:"autoCreateTime:milli" example:"1700000000000"`
+	UpdatedAt int64 `json:"updatedAt" gorm:"autoUpdateTime:milli" example:"1700000000000"`
+}
+
+func (ConfigProfileNodeAssignment) TableName() string {
+	return "config_profile_node_assignments"
+}
+
 type Host struct {
 	Id                int      `json:"id" form:"id" gorm:"primaryKey;autoIncrement" example:"1"`
 	GroupId           string   `json:"groupId" form:"groupId" gorm:"column:group_id;index"`

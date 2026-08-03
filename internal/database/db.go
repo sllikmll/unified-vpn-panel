@@ -78,6 +78,8 @@ func allModels() []any {
 		&model.ClientExternalLink{},
 		&model.ClientGroup{},
 		&model.InboundFallback{},
+		&model.ConfigProfile{},
+		&model.ConfigProfileNodeAssignment{},
 		&model.Host{},
 		&model.NodeClientTraffic{},
 		&model.NodeClientIp{},

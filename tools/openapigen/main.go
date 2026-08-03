@@ -38,6 +38,8 @@ func run(root, outDir string) error {
 				"ClientRecord",
 				"ClientInbound",
 				"InboundFallback",
+				"ConfigProfile",
+				"ConfigProfileNodeAssignment",
 				"Host",
 			),
 			AliasAllow: setOf("Protocol"),
