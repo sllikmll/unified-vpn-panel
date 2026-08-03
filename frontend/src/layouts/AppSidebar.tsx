@@ -13,6 +13,7 @@ import {
   DashboardOutlined,
   DatabaseOutlined,
   ExportOutlined,
+  FileTextOutlined,
   GithubOutlined,
   GlobalOutlined,
   HeartOutlined,
@@ -51,7 +52,7 @@ const SIDEBAR_PINNED_KEY = 'sidebar-pinned';
 
 let hoveredAcrossRemounts = false;
 
-type IconName = 'dashboard' | 'inbound' | 'team' | 'groups' | 'setting' | 'tool' | 'cluster' | 'hosts' | 'logout' | 'apidocs' | 'outbound' | 'routing';
+type IconName = 'dashboard' | 'inbound' | 'team' | 'groups' | 'setting' | 'tool' | 'cluster' | 'hosts' | 'profiles' | 'logout' | 'apidocs' | 'outbound' | 'routing';
 
 const iconByName: Record<IconName, ComponentType> = {
   dashboard: DashboardOutlined,
@@ -62,6 +63,7 @@ const iconByName: Record<IconName, ComponentType> = {
   tool: ToolOutlined,
   cluster: ClusterOutlined,
   hosts: GlobalOutlined,
+  profiles: FileTextOutlined,
   logout: LogoutOutlined,
   apidocs: ApiOutlined,
   outbound: ExportOutlined,
@@ -199,6 +201,7 @@ export default function AppSidebar() {
     { key: '/groups', icon: 'groups', title: t('menu.groups') },
     { key: '/nodes', icon: 'cluster', title: t('menu.nodes') },
     { key: '/hosts', icon: 'hosts', title: t('menu.hosts') },
+    { key: '/profiles', icon: 'profiles', title: t('menu.profiles') },
     { key: '/outbound', icon: 'outbound', title: t('menu.outbounds') },
     { key: '/routing', icon: 'routing', title: t('menu.routing') },
     { key: '/settings', icon: 'setting', title: t('menu.settings') },

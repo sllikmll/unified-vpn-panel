@@ -169,6 +169,11 @@ export const ActiveInboundsByNodeSchema = z
 
 export const GroupSummarySchema = z.object({
   name: z.string(),
+  description: z.string().nullable().transform((v) => v ?? ''),
+  enable: z.boolean().nullable().transform((v) => v ?? true),
+  assignedInboundIds: z.array(z.number()).nullable().transform((v) => v ?? []),
+  defaultTotalGB: z.number().nullable().transform((v) => v ?? 0),
+  defaultExpiryTime: z.number().nullable().transform((v) => v ?? 0),
   clientCount: z.number(),
   trafficUsed: z.number().nullable().transform((v) => v ?? 0),
   up: z.number().nullable().transform((v) => v ?? 0),

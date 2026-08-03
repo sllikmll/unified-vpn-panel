@@ -111,7 +111,8 @@
     "docs": "Документация",
     "openMenu": "Открыть меню",
     "pinSidebar": "Закрепить боковую панель",
-    "unpinSidebar": "Открепить боковую панель"
+    "unpinSidebar": "Открепить боковую панель",
+    "profiles": "Profiles"
   },
   "pages": {
     "login": {
@@ -863,9 +864,7 @@
       "addGroup": "Добавить группу",
       "createSuccess": "Группа «{name}» создана.",
       "rename": "Переименовать",
-      "renameTitle": "Переименовать {name}",
       "renameCollision": "Группа с именем «{name}» уже существует.",
-      "renameSuccess": "Группа переименована для {count} клиент(ов).",
       "deleteConfirmTitle": "Удалить группу {name}?",
       "deleteConfirmContent": "Это удаляет группу и очищает её метку у {count} клиент(ов). Сами клиенты не удаляются.",
       "deleteSuccess": "Группа очищена у {count} клиент(ов).",
@@ -889,7 +888,15 @@
       "removeFromGroup": "Удалить клиентов…",
       "removeFromGroupTitle": "Удалить клиентов из группы «{name}»",
       "removeFromGroupDesc": "Выберите участников для удаления из этой группы. Сами клиенты сохраняются (используйте «Удалить клиентов группы» для полного удаления).",
-      "removeFromGroupResult": "Удалено {count} клиент(ов) из {name}."
+      "removeFromGroupResult": "Удалено {count} клиент(ов) из {name}.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "Добавить узел",
@@ -973,7 +980,8 @@
         "updateStarted": "Обновление панели запущено",
         "updateResult": "Обновление запущено на {ok} узлах, {failed} не удалось",
         "updateNoneEligible": "Выберите хотя бы один включённый узел в сети",
-        "saveMtls": "Сохранить mTLS узла"
+        "saveMtls": "Сохранить mTLS узла",
+        "preflight": "SSH preflight"
       },
       "tlsVerifyMode": "Проверка TLS",
       "tlsVerifyModeHint": "Как панель проверяет HTTPS-сертификат узла. Закрепление или Пропуск — для самоподписанных сертификатов (только https-узлы).",
@@ -1001,7 +1009,28 @@
       "pinnedCertPlaceholder": "SHA-256 в base64 или hex",
       "fetchPin": "Получить",
       "pinFetched": "Текущий сертификат узла получен",
-      "pinFetchFailed": "Не удалось получить сертификат"
+      "pinFetchFailed": "Не удалось получить сертификат",
+      "sshPreflight": "SSH preflight",
+      "sshUsername": "SSH username",
+      "sshPort": "SSH port",
+      "sshAuthMethod": "SSH authentication",
+      "sshPrivateKey": "Private key",
+      "sshPassword": "Password",
+      "sshPrivateKeyPassphrase": "Private key passphrase",
+      "sshHostKeyMode": "SSH host key verification",
+      "sshKnownHosts": "known_hosts entry",
+      "sshHostKeyPin": "Fingerprint pin",
+      "sshHostKeyInsecure": "Insecure opt-in",
+      "sshHostKeyFingerprint": "Host key fingerprint",
+      "sshHostKeyInsecureWarning": "Insecure mode skips SSH host-key verification. Use only for one-time bootstrap on a trusted network.",
+      "runPreflight": "Run SSH preflight",
+      "preflightComplete": "SSH preflight complete",
+      "preflightFailed": "SSH preflight failed",
+      "preflightReady": "Node is ready for provisioning",
+      "preflightNeedsAttention": "Node needs attention before provisioning",
+      "preflightPrivilege": "root/sudo",
+      "preflightDisk": "{gb} GiB free",
+      "preflightPorts": "Occupied ports: {ports}"
     },
     "settings": {
       "defaultTag": "По умолчанию",
@@ -1838,6 +1867,36 @@
         "delete": "Удалить хост",
         "badTag": "Недопустимый тег",
         "badVlessRoute": "Введите одно число от 0 до 65535"
+      }
+    },
+    "profiles": {
+      "createProfile": "Create profile",
+      "editProfile": "Edit profile",
+      "formatJson": "Format JSON",
+      "cloneConfirmTitle": "Clone profile \"{name}\"?",
+      "deleteConfirmTitle": "Delete profile \"{name}\"?",
+      "deleteConfirmContent": "This removes only the reusable template. Existing inbounds and nodes are unchanged.",
+      "summary": {
+        "total": "Total",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      },
+      "fields": {
+        "actions": "Actions",
+        "enabled": "Enabled",
+        "name": "Name",
+        "version": "Version",
+        "profile": "Profile JSON",
+        "descriptionLabel": "Description"
+      },
+      "toasts": {
+        "list": "Failed to load profiles",
+        "obtain": "Failed to load profile",
+        "add": "Profile saved",
+        "update": "Profile updated",
+        "clone": "Profile cloned",
+        "delete": "Profile deleted",
+        "invalidJson": "Profile must be valid JSON"
       }
     }
   },

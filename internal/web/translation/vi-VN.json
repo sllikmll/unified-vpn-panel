@@ -111,7 +111,8 @@
     "docs": "Tài liệu",
     "openMenu": "Mở menu",
     "pinSidebar": "Ghim thanh bên",
-    "unpinSidebar": "Bỏ ghim thanh bên"
+    "unpinSidebar": "Bỏ ghim thanh bên",
+    "profiles": "Profiles"
   },
   "pages": {
     "login": {
@@ -863,9 +864,7 @@
       "addGroup": "Thêm nhóm",
       "createSuccess": "Đã tạo nhóm «{name}».",
       "rename": "Đổi tên",
-      "renameTitle": "Đổi tên {name}",
       "renameCollision": "Nhóm có tên «{name}» đã tồn tại.",
-      "renameSuccess": "Đã đổi tên nhóm trên {count} client.",
       "deleteConfirmTitle": "Xóa nhóm {name}?",
       "deleteConfirmContent": "Việc này xóa nhóm và xóa nhãn khỏi {count} client. Bản thân client không bị xóa.",
       "deleteSuccess": "Đã xóa nhóm khỏi {count} client.",
@@ -889,7 +888,15 @@
       "removeFromGroup": "Xóa client…",
       "removeFromGroupTitle": "Xóa client khỏi nhóm «{name}»",
       "removeFromGroupDesc": "Chọn thành viên để xóa khỏi nhóm này. Bản thân client được giữ lại (dùng «Xóa client trong nhóm» để xóa hoàn toàn).",
-      "removeFromGroupResult": "Đã xóa {count} client khỏi {name}."
+      "removeFromGroupResult": "Đã xóa {count} client khỏi {name}.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "Thêm nút",
@@ -973,7 +980,8 @@
         "updateStarted": "Đã bắt đầu cập nhật bảng điều khiển",
         "updateResult": "Đã kích hoạt cập nhật trên {ok} node, {failed} thất bại",
         "updateNoneEligible": "Chọn ít nhất một node trực tuyến và đang bật",
-        "saveMtls": "Lưu mTLS nút"
+        "saveMtls": "Lưu mTLS nút",
+        "preflight": "SSH preflight"
       },
       "tlsVerifyMode": "Xác minh TLS",
       "tlsVerifyModeHint": "Cách panel xác thực chứng chỉ HTTPS của node. Ghim hoặc Bỏ qua dành cho chứng chỉ tự ký (chỉ node https).",
@@ -1001,7 +1009,28 @@
       "pinnedCertPlaceholder": "SHA-256 base64 hoặc hex",
       "fetchPin": "Lấy",
       "pinFetched": "Đã lấy chứng chỉ hiện tại của node",
-      "pinFetchFailed": "Không thể lấy chứng chỉ"
+      "pinFetchFailed": "Không thể lấy chứng chỉ",
+      "sshPreflight": "SSH preflight",
+      "sshUsername": "SSH username",
+      "sshPort": "SSH port",
+      "sshAuthMethod": "SSH authentication",
+      "sshPrivateKey": "Private key",
+      "sshPassword": "Password",
+      "sshPrivateKeyPassphrase": "Private key passphrase",
+      "sshHostKeyMode": "SSH host key verification",
+      "sshKnownHosts": "known_hosts entry",
+      "sshHostKeyPin": "Fingerprint pin",
+      "sshHostKeyInsecure": "Insecure opt-in",
+      "sshHostKeyFingerprint": "Host key fingerprint",
+      "sshHostKeyInsecureWarning": "Insecure mode skips SSH host-key verification. Use only for one-time bootstrap on a trusted network.",
+      "runPreflight": "Run SSH preflight",
+      "preflightComplete": "SSH preflight complete",
+      "preflightFailed": "SSH preflight failed",
+      "preflightReady": "Node is ready for provisioning",
+      "preflightNeedsAttention": "Node needs attention before provisioning",
+      "preflightPrivilege": "root/sudo",
+      "preflightDisk": "{gb} GiB free",
+      "preflightPorts": "Occupied ports: {ports}"
     },
     "settings": {
       "defaultTag": "Mặc định",
@@ -1838,6 +1867,36 @@
         "delete": "Xóa host",
         "badTag": "Tag không hợp lệ",
         "badVlessRoute": "Nhập một số duy nhất từ 0 đến 65535"
+      }
+    },
+    "profiles": {
+      "createProfile": "Create profile",
+      "editProfile": "Edit profile",
+      "formatJson": "Format JSON",
+      "cloneConfirmTitle": "Clone profile \"{name}\"?",
+      "deleteConfirmTitle": "Delete profile \"{name}\"?",
+      "deleteConfirmContent": "This removes only the reusable template. Existing inbounds and nodes are unchanged.",
+      "summary": {
+        "total": "Total",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      },
+      "fields": {
+        "actions": "Actions",
+        "enabled": "Enabled",
+        "name": "Name",
+        "version": "Version",
+        "profile": "Profile JSON",
+        "descriptionLabel": "Description"
+      },
+      "toasts": {
+        "list": "Failed to load profiles",
+        "obtain": "Failed to load profile",
+        "add": "Profile saved",
+        "update": "Profile updated",
+        "clone": "Profile cloned",
+        "delete": "Profile deleted",
+        "invalidJson": "Profile must be valid JSON"
       }
     }
   },

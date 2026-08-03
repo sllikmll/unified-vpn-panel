@@ -111,7 +111,8 @@
     "docs": "Belgeler",
     "openMenu": "Menüyü aç",
     "pinSidebar": "Kenar çubuğunu sabitle",
-    "unpinSidebar": "Kenar çubuğu sabitlemesini kaldır"
+    "unpinSidebar": "Kenar çubuğu sabitlemesini kaldır",
+    "profiles": "Profiles"
   },
   "pages": {
     "login": {
@@ -863,9 +864,7 @@
       "addGroup": "Grup ekle",
       "createSuccess": "«{name}» grubu oluşturuldu.",
       "rename": "Yeniden adlandır",
-      "renameTitle": "{name} yeniden adlandır",
       "renameCollision": "«{name}» adında bir grup zaten var.",
-      "renameSuccess": "{count} kullanıcının grubu yeniden adlandırıldı.",
       "deleteConfirmTitle": "{name} Grubunu Sil?",
       "deleteConfirmContent": "Bu işlem grubu siler ve etiketini {count} kullanıcıdan kaldırır. Kullanıcılar silinmez.",
       "deleteSuccess": "{count} kullanıcının grubu temizlendi.",
@@ -889,7 +888,15 @@
       "removeFromGroup": "Kullanıcı Çıkar…",
       "removeFromGroupTitle": "«{name}» Grubundan Kullanıcı Çıkar",
       "removeFromGroupDesc": "Bu gruptan çıkarılacak üyeleri seçin. Kullanıcılar korunur (tamamen kaldırmak için «Gruptaki kullanıcıları sil» kullanın).",
-      "removeFromGroupResult": "{name} grubundan {count} kullanıcı çıkarıldı."
+      "removeFromGroupResult": "{name} grubundan {count} kullanıcı çıkarıldı.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "Düğüm Ekle",
@@ -973,7 +980,8 @@
         "updateStarted": "Panel güncellemesi başlatıldı",
         "updateResult": "{ok} düğümde güncelleme başlatıldı, {failed} başarısız",
         "updateNoneEligible": "En az bir çevrimiçi ve etkin düğüm seçin",
-        "saveMtls": "Düğüm mTLS kaydet"
+        "saveMtls": "Düğüm mTLS kaydet",
+        "preflight": "SSH preflight"
       },
       "tlsVerifyMode": "TLS Doğrulaması",
       "tlsVerifyModeHint": "Panelin düğümün HTTPS sertifikasını nasıl doğrulayacağını belirler. Sabitle veya Atla, kendinden imzalı sertifikalar içindir (yalnızca https düğümleri).",
@@ -1001,7 +1009,28 @@
       "pinnedCertPlaceholder": "base64 veya hex SHA-256",
       "fetchPin": "Getir",
       "pinFetched": "Düğümün geçerli sertifikası alındı",
-      "pinFetchFailed": "Sertifika alınamadı"
+      "pinFetchFailed": "Sertifika alınamadı",
+      "sshPreflight": "SSH preflight",
+      "sshUsername": "SSH username",
+      "sshPort": "SSH port",
+      "sshAuthMethod": "SSH authentication",
+      "sshPrivateKey": "Private key",
+      "sshPassword": "Password",
+      "sshPrivateKeyPassphrase": "Private key passphrase",
+      "sshHostKeyMode": "SSH host key verification",
+      "sshKnownHosts": "known_hosts entry",
+      "sshHostKeyPin": "Fingerprint pin",
+      "sshHostKeyInsecure": "Insecure opt-in",
+      "sshHostKeyFingerprint": "Host key fingerprint",
+      "sshHostKeyInsecureWarning": "Insecure mode skips SSH host-key verification. Use only for one-time bootstrap on a trusted network.",
+      "runPreflight": "Run SSH preflight",
+      "preflightComplete": "SSH preflight complete",
+      "preflightFailed": "SSH preflight failed",
+      "preflightReady": "Node is ready for provisioning",
+      "preflightNeedsAttention": "Node needs attention before provisioning",
+      "preflightPrivilege": "root/sudo",
+      "preflightDisk": "{gb} GiB free",
+      "preflightPorts": "Occupied ports: {ports}"
     },
     "settings": {
       "defaultTag": "Varsayılan",
@@ -1838,6 +1867,36 @@
         "delete": "Host'u sil",
         "badTag": "Geçersiz etiket",
         "badVlessRoute": "0 ile 65535 arasında tek bir sayı girin"
+      }
+    },
+    "profiles": {
+      "createProfile": "Create profile",
+      "editProfile": "Edit profile",
+      "formatJson": "Format JSON",
+      "cloneConfirmTitle": "Clone profile \"{name}\"?",
+      "deleteConfirmTitle": "Delete profile \"{name}\"?",
+      "deleteConfirmContent": "This removes only the reusable template. Existing inbounds and nodes are unchanged.",
+      "summary": {
+        "total": "Total",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      },
+      "fields": {
+        "actions": "Actions",
+        "enabled": "Enabled",
+        "name": "Name",
+        "version": "Version",
+        "profile": "Profile JSON",
+        "descriptionLabel": "Description"
+      },
+      "toasts": {
+        "list": "Failed to load profiles",
+        "obtain": "Failed to load profile",
+        "add": "Profile saved",
+        "update": "Profile updated",
+        "clone": "Profile cloned",
+        "delete": "Profile deleted",
+        "invalidJson": "Profile must be valid JSON"
       }
     }
   },

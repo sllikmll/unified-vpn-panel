@@ -8,13 +8,16 @@ import {
   Dropdown,
   Form,
   Input,
+  InputNumber,
   Layout,
   Modal,
   Result,
   Row,
+  Select,
   Space,
   Spin,
   Statistic,
+  Switch,
   Table,
   Tag,
   Tooltip,
@@ -49,6 +52,7 @@ import { setMessageInstance } from '@/utils/messageBus';
 import AppSidebar from '@/layouts/AppSidebar';
 import { LazyMount } from '@/components/utility';
 import { keys } from '@/api/queryKeys';
+import { useInboundOptions } from '@/api/queries/useInboundOptions';
 import {
   ClientRecordSchema,
   GroupSummaryListSchema,
@@ -65,6 +69,35 @@ const GroupAddClientsModal = lazy(() => import('./GroupAddClientsModal'));
 const GroupRemoveClientsModal = lazy(() => import('./GroupRemoveClientsModal'));
 
 const JSON_HEADERS = { headers: { 'Content-Type': 'application/json' } } as const;
+
+interface GroupFormState {
+  name: string;
+  description: string;
+  enable: boolean;
+  assignedInboundIds: number[];
+  defaultTotalGB: number;
+  defaultExpiryTime: number;
+}
+
+const emptyGroupForm: GroupFormState = {
+  name: '',
+  description: '',
+  enable: true,
+  assignedInboundIds: [],
+  defaultTotalGB: 0,
+  defaultExpiryTime: 0,
+};
+
+function groupToForm(group: GroupSummary): GroupFormState {
+  return {
+    name: group.name,
+    description: group.description || '',
+    enable: group.enable !== false,
+    assignedInboundIds: group.assignedInboundIds || [],
+    defaultTotalGB: Math.max(0, group.defaultTotalGB || 0),
+    defaultExpiryTime: Math.max(0, group.defaultExpiryTime || 0),
+  };
+}
 
 async function fetchGroups(): Promise<GroupSummary[]> {
   const msg = await HttpUtil.get('/panel/api/clients/groups', undefined, { silent: true });
@@ -94,6 +127,7 @@ export default function GroupsPage() {
   const queryClient = useQueryClient();
 
   const { subSettings, bulkAdjust, bulkAddToGroup, bulkRemoveFromGroup, bulkDelete } = useClients({ list: false });
+  const inboundOptionsQuery = useInboundOptions();
 
   const groupsQuery = useQuery({
     queryKey: keys.clients.groups(),
@@ -109,14 +143,33 @@ export default function GroupsPage() {
   }, [queryClient]);
 
   const createMut = useMutation({
-    mutationFn: (body: { name: string }) =>
-      HttpUtil.post('/panel/api/clients/groups/create', body, JSON_HEADERS),
+    mutationFn: (body: GroupFormState) =>
+      HttpUtil.post('/panel/api/clients/groups/create', {
+        name: body.name,
+        description: body.description,
+        enable: body.enable,
+        assignedInboundIds: body.assignedInboundIds,
+        policy: {
+          defaultTotalGB: body.defaultTotalGB,
+          defaultExpiryTime: body.defaultExpiryTime,
+        },
+      }, JSON_HEADERS),
     onSuccess: (msg) => { if (msg?.success) invalidate(); },
   });
 
-  const renameMut = useMutation({
-    mutationFn: (body: { oldName: string; newName: string }) =>
-      HttpUtil.post('/panel/api/clients/groups/rename', body, JSON_HEADERS),
+  const updateMut = useMutation({
+    mutationFn: (body: { oldName: string } & GroupFormState) =>
+      HttpUtil.post('/panel/api/clients/groups/update', {
+        oldName: body.oldName,
+        name: body.name,
+        description: body.description,
+        enable: body.enable,
+        assignedInboundIds: body.assignedInboundIds,
+        policy: {
+          defaultTotalGB: body.defaultTotalGB,
+          defaultExpiryTime: body.defaultExpiryTime,
+        },
+      }, JSON_HEADERS),
     onSuccess: (msg) => { if (msg?.success) invalidate(); },
   });
 
@@ -133,11 +186,11 @@ export default function GroupsPage() {
   });
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [createName, setCreateName] = useState('');
+  const [createForm, setCreateForm] = useState<GroupFormState>(emptyGroupForm);
 
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<GroupSummary | null>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [renameForm, setRenameForm] = useState<GroupFormState>(emptyGroupForm);
 
   const [subLinksOpen, setSubLinksOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -178,18 +231,18 @@ export default function GroupsPage() {
   );
 
   function openCreate() {
-    setCreateName('');
+    setCreateForm(emptyGroupForm);
     setCreateOpen(true);
   }
 
   async function confirmCreate() {
-    const name = createName.trim();
+    const name = createForm.name.trim();
     if (!name) return;
     if (groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) {
       messageApi.error(t('pages.groups.renameCollision', { name }));
       return;
     }
-    const msg = await createMut.mutateAsync({ name });
+    const msg = await createMut.mutateAsync({ ...createForm, name });
     if (msg?.success) {
       messageApi.success(t('pages.groups.createSuccess', { name }));
       setCreateOpen(false);
@@ -198,14 +251,24 @@ export default function GroupsPage() {
 
   function openRename(g: GroupSummary) {
     setRenameTarget(g);
-    setRenameValue(g.name);
+    setRenameForm(groupToForm(g));
     setRenameOpen(true);
   }
 
   async function confirmRename() {
     if (!renameTarget) return;
-    const next = renameValue.trim();
-    if (!next || next === renameTarget.name) {
+    const next = renameForm.name.trim();
+    if (!next) {
+      return;
+    }
+    const sameMetadata =
+      next === renameTarget.name &&
+      renameForm.description === (renameTarget.description || '') &&
+      renameForm.enable === (renameTarget.enable !== false) &&
+      JSON.stringify([...renameForm.assignedInboundIds].sort()) === JSON.stringify([...(renameTarget.assignedInboundIds || [])].sort()) &&
+      renameForm.defaultTotalGB === (renameTarget.defaultTotalGB || 0) &&
+      renameForm.defaultExpiryTime === (renameTarget.defaultExpiryTime || 0);
+    if (sameMetadata) {
       setRenameOpen(false);
       return;
     }
@@ -213,10 +276,10 @@ export default function GroupsPage() {
       messageApi.error(t('pages.groups.renameCollision', { name: next }));
       return;
     }
-    const msg = await renameMut.mutateAsync({ oldName: renameTarget.name, newName: next });
+    const msg = await updateMut.mutateAsync({ ...renameForm, oldName: renameTarget.name, name: next });
     if (msg?.success) {
       const affected = (msg.obj as { affected?: number } | undefined)?.affected ?? 0;
-      messageApi.success(t('pages.groups.renameSuccess', { count: affected }));
+      messageApi.success(t('pages.groups.updateSuccess', { count: affected }));
       setRenameOpen(false);
     }
   }
@@ -416,7 +479,45 @@ export default function GroupsPage() {
       title: t('pages.groups.name'),
       dataIndex: 'name',
       key: 'name',
-      render: (name: string) => <Tag color="geekblue" style={{ margin: 0, fontSize: 13 }}>{name}</Tag>,
+      render: (name: string, row) => (
+        <Space direction="vertical" size={2}>
+          <Space size={6} wrap>
+            <Tag color="geekblue" style={{ margin: 0, fontSize: 13 }}>{name}</Tag>
+            <Tag color={row.enable === false ? 'default' : 'success'}>{row.enable === false ? t('disabled') : t('enable')}</Tag>
+          </Space>
+          {row.description ? <span style={{ color: 'rgba(0,0,0,0.55)' }}>{row.description}</span> : null}
+        </Space>
+      ),
+    },
+    {
+      title: t('pages.groups.assignedInbounds'),
+      dataIndex: 'assignedInboundIds',
+      key: 'assignedInboundIds',
+      width: 220,
+      render: (ids: number[]) => {
+        if (!ids?.length) return <span style={{ color: 'rgba(0,0,0,0.45)' }}>—</span>;
+        const byId = new Map((inboundOptionsQuery.data ?? []).map((ib) => [ib.id, ib]));
+        return (
+          <Space size={[4, 4]} wrap>
+            {ids.map((id) => {
+              const ib = byId.get(id);
+              return <Tag key={id}>{ib ? `${ib.remark || ib.tag} · ${ib.protocol}` : `#${id}`}</Tag>;
+            })}
+          </Space>
+        );
+      },
+    },
+    {
+      title: t('pages.groups.defaults'),
+      key: 'defaults',
+      width: 220,
+      render: (_value, row) => (
+        <Space size={[4, 4]} wrap>
+          {row.defaultTotalGB > 0 ? <Tag>{SizeFormatter.sizeFormat(row.defaultTotalGB)}</Tag> : null}
+          {row.defaultExpiryTime > 0 ? <Tag>{new Date(row.defaultExpiryTime).toLocaleDateString()}</Tag> : null}
+          {row.defaultTotalGB <= 0 && row.defaultExpiryTime <= 0 ? <span style={{ color: 'rgba(0,0,0,0.45)' }}>—</span> : null}
+        </Space>
+      ),
     },
     {
       title: t('pages.groups.clientCount'),
@@ -565,22 +666,56 @@ export default function GroupsPage() {
           <Form layout="vertical">
             <Form.Item label={t('pages.groups.name')}>
               <Input
-                value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
+                value={createForm.name}
+                onChange={(e) => setCreateForm((v) => ({ ...v, name: e.target.value }))}
                 onPressEnter={confirmCreate}
                 placeholder={t('pages.clients.groupPlaceholder')}
                 autoFocus
               />
             </Form.Item>
+            <Form.Item label={t('pages.groups.descriptionLabel')}>
+              <Input.TextArea
+                value={createForm.description}
+                onChange={(e) => setCreateForm((v) => ({ ...v, description: e.target.value }))}
+                autoSize={{ minRows: 2, maxRows: 4 }}
+              />
+            </Form.Item>
+            <Form.Item label={t('pages.groups.enabled')} valuePropName="checked">
+              <Switch checked={createForm.enable} onChange={(enable) => setCreateForm((v) => ({ ...v, enable }))} />
+            </Form.Item>
+            <Form.Item label={t('pages.groups.assignedInbounds')}>
+              <Select
+                mode="multiple"
+                value={createForm.assignedInboundIds}
+                onChange={(assignedInboundIds) => setCreateForm((v) => ({ ...v, assignedInboundIds }))}
+                options={(inboundOptionsQuery.data ?? []).map((ib) => ({
+                  value: ib.id,
+                  label: `${ib.remark || ib.tag} · ${ib.protocol}`,
+                }))}
+                loading={inboundOptionsQuery.isFetching}
+              />
+            </Form.Item>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item label={t('pages.groups.defaultTraffic')}>
+                  <InputNumber min={0} value={createForm.defaultTotalGB} onChange={(defaultTotalGB) => setCreateForm((v) => ({ ...v, defaultTotalGB: Number(defaultTotalGB || 0) }))} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label={t('pages.groups.defaultExpiry')}>
+                  <InputNumber min={0} value={createForm.defaultExpiryTime} onChange={(defaultExpiryTime) => setCreateForm((v) => ({ ...v, defaultExpiryTime: Number(defaultExpiryTime || 0) }))} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            </Row>
           </Form>
         </Modal>
 
         <Modal
           open={renameOpen}
-          title={renameTarget ? t('pages.groups.renameTitle', { name: renameTarget.name }) : ''}
+          title={renameTarget ? t('pages.groups.editTitle', { name: renameTarget.name }) : ''}
           okText={t('save')}
           cancelText={t('cancel')}
-          confirmLoading={renameMut.isPending}
+          confirmLoading={updateMut.isPending}
           onCancel={() => setRenameOpen(false)}
           onOk={confirmRename}
           destroyOnHidden
@@ -588,13 +723,47 @@ export default function GroupsPage() {
           <Form layout="vertical">
             <Form.Item label={t('pages.groups.name')}>
               <Input
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
+                value={renameForm.name}
+                onChange={(e) => setRenameForm((v) => ({ ...v, name: e.target.value }))}
                 onPressEnter={confirmRename}
                 placeholder={t('pages.clients.groupPlaceholder')}
                 autoFocus
               />
             </Form.Item>
+            <Form.Item label={t('pages.groups.descriptionLabel')}>
+              <Input.TextArea
+                value={renameForm.description}
+                onChange={(e) => setRenameForm((v) => ({ ...v, description: e.target.value }))}
+                autoSize={{ minRows: 2, maxRows: 4 }}
+              />
+            </Form.Item>
+            <Form.Item label={t('pages.groups.enabled')} valuePropName="checked">
+              <Switch checked={renameForm.enable} onChange={(enable) => setRenameForm((v) => ({ ...v, enable }))} />
+            </Form.Item>
+            <Form.Item label={t('pages.groups.assignedInbounds')}>
+              <Select
+                mode="multiple"
+                value={renameForm.assignedInboundIds}
+                onChange={(assignedInboundIds) => setRenameForm((v) => ({ ...v, assignedInboundIds }))}
+                options={(inboundOptionsQuery.data ?? []).map((ib) => ({
+                  value: ib.id,
+                  label: `${ib.remark || ib.tag} · ${ib.protocol}`,
+                }))}
+                loading={inboundOptionsQuery.isFetching}
+              />
+            </Form.Item>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item label={t('pages.groups.defaultTraffic')}>
+                  <InputNumber min={0} value={renameForm.defaultTotalGB} onChange={(defaultTotalGB) => setRenameForm((v) => ({ ...v, defaultTotalGB: Number(defaultTotalGB || 0) }))} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label={t('pages.groups.defaultExpiry')}>
+                  <InputNumber min={0} value={renameForm.defaultExpiryTime} onChange={(defaultExpiryTime) => setRenameForm((v) => ({ ...v, defaultExpiryTime: Number(defaultExpiryTime || 0) }))} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            </Row>
           </Form>
         </Modal>
 

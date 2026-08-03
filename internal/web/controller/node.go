@@ -37,6 +37,7 @@ func (a *NodeController) initRouter(g *gin.RouterGroup) {
 	g.POST("/setEnable/:id", a.setEnable)
 
 	g.POST("/test", a.test)
+	g.POST("/preflight", a.preflight)
 	g.POST("/certFingerprint", a.certFingerprint)
 	g.POST("/inbounds", a.inbounds)
 	g.POST("/probe/:id", a.probe)
@@ -272,6 +273,21 @@ func (a *NodeController) test(c *gin.Context) {
 		patch, err = a.nodeService.Probe(ctx, runtimeNode)
 	}
 	jsonObj(c, patch.ToUI(err == nil), nil)
+}
+
+func (a *NodeController) preflight(c *gin.Context) {
+	req, ok := middleware.BindAndValidate[service.NodePreflightRequest](c)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 65*time.Second)
+	defer cancel()
+	result, err := a.nodeService.Preflight(ctx, req)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.nodes.toasts.preflight"), err)
+		return
+	}
+	jsonObj(c, result, nil)
 }
 
 func (a *NodeController) certFingerprint(c *gin.Context) {

@@ -12,6 +12,9 @@ export type Protocol = z.infer<typeof ProtocolSchema>;
 export const SubLinkProviderSchema = z.unknown();
 export type SubLinkProvider = z.infer<typeof SubLinkProviderSchema>;
 
+export const nodeSSHRunnerSchema = z.unknown();
+export type nodeSSHRunner = z.infer<typeof nodeSSHRunnerSchema>;
+
 export const staticEgressResolverSchema = z.string();
 export type staticEgressResolver = z.infer<typeof staticEgressResolverSchema>;
 
@@ -345,11 +348,79 @@ export const ClientTrafficSchema = z.object({
 });
 export type ClientTraffic = z.infer<typeof ClientTrafficSchema>;
 
+export const ConfigProfileSchema = z.object({
+  createdAt: z.number().int(),
+  description: z.string().max(1024),
+  enabled: z.boolean(),
+  id: z.number().int(),
+  name: z.string().max(128),
+  profile: z.string(),
+  updatedAt: z.number().int(),
+  version: z.number().int().min(1),
+});
+export type ConfigProfile = z.infer<typeof ConfigProfileSchema>;
+
+export const ConfigProfileNodeAssignmentSchema = z.object({
+  createdAt: z.number().int(),
+  enabled: z.boolean(),
+  nodeId: z.number().int(),
+  profileId: z.number().int(),
+  updatedAt: z.number().int(),
+});
+export type ConfigProfileNodeAssignment = z.infer<typeof ConfigProfileNodeAssignmentSchema>;
+
 export const FallbackParentInfoSchema = z.object({
   masterId: z.number().int(),
   path: z.string().optional(),
 });
 export type FallbackParentInfo = z.infer<typeof FallbackParentInfoSchema>;
+
+export const GroupApplyResultSchema = z.object({
+  affected: z.number().int(),
+  attached: z.number().int(),
+  detached: z.number().int(),
+  updated: z.number().int(),
+});
+export type GroupApplyResult = z.infer<typeof GroupApplyResultSchema>;
+
+export const GroupPolicySchema = z.object({
+  defaultExpiryTime: z.number().int(),
+  defaultTotalGB: z.number().int(),
+});
+export type GroupPolicy = z.infer<typeof GroupPolicySchema>;
+
+export const GroupSummarySchema = z.object({
+  assignedInboundIds: z.array(z.number().int()),
+  clientCount: z.number().int(),
+  defaultExpiryTime: z.number().int(),
+  defaultTotalGB: z.number().int(),
+  description: z.string(),
+  down: z.number().int(),
+  enable: z.boolean(),
+  name: z.string(),
+  trafficUsed: z.number().int(),
+  up: z.number().int(),
+});
+export type GroupSummary = z.infer<typeof GroupSummarySchema>;
+
+export const GroupUpdateRequestSchema = z.object({
+  assignedInboundIds: z.array(z.number().int()),
+  description: z.string(),
+  enable: z.boolean(),
+  name: z.string(),
+  oldName: z.string(),
+  policy: z.lazy(() => GroupPolicySchema),
+});
+export type GroupUpdateRequest = z.infer<typeof GroupUpdateRequestSchema>;
+
+export const GroupUpsertRequestSchema = z.object({
+  assignedInboundIds: z.array(z.number().int()),
+  description: z.string(),
+  enable: z.boolean(),
+  name: z.string(),
+  policy: z.lazy(() => GroupPolicySchema),
+});
+export type GroupUpsertRequest = z.infer<typeof GroupUpsertRequestSchema>;
 
 export const HistoryOfSeedersSchema = z.object({
   id: z.number().int(),
@@ -569,6 +640,48 @@ export const NodeMutationRequestSchema = z.object({
   tlsVerifyMode: z.enum(['verify', 'skip', 'pin', 'mtls']),
 });
 export type NodeMutationRequest = z.infer<typeof NodeMutationRequestSchema>;
+
+export const NodePreflightErrorSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+});
+export type NodePreflightError = z.infer<typeof NodePreflightErrorSchema>;
+
+export const NodePreflightRequestSchema = z.object({
+  address: z.string(),
+  authMethod: z.enum(['password', 'privateKey']),
+  hostKeyFingerprint: z.string(),
+  hostKeyMode: z.enum(['known_hosts', 'pin', 'insecure']),
+  knownHosts: z.string(),
+  password: z.string().nullable().optional(),
+  port: z.number().int().min(1).max(65535),
+  privateKey: z.string().nullable().optional(),
+  privateKeyPassphrase: z.string().nullable().optional(),
+  timeoutSeconds: z.number().int(),
+  username: z.string(),
+});
+export type NodePreflightRequest = z.infer<typeof NodePreflightRequestSchema>;
+
+export const NodePreflightResultSchema = z.object({
+  arch: z.string(),
+  docker: z.boolean(),
+  errors: z.array(z.lazy(() => NodePreflightErrorSchema)),
+  freeDiskBytes: z.number().int(),
+  hostname: z.string(),
+  occupiedPorts: z.array(z.number().int()),
+  os: z.string(),
+  provisioning: z.lazy(() => NodeProvisioningPlanSchema),
+  root: z.boolean(),
+  sudo: z.boolean(),
+  systemd: z.boolean(),
+});
+export type NodePreflightResult = z.infer<typeof NodePreflightResultSchema>;
+
+export const NodeProvisioningPlanSchema = z.object({
+  canInstall: z.boolean(),
+  warnings: z.array(z.string()),
+});
+export type NodeProvisioningPlan = z.infer<typeof NodeProvisioningPlanSchema>;
 
 export const NodeViewSchema = z.object({
   activeCount: z.number().int(),

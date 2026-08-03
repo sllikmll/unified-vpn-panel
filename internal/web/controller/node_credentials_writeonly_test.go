@@ -124,6 +124,33 @@ func TestNodeControllerAddAcceptsTokenButReturnsView(t *testing.T) {
 	}
 }
 
+func TestNodeControllerPreflightDoesNotLeakSSHSecretsOnValidationError(t *testing.T) {
+	engine := newNodeCredentialTestEngine(t)
+	payload := map[string]any{
+		"address":     "node.example.com",
+		"port":        22,
+		"username":    "root",
+		"authMethod":  "password",
+		"password":    "input-ssh-secret",
+		"hostKeyMode": "known_hosts",
+	}
+	raw, _ := json.Marshal(payload)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/panel/api/nodes/preflight", strings.NewReader(string(raw)))
+	req.Header.Set("Content-Type", "application/json")
+	engine.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("preflight status = %d body=%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if strings.Contains(body, "input-ssh-secret") || strings.Contains(body, "password") {
+		t.Fatalf("preflight response leaked ssh secret: %s", body)
+	}
+	if !strings.Contains(body, "knownHosts") {
+		t.Fatalf("preflight response did not report validation context: %s", body)
+	}
+}
+
 func TestNodeControllerUpdateBlankApiTokenKeepsStoredToken(t *testing.T) {
 	engine := newNodeCredentialTestEngine(t)
 

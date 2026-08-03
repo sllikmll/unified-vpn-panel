@@ -773,7 +773,7 @@ export const sections: readonly Section[] = [
       {
         method: 'GET',
         path: '/panel/api/clients/groups',
-        summary: 'List all client groups with their member counts. Merges persisted groups (rows in client_groups, including empty placeholders) with the distinct group_name values currently set on clients. Sorted alphabetically (case-insensitive).',
+        summary: 'List all client groups/squads with their member counts, metadata, assigned inbound IDs and optional default traffic/expiry policy. Membership is still the existing clients.group_name label; no second squad membership table is introduced.',
         response: '{\n  "success": true,\n  "obj": [\n    { "name": "customer-a", "clientCount": 5 },\n    { "name": "internal", "clientCount": 0 }\n  ]\n}',
       },
       {
@@ -788,9 +788,16 @@ export const sections: readonly Section[] = [
       {
         method: 'POST',
         path: '/panel/api/clients/groups/create',
-        summary: 'Create a new empty (placeholder) group. The group becomes selectable in client forms and the filter drawer even before any client is added to it. Errors if a group with the same name already exists.',
-        body: '{\n  "name": "customer-a"\n}',
+        summary: 'Create a new group/squad row with optional description, enabled status, assigned inbound IDs and traffic/expiry defaults. Assigned inbounds are applied to current members through the client service runtime path.',
+        body: '{\n  "name": "customer-a",\n  "description": "Team access",\n  "enable": true,\n  "assignedInboundIds": [7, 9],\n  "policy": {\n    "defaultTotalGB": 107374182400,\n    "defaultExpiryTime": 1893456000000\n  }\n}',
         response: '{\n  "success": true,\n  "obj": {\n    "name": "customer-a"\n  }\n}',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/clients/groups/update',
+        summary: 'Update group/squad metadata and assignments. If name changes, the existing group label is renamed; assigned inbound membership and policy defaults are applied through runtime-aware client operations.',
+        body: '{\n  "oldName": "customer-a",\n  "name": "tier-1",\n  "description": "Tier 1 users",\n  "enable": true,\n  "assignedInboundIds": [7, 9],\n  "policy": {\n    "defaultTotalGB": 107374182400,\n    "defaultExpiryTime": 1893456000000\n  }\n}',
+        response: '{\n  "success": true,\n  "obj": {\n    "affected": 5,\n    "attached": 10,\n    "detached": 0,\n    "updated": 5\n  }\n}',
       },
       {
         method: 'POST',
@@ -812,6 +819,13 @@ export const sections: readonly Section[] = [
         summary: 'Reset only the group-level traffic counter shown on the groups page. Snapshots the current up/down sum of the group\'s members as a baseline so the group total reads zero, while leaving each client\'s own counters (and their quotas) untouched. No Xray restart is triggered. Creates the client_groups row if the group exists only as a derived label.',
         body: '{\n  "name": "customer-a"\n}',
         response: '{\n  "success": true,\n  "obj": {\n    "name": "customer-a"\n  }\n}',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/clients/groups/applyAssignments',
+        summary: 'Reapply a group/squad assigned-inbound and policy-default configuration to current members. This is useful after importing clients or repairing drift; all client changes go through runtime-aware client operations.',
+        body: '{\n  "name": "customer-a"\n}',
+        response: '{\n  "success": true,\n  "obj": {\n    "affected": 0,\n    "attached": 3,\n    "detached": 1,\n    "updated": 2\n  }\n}',
       },
       {
         method: 'POST',
@@ -996,6 +1010,13 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'POST',
+        path: '/panel/api/nodes/preflight',
+        summary: 'Run an ephemeral SSH preflight against a candidate node without saving credentials. Supports write-only password or private-key auth, strict host-key verification by known_hosts or fingerprint pin, and explicit insecure opt-in. Returns OS, arch, hostname, privilege capability, systemd/Docker, free disk, occupied ports, and provisioning readiness.',
+        body: '{\n  "address": "node1.example.com",\n  "port": 22,\n  "username": "root",\n  "authMethod": "privateKey",\n  "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----\\n...\\n-----END OPENSSH PRIVATE KEY-----",\n  "hostKeyMode": "known_hosts",\n  "knownHosts": "node1.example.com ssh-ed25519 AAAA..."\n}',
+        responseSchema: 'NodePreflightResult',
+      },
+      {
+        method: 'POST',
         path: '/panel/api/nodes/certFingerprint',
         summary: "Connect to the node over HTTPS without verifying its certificate and return the leaf certificate's SHA-256 (base64). Used by the Add/Edit Node dialog to fetch and pin a self-signed certificate. Uses the same body as /test.",
         body: '{\n  "scheme": "https",\n  "address": "node1.example.com",\n  "port": 2053,\n  "basePath": "/"\n}',
@@ -1135,6 +1156,75 @@ export const sections: readonly Section[] = [
         path: '/panel/api/hosts/bulk/del',
         summary: 'Delete many host groups in one call.',
         body: '{\n  "ids": ["abc-123", "def-456"]\n}',
+      },
+    ],
+  },
+
+  {
+    id: 'profiles',
+    title: 'Config Profiles',
+    description:
+      'Reusable protocol/config profile templates. Profiles store canonical JSON documents and never include credentials or per-client secrets. Rollout and node assignment are intentionally out of scope for these endpoints.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/panel/api/profiles/list',
+        summary: 'List every reusable config profile ordered by name.',
+        responseSchema: 'ConfigProfile',
+        responseSchemaArray: true,
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/profiles/get/:id',
+        summary: 'Fetch one config profile by id.',
+        params: [
+          { name: 'id', in: 'path', type: 'number', desc: 'Config profile ID.' },
+        ],
+        responseSchema: 'ConfigProfile',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/profiles/add',
+        summary: 'Create a config profile. The profile JSON is validated, canonicalized, checked for port conflicts, and rejected if it contains secret-like fields.',
+        body: '{\n  "name": "VLESS Reality TCP",\n  "description": "Reusable edge template without credentials",\n  "enabled": true,\n  "version": 1,\n  "profile": "{\\"inbounds\\":[{\\"protocol\\":\\"vless\\",\\"port\\":443}]}"\n}',
+        responseSchema: 'ConfigProfile',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/profiles/update/:id',
+        summary: 'Replace an existing config profile after the same validation and canonicalization used by create.',
+        params: [
+          { name: 'id', in: 'path', type: 'number', desc: 'Config profile ID.' },
+        ],
+        body: '{\n  "name": "VLESS Reality TCP",\n  "description": "Reusable edge template without credentials",\n  "enabled": true,\n  "version": 2,\n  "profile": "{\\"inbounds\\":[{\\"protocol\\":\\"vless\\",\\"port\\":443}]}"\n}',
+        responseSchema: 'ConfigProfile',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/profiles/clone/:id',
+        summary: 'Clone a config profile under a new name.',
+        params: [
+          { name: 'id', in: 'path', type: 'number', desc: 'Source config profile ID.' },
+        ],
+        body: '{\n  "name": "VLESS Reality TCP copy"\n}',
+        responseSchema: 'ConfigProfile',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/profiles/del/:id',
+        summary: 'Delete a config profile. This does not affect inbounds or nodes because rollout is not implemented yet.',
+        params: [
+          { name: 'id', in: 'path', type: 'number', desc: 'Config profile ID.' },
+        ],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/profiles/setEnable/:id',
+        summary: 'Enable or disable a config profile.',
+        params: [
+          { name: 'id', in: 'path', type: 'number', desc: 'Config profile ID.' },
+        ],
+        body: '{\n  "enabled": true\n}',
       },
     ],
   },

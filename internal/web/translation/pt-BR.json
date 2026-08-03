@@ -111,7 +111,8 @@
     "docs": "Documentação",
     "openMenu": "Abrir menu",
     "pinSidebar": "Fixar barra lateral",
-    "unpinSidebar": "Desafixar barra lateral"
+    "unpinSidebar": "Desafixar barra lateral",
+    "profiles": "Profiles"
   },
   "pages": {
     "login": {
@@ -863,9 +864,7 @@
       "addGroup": "Adicionar grupo",
       "createSuccess": "Grupo «{name}» criado.",
       "rename": "Renomear",
-      "renameTitle": "Renomear {name}",
       "renameCollision": "Já existe um grupo chamado «{name}».",
-      "renameSuccess": "Grupo renomeado em {count} cliente(s).",
       "deleteConfirmTitle": "Excluir o grupo {name}?",
       "deleteConfirmContent": "Isso remove o grupo e limpa seu rótulo de {count} cliente(s). Os clientes em si não são excluídos.",
       "deleteSuccess": "Grupo limpo de {count} cliente(s).",
@@ -889,7 +888,15 @@
       "removeFromGroup": "Remover clientes…",
       "removeFromGroupTitle": "Remover clientes do grupo «{name}»",
       "removeFromGroupDesc": "Selecione membros para remover deste grupo. Os clientes em si são mantidos (use «Excluir clientes do grupo» para removê-los por completo).",
-      "removeFromGroupResult": "Removidos {count} cliente(s) de {name}."
+      "removeFromGroupResult": "Removidos {count} cliente(s) de {name}.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "Adicionar nó",
@@ -973,7 +980,8 @@
         "updateStarted": "Atualização do painel iniciada",
         "updateResult": "Atualização iniciada em {ok} nó(s), {failed} falharam",
         "updateNoneEligible": "Selecione pelo menos um nó online e ativo",
-        "saveMtls": "Salvar mTLS do nó"
+        "saveMtls": "Salvar mTLS do nó",
+        "preflight": "SSH preflight"
       },
       "tlsVerifyMode": "Verificação TLS",
       "tlsVerifyModeHint": "Como o painel valida o certificado HTTPS do nó. Fixar ou Ignorar são para certificados autoassinados (apenas nós https).",
@@ -1001,7 +1009,28 @@
       "pinnedCertPlaceholder": "SHA-256 em base64 ou hex",
       "fetchPin": "Obter",
       "pinFetched": "Certificado atual do nó obtido",
-      "pinFetchFailed": "Não foi possível obter o certificado"
+      "pinFetchFailed": "Não foi possível obter o certificado",
+      "sshPreflight": "SSH preflight",
+      "sshUsername": "SSH username",
+      "sshPort": "SSH port",
+      "sshAuthMethod": "SSH authentication",
+      "sshPrivateKey": "Private key",
+      "sshPassword": "Password",
+      "sshPrivateKeyPassphrase": "Private key passphrase",
+      "sshHostKeyMode": "SSH host key verification",
+      "sshKnownHosts": "known_hosts entry",
+      "sshHostKeyPin": "Fingerprint pin",
+      "sshHostKeyInsecure": "Insecure opt-in",
+      "sshHostKeyFingerprint": "Host key fingerprint",
+      "sshHostKeyInsecureWarning": "Insecure mode skips SSH host-key verification. Use only for one-time bootstrap on a trusted network.",
+      "runPreflight": "Run SSH preflight",
+      "preflightComplete": "SSH preflight complete",
+      "preflightFailed": "SSH preflight failed",
+      "preflightReady": "Node is ready for provisioning",
+      "preflightNeedsAttention": "Node needs attention before provisioning",
+      "preflightPrivilege": "root/sudo",
+      "preflightDisk": "{gb} GiB free",
+      "preflightPorts": "Occupied ports: {ports}"
     },
     "settings": {
       "defaultTag": "Padrão",
@@ -1838,6 +1867,36 @@
         "delete": "Excluir host",
         "badTag": "Tag inválida",
         "badVlessRoute": "Insira um único número entre 0 e 65535"
+      }
+    },
+    "profiles": {
+      "createProfile": "Create profile",
+      "editProfile": "Edit profile",
+      "formatJson": "Format JSON",
+      "cloneConfirmTitle": "Clone profile \"{name}\"?",
+      "deleteConfirmTitle": "Delete profile \"{name}\"?",
+      "deleteConfirmContent": "This removes only the reusable template. Existing inbounds and nodes are unchanged.",
+      "summary": {
+        "total": "Total",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      },
+      "fields": {
+        "actions": "Actions",
+        "enabled": "Enabled",
+        "name": "Name",
+        "version": "Version",
+        "profile": "Profile JSON",
+        "descriptionLabel": "Description"
+      },
+      "toasts": {
+        "list": "Failed to load profiles",
+        "obtain": "Failed to load profile",
+        "add": "Profile saved",
+        "update": "Profile updated",
+        "clone": "Profile cloned",
+        "delete": "Profile deleted",
+        "invalidJson": "Profile must be valid JSON"
       }
     }
   },

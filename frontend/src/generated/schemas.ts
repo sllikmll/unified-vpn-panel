@@ -1337,6 +1337,92 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "ConfigProfile": {
+    "properties": {
+      "createdAt": {
+        "example": 1700000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "description": {
+        "example": "Reusable VLESS Reality template without client credentials.",
+        "maxLength": 1024,
+        "type": "string"
+      },
+      "enabled": {
+        "example": true,
+        "type": "boolean"
+      },
+      "id": {
+        "example": 1,
+        "type": "integer"
+      },
+      "name": {
+        "example": "VLESS Reality TCP",
+        "maxLength": 128,
+        "type": "string"
+      },
+      "profile": {
+        "example": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}",
+        "type": "string"
+      },
+      "updatedAt": {
+        "example": 1700000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "version": {
+        "example": 1,
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "createdAt",
+      "description",
+      "enabled",
+      "id",
+      "name",
+      "profile",
+      "updatedAt",
+      "version"
+    ],
+    "type": "object"
+  },
+  "ConfigProfileNodeAssignment": {
+    "properties": {
+      "createdAt": {
+        "example": 1700000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "enabled": {
+        "example": true,
+        "type": "boolean"
+      },
+      "nodeId": {
+        "example": 1,
+        "type": "integer"
+      },
+      "profileId": {
+        "example": 1,
+        "type": "integer"
+      },
+      "updatedAt": {
+        "example": 1700000000000,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "createdAt",
+      "enabled",
+      "nodeId",
+      "profileId",
+      "updatedAt"
+    ],
+    "type": "object"
+  },
   "FallbackParentInfo": {
     "description": "FallbackParentInfo carries everything the frontend needs to rewrite a\nchild inbound's client link: where to connect (the master's address\nand port) and which path matched on the master's fallbacks array.\nThe frontend already has the master inbound in its dbInbounds list,\nso we only ship identifiers + the match path here.",
     "properties": {
@@ -1349,6 +1435,196 @@ export const SCHEMAS: Record<string, unknown> = {
     },
     "required": [
       "masterId"
+    ],
+    "type": "object"
+  },
+  "GroupApplyResult": {
+    "properties": {
+      "affected": {
+        "example": 5,
+        "type": "integer"
+      },
+      "attached": {
+        "example": 10,
+        "type": "integer"
+      },
+      "detached": {
+        "example": 2,
+        "type": "integer"
+      },
+      "updated": {
+        "example": 5,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "affected",
+      "attached",
+      "detached",
+      "updated"
+    ],
+    "type": "object"
+  },
+  "GroupPolicy": {
+    "properties": {
+      "defaultExpiryTime": {
+        "example": 1893456000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "defaultTotalGB": {
+        "example": 107374182400,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "defaultExpiryTime",
+      "defaultTotalGB"
+    ],
+    "type": "object"
+  },
+  "GroupSummary": {
+    "properties": {
+      "assignedInboundIds": {
+        "example": [
+          1
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "clientCount": {
+        "example": 5,
+        "type": "integer"
+      },
+      "defaultExpiryTime": {
+        "example": 1893456000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "defaultTotalGB": {
+        "example": 107374182400,
+        "format": "int64",
+        "type": "integer"
+      },
+      "description": {
+        "example": "Team access profile",
+        "type": "string"
+      },
+      "down": {
+        "example": 524288,
+        "format": "int64",
+        "type": "integer"
+      },
+      "enable": {
+        "example": true,
+        "type": "boolean"
+      },
+      "name": {
+        "example": "customer-a",
+        "type": "string"
+      },
+      "trafficUsed": {
+        "example": 1048576,
+        "format": "int64",
+        "type": "integer"
+      },
+      "up": {
+        "example": 524288,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "assignedInboundIds",
+      "clientCount",
+      "defaultExpiryTime",
+      "defaultTotalGB",
+      "description",
+      "down",
+      "enable",
+      "name",
+      "trafficUsed",
+      "up"
+    ],
+    "type": "object"
+  },
+  "GroupUpdateRequest": {
+    "properties": {
+      "assignedInboundIds": {
+        "example": [
+          1
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "description": {
+        "example": "Team access profile",
+        "type": "string"
+      },
+      "enable": {
+        "example": true,
+        "type": "boolean"
+      },
+      "name": {
+        "example": "customer-a",
+        "type": "string"
+      },
+      "oldName": {
+        "example": "customer-a",
+        "type": "string"
+      },
+      "policy": {
+        "$ref": "#/components/schemas/GroupPolicy"
+      }
+    },
+    "required": [
+      "assignedInboundIds",
+      "description",
+      "enable",
+      "name",
+      "oldName",
+      "policy"
+    ],
+    "type": "object"
+  },
+  "GroupUpsertRequest": {
+    "properties": {
+      "assignedInboundIds": {
+        "example": [
+          1
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "description": {
+        "example": "Team access profile",
+        "type": "string"
+      },
+      "enable": {
+        "example": true,
+        "type": "boolean"
+      },
+      "name": {
+        "example": "customer-a",
+        "type": "string"
+      },
+      "policy": {
+        "$ref": "#/components/schemas/GroupPolicy"
+      }
+    },
+    "required": [
+      "assignedInboundIds",
+      "description",
+      "enable",
+      "name",
+      "policy"
     ],
     "type": "object"
   },
@@ -2343,6 +2619,189 @@ export const SCHEMAS: Record<string, unknown> = {
       "remark",
       "scheme",
       "tlsVerifyMode"
+    ],
+    "type": "object"
+  },
+  "NodePreflightError": {
+    "properties": {
+      "code": {
+        "example": "docker_missing",
+        "type": "string"
+      },
+      "message": {
+        "example": "Docker is not installed",
+        "type": "string"
+      }
+    },
+    "required": [
+      "code",
+      "message"
+    ],
+    "type": "object"
+  },
+  "NodePreflightRequest": {
+    "properties": {
+      "address": {
+        "example": "node1.example.com",
+        "type": "string"
+      },
+      "authMethod": {
+        "enum": [
+          "password",
+          "privateKey"
+        ],
+        "example": "privateKey",
+        "type": "string"
+      },
+      "hostKeyFingerprint": {
+        "example": "SHA256:abc...",
+        "type": "string"
+      },
+      "hostKeyMode": {
+        "enum": [
+          "known_hosts",
+          "pin",
+          "insecure"
+        ],
+        "example": "known_hosts",
+        "type": "string"
+      },
+      "knownHosts": {
+        "example": "node1.example.com ssh-ed25519 AAAA...",
+        "type": "string"
+      },
+      "password": {
+        "example": "\u003cwrite-only password\u003e",
+        "nullable": true,
+        "type": "string"
+      },
+      "port": {
+        "example": 22,
+        "maximum": 65535,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "privateKey": {
+        "example": "-----BEGIN OPENSSH PRIVATE KEY-----",
+        "nullable": true,
+        "type": "string"
+      },
+      "privateKeyPassphrase": {
+        "example": "\u003cwrite-only passphrase\u003e",
+        "nullable": true,
+        "type": "string"
+      },
+      "timeoutSeconds": {
+        "example": 12,
+        "type": "integer"
+      },
+      "username": {
+        "example": "root",
+        "type": "string"
+      }
+    },
+    "required": [
+      "address",
+      "authMethod",
+      "hostKeyFingerprint",
+      "hostKeyMode",
+      "knownHosts",
+      "port",
+      "timeoutSeconds",
+      "username"
+    ],
+    "type": "object"
+  },
+  "NodePreflightResult": {
+    "properties": {
+      "arch": {
+        "example": "amd64",
+        "type": "string"
+      },
+      "docker": {
+        "example": false,
+        "type": "boolean"
+      },
+      "errors": {
+        "items": {
+          "$ref": "#/components/schemas/NodePreflightError"
+        },
+        "type": "array"
+      },
+      "freeDiskBytes": {
+        "example": 10737418240,
+        "format": "int64",
+        "type": "integer"
+      },
+      "hostname": {
+        "example": "edge-1",
+        "type": "string"
+      },
+      "occupiedPorts": {
+        "example": [
+          22,
+          80,
+          443
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "os": {
+        "example": "ubuntu",
+        "type": "string"
+      },
+      "provisioning": {
+        "$ref": "#/components/schemas/NodeProvisioningPlan"
+      },
+      "root": {
+        "example": true,
+        "type": "boolean"
+      },
+      "sudo": {
+        "example": true,
+        "type": "boolean"
+      },
+      "systemd": {
+        "example": true,
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "arch",
+      "docker",
+      "errors",
+      "freeDiskBytes",
+      "hostname",
+      "occupiedPorts",
+      "os",
+      "provisioning",
+      "root",
+      "sudo",
+      "systemd"
+    ],
+    "type": "object"
+  },
+  "NodeProvisioningPlan": {
+    "properties": {
+      "canInstall": {
+        "example": true,
+        "type": "boolean"
+      },
+      "warnings": {
+        "example": [
+          "Docker will be installed"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "canInstall",
+      "warnings"
     ],
     "type": "object"
   },

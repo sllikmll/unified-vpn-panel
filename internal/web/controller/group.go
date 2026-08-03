@@ -10,8 +10,8 @@ import (
 )
 
 type GroupController struct {
-	clientService service.ClientService
-	xrayService   service.XrayService
+	clientService  service.ClientService
+	inboundService service.InboundService
 }
 
 func NewGroupController(g *gin.RouterGroup) *GroupController {
@@ -24,9 +24,11 @@ func (a *GroupController) initRouter(g *gin.RouterGroup) {
 	g.GET("/groups", a.list)
 	g.GET("/groups/:name/emails", a.emails)
 	g.POST("/groups/create", a.create)
+	g.POST("/groups/update", a.update)
 	g.POST("/groups/rename", a.rename)
 	g.POST("/groups/delete", a.delete)
 	g.POST("/groups/resetTraffic", a.resetTraffic)
+	g.POST("/groups/applyAssignments", a.applyAssignments)
 	g.POST("/groups/bulkAdd", a.bulkAdd)
 	g.POST("/groups/bulkRemove", a.bulkRemove)
 }
@@ -50,21 +52,36 @@ func (a *GroupController) emails(c *gin.Context) {
 	jsonObj(c, emails, nil)
 }
 
-type groupCreateBody struct {
-	Name string `json:"name"`
-}
-
 func (a *GroupController) create(c *gin.Context) {
-	var body groupCreateBody
+	var body service.GroupUpsertRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	if err := a.clientService.CreateGroup(body.Name); err != nil {
+	if body.Description == "" && len(body.AssignedInboundIds) == 0 && body.Policy.DefaultTotalGB == 0 && body.Policy.DefaultExpiryTime == 0 && !body.Enable {
+		body.Enable = true
+	}
+	result, err := a.clientService.CreateGroupWithConfig(&a.inboundService, body)
+	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	jsonObj(c, gin.H{"name": body.Name}, nil)
+	jsonObj(c, result, nil)
+	notifyClientsChanged()
+}
+
+func (a *GroupController) update(c *gin.Context) {
+	var body service.GroupUpdateRequest
+	if err := c.ShouldBindJSON(&body); err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	result, err := a.clientService.UpdateGroupWithConfig(&a.inboundService, body)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	jsonObj(c, result, nil)
 	notifyClientsChanged()
 }
 
@@ -79,13 +96,12 @@ func (a *GroupController) rename(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	affected, err := a.clientService.RenameGroup(body.OldName, body.NewName)
+	result, err := a.clientService.RenameGroupAndApply(&a.inboundService, body.OldName, body.NewName)
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	a.xrayService.SetToNeedRestart()
-	jsonObj(c, gin.H{"affected": affected}, nil)
+	jsonObj(c, result, nil)
 	notifyClientsChanged()
 }
 
@@ -99,13 +115,12 @@ func (a *GroupController) delete(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	affected, err := a.clientService.DeleteGroup(body.Name)
+	result, err := a.clientService.DeleteGroupAndApply(&a.inboundService, body.Name)
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	a.xrayService.SetToNeedRestart()
-	jsonObj(c, gin.H{"affected": affected}, nil)
+	jsonObj(c, result, nil)
 	notifyClientsChanged()
 }
 
@@ -132,6 +147,25 @@ type bulkAddToGroupRequest struct {
 	Group  string   `json:"group"`
 }
 
+type groupApplyAssignmentsRequest struct {
+	Name string `json:"name"`
+}
+
+func (a *GroupController) applyAssignments(c *gin.Context) {
+	var req groupApplyAssignmentsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	result, err := a.clientService.ApplyGroupAssignments(&a.inboundService, req.Name)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	jsonObj(c, result, nil)
+	notifyClientsChanged()
+}
+
 func (a *GroupController) bulkAdd(c *gin.Context) {
 	var req bulkAddToGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -142,13 +176,12 @@ func (a *GroupController) bulkAdd(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), common.NewError("group name is required"))
 		return
 	}
-	affected, err := a.clientService.AddToGroup(req.Emails, req.Group)
+	result, err := a.clientService.AddToGroupAndApply(&a.inboundService, req.Emails, req.Group)
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	jsonObj(c, gin.H{"affected": affected}, nil)
-	a.xrayService.SetToNeedRestart()
+	jsonObj(c, result, nil)
 	notifyClientsChanged()
 }
 
@@ -162,12 +195,11 @@ func (a *GroupController) bulkRemove(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	affected, err := a.clientService.RemoveFromGroup(req.Emails)
+	result, err := a.clientService.RemoveFromGroupAndApply(&a.inboundService, req.Emails)
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	jsonObj(c, gin.H{"affected": affected}, nil)
-	a.xrayService.SetToNeedRestart()
+	jsonObj(c, result, nil)
 	notifyClientsChanged()
 }

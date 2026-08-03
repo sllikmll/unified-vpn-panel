@@ -311,9 +311,75 @@ export const EXAMPLES: Record<string, unknown> = {
     "up": 1048576,
     "uuid": "e18c9a96-71bf-48d4-933f-8b9a46d4290c"
   },
+  "ConfigProfile": {
+    "createdAt": 1700000000000,
+    "description": "Reusable VLESS Reality template without client credentials.",
+    "enabled": true,
+    "id": 1,
+    "name": "VLESS Reality TCP",
+    "profile": "{\"inbounds\":[{\"protocol\":\"vless\",\"port\":443}]}",
+    "updatedAt": 1700000000000,
+    "version": 1
+  },
+  "ConfigProfileNodeAssignment": {
+    "createdAt": 1700000000000,
+    "enabled": true,
+    "nodeId": 1,
+    "profileId": 1,
+    "updatedAt": 1700000000000
+  },
   "FallbackParentInfo": {
     "masterId": 0,
     "path": ""
+  },
+  "GroupApplyResult": {
+    "affected": 5,
+    "attached": 10,
+    "detached": 2,
+    "updated": 5
+  },
+  "GroupPolicy": {
+    "defaultExpiryTime": 1893456000000,
+    "defaultTotalGB": 107374182400
+  },
+  "GroupSummary": {
+    "assignedInboundIds": [
+      1
+    ],
+    "clientCount": 5,
+    "defaultExpiryTime": 1893456000000,
+    "defaultTotalGB": 107374182400,
+    "description": "Team access profile",
+    "down": 524288,
+    "enable": true,
+    "name": "customer-a",
+    "trafficUsed": 1048576,
+    "up": 524288
+  },
+  "GroupUpdateRequest": {
+    "assignedInboundIds": [
+      1
+    ],
+    "description": "Team access profile",
+    "enable": true,
+    "name": "customer-a",
+    "oldName": "customer-a",
+    "policy": {
+      "defaultExpiryTime": 1893456000000,
+      "defaultTotalGB": 107374182400
+    }
+  },
+  "GroupUpsertRequest": {
+    "assignedInboundIds": [
+      1
+    ],
+    "description": "Team access profile",
+    "enable": true,
+    "name": "customer-a",
+    "policy": {
+      "defaultExpiryTime": 1893456000000,
+      "defaultTotalGB": 107374182400
+    }
   },
   "HistoryOfSeeders": {
     "id": 0,
@@ -556,6 +622,56 @@ export const EXAMPLES: Record<string, unknown> = {
     "remark": "",
     "scheme": "http",
     "tlsVerifyMode": "verify"
+  },
+  "NodePreflightError": {
+    "code": "docker_missing",
+    "message": "Docker is not installed"
+  },
+  "NodePreflightRequest": {
+    "address": "node1.example.com",
+    "authMethod": "privateKey",
+    "hostKeyFingerprint": "SHA256:abc...",
+    "hostKeyMode": "known_hosts",
+    "knownHosts": "node1.example.com ssh-ed25519 AAAA...",
+    "password": "\u003cwrite-only password\u003e",
+    "port": 22,
+    "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----",
+    "privateKeyPassphrase": "\u003cwrite-only passphrase\u003e",
+    "timeoutSeconds": 12,
+    "username": "root"
+  },
+  "NodePreflightResult": {
+    "arch": "amd64",
+    "docker": false,
+    "errors": [
+      {
+        "code": "docker_missing",
+        "message": "Docker is not installed"
+      }
+    ],
+    "freeDiskBytes": 10737418240,
+    "hostname": "edge-1",
+    "occupiedPorts": [
+      22,
+      80,
+      443
+    ],
+    "os": "ubuntu",
+    "provisioning": {
+      "canInstall": true,
+      "warnings": [
+        "Docker will be installed"
+      ]
+    },
+    "root": true,
+    "sudo": true,
+    "systemd": true
+  },
+  "NodeProvisioningPlan": {
+    "canInstall": true,
+    "warnings": [
+      "Docker will be installed"
+    ]
   },
   "NodeView": {
     "activeCount": 20,

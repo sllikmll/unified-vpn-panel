@@ -57,6 +57,26 @@ export const ProbeResultSchema = z.object({
   xrayError: z.string().optional(),
 }).loose();
 
+export const NodePreflightResultSchema = z.object({
+  os: z.string().optional(),
+  arch: z.string().optional(),
+  hostname: z.string().optional(),
+  root: z.boolean().optional(),
+  sudo: z.boolean().optional(),
+  systemd: z.boolean().optional(),
+  docker: z.boolean().optional(),
+  freeDiskBytes: z.number().optional(),
+  occupiedPorts: z.array(z.number()).optional(),
+  errors: z.array(z.object({
+    code: z.string(),
+    message: z.string(),
+  })).optional(),
+  provisioning: z.object({
+    canInstall: z.boolean().optional(),
+    warnings: z.array(z.string()).optional(),
+  }).optional(),
+}).loose();
+
 export const NodeFormSchema = z.object({
   id: z.number().optional(),
   name: z.string().trim().min(1, 'pages.nodes.toasts.fillRequired'),
@@ -78,6 +98,15 @@ export const NodeFormSchema = z.object({
   // serialized as null by the backend for a nil slice — tolerate both.
   inboundTags: z.array(z.string()).nullish().transform((tags) => tags ?? []),
   outboundTag: z.string().optional(),
+  sshUsername: z.string().trim().optional().default('root'),
+  sshPort: z.number().int().min(1).max(65535).optional().default(22),
+  sshAuthMethod: z.enum(['password', 'privateKey']).optional().default('privateKey'),
+  sshPassword: z.string().optional().default(''),
+  sshPrivateKey: z.string().optional().default(''),
+  sshPrivateKeyPassphrase: z.string().optional().default(''),
+  sshHostKeyMode: z.enum(['known_hosts', 'pin', 'insecure']).optional().default('known_hosts'),
+  sshKnownHosts: z.string().optional().default(''),
+  sshHostKeyFingerprint: z.string().optional().default(''),
 }).superRefine((val, ctx) => {
   if (val.tlsVerifyMode !== 'mtls' && val.apiToken.length === 0 && !val.hasStoredToken) {
     ctx.addIssue({
@@ -90,4 +119,5 @@ export const NodeFormSchema = z.object({
 
 export type NodeRecord = z.infer<typeof NodeRecordSchema>;
 export type ProbeResult = z.infer<typeof ProbeResultSchema>;
+export type NodePreflightResult = z.infer<typeof NodePreflightResultSchema>;
 export type NodeFormValues = z.infer<typeof NodeFormSchema>;

@@ -51,7 +51,9 @@ type HeartbeatPatch struct {
 	XrayError string
 }
 
-type NodeService struct{}
+type NodeService struct {
+	sshExecutor nodeSSHRunner
+}
 
 // FetchCertFingerprint connects to the node over HTTPS without verifying the
 // certificate and returns the leaf certificate's SHA-256 as base64, so the UI

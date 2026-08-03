@@ -19,6 +19,7 @@ type fakeNodeRuntime struct {
 	addInbound    atomic.Int32
 	delInbound    atomic.Int32
 	addClient     atomic.Int32
+	addUser       atomic.Int32
 	deleteClient  atomic.Int32
 	deleteUser    atomic.Int32
 	updateInbound atomic.Int32
@@ -42,7 +43,10 @@ func (f *fakeNodeRuntime) UpdateInbound(context.Context, *model.Inbound, *model.
 	return nil
 }
 
-func (f *fakeNodeRuntime) AddUser(context.Context, *model.Inbound, map[string]any) error { return nil }
+func (f *fakeNodeRuntime) AddUser(context.Context, *model.Inbound, map[string]any) error {
+	f.addUser.Add(1)
+	return nil
+}
 
 func (f *fakeNodeRuntime) RemoveUser(context.Context, *model.Inbound, string) error { return nil }
 

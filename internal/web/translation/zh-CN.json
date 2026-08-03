@@ -111,7 +111,8 @@
     "docs": "文档",
     "openMenu": "打开菜单",
     "pinSidebar": "固定侧边栏",
-    "unpinSidebar": "取消固定侧边栏"
+    "unpinSidebar": "取消固定侧边栏",
+    "profiles": "Profiles"
   },
   "pages": {
     "login": {
@@ -863,9 +864,7 @@
       "addGroup": "添加分组",
       "createSuccess": "已创建分组 “{name}”。",
       "rename": "重命名",
-      "renameTitle": "重命名 {name}",
       "renameCollision": "已存在名为 “{name}” 的分组。",
-      "renameSuccess": "已为 {count} 个客户端重命名分组。",
       "deleteConfirmTitle": "删除分组 {name}?",
       "deleteConfirmContent": "这将删除分组并清除 {count} 个客户端的标签。客户端本身不会被删除。",
       "deleteSuccess": "已清除 {count} 个客户端的分组。",
@@ -889,7 +888,15 @@
       "removeFromGroup": "移除客户端…",
       "removeFromGroupTitle": "从分组 “{name}” 移除客户端",
       "removeFromGroupDesc": "选择要从此分组中移除的成员。客户端本身保留(使用 “删除分组中的客户端” 完全移除)。",
-      "removeFromGroupResult": "已从 {name} 移除 {count} 个客户端。"
+      "removeFromGroupResult": "已从 {name} 移除 {count} 个客户端。",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "添加节点",
@@ -973,7 +980,8 @@
         "updateStarted": "已开始更新面板",
         "updateResult": "已在 {ok} 个节点上触发更新，{failed} 个失败",
         "updateNoneEligible": "请至少选择一个在线且已启用的节点",
-        "saveMtls": "保存节点 mTLS"
+        "saveMtls": "保存节点 mTLS",
+        "preflight": "SSH preflight"
       },
       "tlsVerifyMode": "TLS 校验",
       "tlsVerifyModeHint": "面板如何校验节点的 HTTPS 证书。固定或跳过用于自签名证书（仅 https 节点）。",
@@ -1001,7 +1009,28 @@
       "pinnedCertPlaceholder": "base64 或 hex 的 SHA-256",
       "fetchPin": "获取",
       "pinFetched": "已获取节点当前证书",
-      "pinFetchFailed": "无法获取证书"
+      "pinFetchFailed": "无法获取证书",
+      "sshPreflight": "SSH preflight",
+      "sshUsername": "SSH username",
+      "sshPort": "SSH port",
+      "sshAuthMethod": "SSH authentication",
+      "sshPrivateKey": "Private key",
+      "sshPassword": "Password",
+      "sshPrivateKeyPassphrase": "Private key passphrase",
+      "sshHostKeyMode": "SSH host key verification",
+      "sshKnownHosts": "known_hosts entry",
+      "sshHostKeyPin": "Fingerprint pin",
+      "sshHostKeyInsecure": "Insecure opt-in",
+      "sshHostKeyFingerprint": "Host key fingerprint",
+      "sshHostKeyInsecureWarning": "Insecure mode skips SSH host-key verification. Use only for one-time bootstrap on a trusted network.",
+      "runPreflight": "Run SSH preflight",
+      "preflightComplete": "SSH preflight complete",
+      "preflightFailed": "SSH preflight failed",
+      "preflightReady": "Node is ready for provisioning",
+      "preflightNeedsAttention": "Node needs attention before provisioning",
+      "preflightPrivilege": "root/sudo",
+      "preflightDisk": "{gb} GiB free",
+      "preflightPorts": "Occupied ports: {ports}"
     },
     "settings": {
       "defaultTag": "默认",
@@ -1838,6 +1867,36 @@
         "delete": "删除主机",
         "badTag": "无效的标签",
         "badVlessRoute": "请输入 0 到 65535 之间的单个数字"
+      }
+    },
+    "profiles": {
+      "createProfile": "Create profile",
+      "editProfile": "Edit profile",
+      "formatJson": "Format JSON",
+      "cloneConfirmTitle": "Clone profile \"{name}\"?",
+      "deleteConfirmTitle": "Delete profile \"{name}\"?",
+      "deleteConfirmContent": "This removes only the reusable template. Existing inbounds and nodes are unchanged.",
+      "summary": {
+        "total": "Total",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      },
+      "fields": {
+        "actions": "Actions",
+        "enabled": "Enabled",
+        "name": "Name",
+        "version": "Version",
+        "profile": "Profile JSON",
+        "descriptionLabel": "Description"
+      },
+      "toasts": {
+        "list": "Failed to load profiles",
+        "obtain": "Failed to load profile",
+        "add": "Profile saved",
+        "update": "Profile updated",
+        "clone": "Profile cloned",
+        "delete": "Profile deleted",
+        "invalidJson": "Profile must be valid JSON"
       }
     }
   },

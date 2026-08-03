@@ -111,7 +111,8 @@
     "docs": "التوثيق",
     "openMenu": "فتح القائمة",
     "pinSidebar": "تثبيت الشريط الجانبي",
-    "unpinSidebar": "إلغاء تثبيت الشريط الجانبي"
+    "unpinSidebar": "إلغاء تثبيت الشريط الجانبي",
+    "profiles": "Profiles"
   },
   "pages": {
     "login": {
@@ -863,9 +864,7 @@
       "addGroup": "إضافة مجموعة",
       "createSuccess": "تم إنشاء المجموعة «{name}».",
       "rename": "إعادة تسمية",
-      "renameTitle": "إعادة تسمية {name}",
       "renameCollision": "مجموعة باسم «{name}» موجودة بالفعل.",
-      "renameSuccess": "تمت إعادة تسمية المجموعة على {count} عميل.",
       "deleteConfirmTitle": "حذف المجموعة {name}؟",
       "deleteConfirmContent": "يحذف المجموعة ويمسح تسميتها من {count} عميل. العملاء أنفسهم لا يُحذفون.",
       "deleteSuccess": "تم مسح المجموعة من {count} عميل.",
@@ -889,7 +888,15 @@
       "removeFromGroup": "إزالة عملاء…",
       "removeFromGroupTitle": "إزالة عملاء من المجموعة «{name}»",
       "removeFromGroupDesc": "اختر الأعضاء لإزالتهم من هذه المجموعة. يُحفظ العملاء (استخدم «حذف عملاء المجموعة» للإزالة الكاملة).",
-      "removeFromGroupResult": "تمت إزالة {count} عميل من {name}."
+      "removeFromGroupResult": "تمت إزالة {count} عميل من {name}.",
+      "enabled": "Enabled",
+      "assignedInbounds": "Assigned inbounds",
+      "defaults": "Defaults",
+      "defaultTraffic": "Default traffic bytes",
+      "defaultExpiry": "Default expiry timestamp",
+      "editTitle": "Edit {name}",
+      "updateSuccess": "Updated group on {count} client(s).",
+      "descriptionLabel": "Description"
     },
     "nodes": {
       "addNode": "إضافة نود",
@@ -973,7 +980,8 @@
         "updateStarted": "بدأ تحديث اللوحة",
         "updateResult": "تم بدء التحديث على {ok} عقدة، فشل {failed}",
         "updateNoneEligible": "اختر عقدة واحدة على الأقل متصلة ومفعّلة",
-        "saveMtls": "حفظ mTLS النود"
+        "saveMtls": "حفظ mTLS النود",
+        "preflight": "SSH preflight"
       },
       "tlsVerifyMode": "التحقق من TLS",
       "tlsVerifyModeHint": "كيف يتحقق اللوحة من شهادة HTTPS الخاصة بالعقدة. التثبيت أو التخطّي مخصّصان للشهادات الموقّعة ذاتيًا (عُقد https فقط).",
@@ -1001,7 +1009,28 @@
       "pinnedCertPlaceholder": "SHA-256 بصيغة base64 أو hex",
       "fetchPin": "جلب",
       "pinFetched": "تم جلب شهادة العقدة الحالية",
-      "pinFetchFailed": "تعذّر جلب الشهادة"
+      "pinFetchFailed": "تعذّر جلب الشهادة",
+      "sshPreflight": "SSH preflight",
+      "sshUsername": "SSH username",
+      "sshPort": "SSH port",
+      "sshAuthMethod": "SSH authentication",
+      "sshPrivateKey": "Private key",
+      "sshPassword": "Password",
+      "sshPrivateKeyPassphrase": "Private key passphrase",
+      "sshHostKeyMode": "SSH host key verification",
+      "sshKnownHosts": "known_hosts entry",
+      "sshHostKeyPin": "Fingerprint pin",
+      "sshHostKeyInsecure": "Insecure opt-in",
+      "sshHostKeyFingerprint": "Host key fingerprint",
+      "sshHostKeyInsecureWarning": "Insecure mode skips SSH host-key verification. Use only for one-time bootstrap on a trusted network.",
+      "runPreflight": "Run SSH preflight",
+      "preflightComplete": "SSH preflight complete",
+      "preflightFailed": "SSH preflight failed",
+      "preflightReady": "Node is ready for provisioning",
+      "preflightNeedsAttention": "Node needs attention before provisioning",
+      "preflightPrivilege": "root/sudo",
+      "preflightDisk": "{gb} GiB free",
+      "preflightPorts": "Occupied ports: {ports}"
     },
     "settings": {
       "defaultTag": "افتراضي",
@@ -1838,6 +1867,36 @@
         "delete": "حذف المضيف",
         "badTag": "وسم غير صالح",
         "badVlessRoute": "أدخل رقماً واحداً بين 0 و65535"
+      }
+    },
+    "profiles": {
+      "createProfile": "Create profile",
+      "editProfile": "Edit profile",
+      "formatJson": "Format JSON",
+      "cloneConfirmTitle": "Clone profile \"{name}\"?",
+      "deleteConfirmTitle": "Delete profile \"{name}\"?",
+      "deleteConfirmContent": "This removes only the reusable template. Existing inbounds and nodes are unchanged.",
+      "summary": {
+        "total": "Total",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      },
+      "fields": {
+        "actions": "Actions",
+        "enabled": "Enabled",
+        "name": "Name",
+        "version": "Version",
+        "profile": "Profile JSON",
+        "descriptionLabel": "Description"
+      },
+      "toasts": {
+        "list": "Failed to load profiles",
+        "obtain": "Failed to load profile",
+        "add": "Profile saved",
+        "update": "Profile updated",
+        "clone": "Profile cloned",
+        "delete": "Profile deleted",
+        "invalidJson": "Profile must be valid JSON"
       }
     }
   },

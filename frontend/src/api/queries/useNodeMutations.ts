@@ -4,9 +4,10 @@ import { HttpUtil, Msg } from '@/utils';
 import { parseMsg } from '@/utils/zodValidate';
 import { keys } from '@/api/queryKeys';
 import type { NodeRecord } from '@/api/queries/useNodesQuery';
-import { ProbeResultSchema, type ProbeResult } from '@/schemas/node';
+import { NodePreflightResultSchema, ProbeResultSchema, type NodePreflightResult, type ProbeResult } from '@/schemas/node';
 
 export type { ProbeResult };
+export type { NodePreflightResult };
 
 export interface NodeUpdateResult {
   id: number;
@@ -84,5 +85,9 @@ export function useNodeMutations() {
       HttpUtil.post<string>('/panel/api/nodes/certFingerprint', payload),
     fetchInbounds: (payload: Partial<NodeRecord>): Promise<Msg<RemoteInboundOption[]>> =>
       HttpUtil.post<RemoteInboundOption[]>('/panel/api/nodes/inbounds', payload),
+    preflight: async (payload: Record<string, unknown>): Promise<Msg<NodePreflightResult>> => {
+      const raw = await HttpUtil.post('/panel/api/nodes/preflight', payload);
+      return parseMsg(raw, NodePreflightResultSchema, 'nodes/preflight');
+    },
   };
 }

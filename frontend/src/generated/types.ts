@@ -3,6 +3,7 @@ export type OnlineAPISupport = number;
 export type ProcessState = string;
 export type Protocol = string;
 export type SubLinkProvider = unknown;
+export type nodeSSHRunner = unknown;
 export type staticEgressResolver = string;
 export type transportBits = number;
 
@@ -324,9 +325,70 @@ export interface ClientTraffic {
   uuid: string;
 }
 
+export interface ConfigProfile {
+  createdAt: number;
+  description: string;
+  enabled: boolean;
+  id: number;
+  name: string;
+  profile: string;
+  updatedAt: number;
+  version: number;
+}
+
+export interface ConfigProfileNodeAssignment {
+  createdAt: number;
+  enabled: boolean;
+  nodeId: number;
+  profileId: number;
+  updatedAt: number;
+}
+
 export interface FallbackParentInfo {
   masterId: number;
   path?: string;
+}
+
+export interface GroupApplyResult {
+  affected: number;
+  attached: number;
+  detached: number;
+  updated: number;
+}
+
+export interface GroupPolicy {
+  defaultExpiryTime: number;
+  defaultTotalGB: number;
+}
+
+export interface GroupSummary {
+  assignedInboundIds: number[];
+  clientCount: number;
+  defaultExpiryTime: number;
+  defaultTotalGB: number;
+  description: string;
+  down: number;
+  enable: boolean;
+  name: string;
+  trafficUsed: number;
+  up: number;
+}
+
+export interface GroupUpdateRequest {
+  assignedInboundIds: number[];
+  description: string;
+  enable: boolean;
+  name: string;
+  oldName: string;
+  policy: GroupPolicy;
+}
+
+export interface GroupUpsertRequest {
+  assignedInboundIds: number[];
+  description: string;
+  enable: boolean;
+  name: string;
+  policy: GroupPolicy;
 }
 
 export interface HistoryOfSeeders {
@@ -536,6 +598,44 @@ export interface NodeMutationRequest {
   remark: string;
   scheme: string;
   tlsVerifyMode: string;
+}
+
+export interface NodePreflightError {
+  code: string;
+  message: string;
+}
+
+export interface NodePreflightRequest {
+  address: string;
+  authMethod: string;
+  hostKeyFingerprint: string;
+  hostKeyMode: string;
+  knownHosts: string;
+  password?: string | null;
+  port: number;
+  privateKey?: string | null;
+  privateKeyPassphrase?: string | null;
+  timeoutSeconds: number;
+  username: string;
+}
+
+export interface NodePreflightResult {
+  arch: string;
+  docker: boolean;
+  errors: NodePreflightError[];
+  freeDiskBytes: number;
+  hostname: string;
+  occupiedPorts: number[];
+  os: string;
+  provisioning: NodeProvisioningPlan;
+  root: boolean;
+  sudo: boolean;
+  systemd: boolean;
+}
+
+export interface NodeProvisioningPlan {
+  canInstall: boolean;
+  warnings: string[];
 }
 
 export interface NodeView {
