@@ -710,6 +710,18 @@ export interface ProbeResultUI {
   xrayVersion: string;
 }
 
+export interface ProtocolConnection {
+  createdAt: number;
+  enabled: boolean;
+  id: string;
+  mihomoJson: string;
+  mihomoYaml: string;
+  name: string;
+  protocol: string;
+  selectors: string[];
+  updatedAt: number;
+}
+
 export interface RealityScanResult {
   alpn: string;
   certIssuer: string;

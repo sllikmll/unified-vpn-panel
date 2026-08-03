@@ -1206,6 +1206,21 @@ type OutboundSubscription struct {
 	OutboundCount        int    `json:"outboundCount" gorm:"-"`
 }
 
+type ProtocolConnection struct {
+	Id         string   `json:"id" form:"id" gorm:"primaryKey;size:160" example:"trojan-node-a-abcdef123456"`
+	Protocol   string   `json:"protocol" form:"protocol" gorm:"index:idx_protocol_connections_protocol;not null" validate:"required" example:"trojan"`
+	Name       string   `json:"name" form:"name" gorm:"uniqueIndex;not null" validate:"required,max=128" example:"de-frankfurt"`
+	Enabled    bool     `json:"enabled" form:"enabled" gorm:"default:true" example:"true"`
+	RawSource  string   `json:"-" form:"-" gorm:"type:text;column:raw_source"`
+	MihomoJSON string   `json:"mihomoJson" form:"mihomoJson" gorm:"type:text;column:mihomo_json" example:"{\"type\":\"trojan\"}"`
+	MihomoYAML string   `json:"mihomoYaml" form:"mihomoYaml" gorm:"type:text;column:mihomo_yaml" example:"- name: de-frankfurt\\n  type: trojan\\n"`
+	Selectors  []string `json:"selectors" form:"selectors" gorm:"serializer:json"`
+	CreatedAt  int64    `json:"createdAt" gorm:"autoCreateTime:milli" example:"1700000000000"`
+	UpdatedAt  int64    `json:"updatedAt" gorm:"autoUpdateTime:milli" example:"1700000000000"`
+}
+
+func (ProtocolConnection) TableName() string { return "protocol_connections" }
+
 func MergeClientRecord(existing *ClientRecord, incoming *ClientRecord) []ClientMergeConflict {
 	var conflicts []ClientMergeConflict
 	keep := func(field string, oldV, newV, kept any) {

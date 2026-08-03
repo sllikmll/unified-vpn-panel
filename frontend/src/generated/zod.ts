@@ -759,6 +759,19 @@ export const ProbeResultUISchema = z.object({
 });
 export type ProbeResultUI = z.infer<typeof ProbeResultUISchema>;
 
+export const ProtocolConnectionSchema = z.object({
+  createdAt: z.number().int(),
+  enabled: z.boolean(),
+  id: z.string(),
+  mihomoJson: z.string(),
+  mihomoYaml: z.string(),
+  name: z.string().max(128),
+  protocol: z.string(),
+  selectors: z.array(z.string()),
+  updatedAt: z.number().int(),
+});
+export type ProtocolConnection = z.infer<typeof ProtocolConnectionSchema>;
+
 export const RealityScanResultSchema = z.object({
   alpn: z.string(),
   certIssuer: z.string(),

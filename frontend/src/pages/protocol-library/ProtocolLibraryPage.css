@@ -1,0 +1,48 @@
+.protocol-library-page {
+  padding-bottom: 32px;
+}
+
+.protocol-tabs {
+  margin: 4px 0 16px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.protocol-library-grid {
+  align-items: stretch;
+}
+
+.protocol-library-page .ant-card {
+  border-radius: 8px;
+}
+
+.protocol-library-name {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.protocol-library-name > span {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.protocol-library-preview {
+  margin-top: 16px;
+}
+
+.protocol-library-page textarea,
+.protocol-library-page .ant-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+@media (max-width: 768px) {
+  .protocol-library-page {
+    padding-inline: 12px;
+  }
+
+  .protocol-library-page .page-header-row {
+    align-items: flex-start;
+  }
+}

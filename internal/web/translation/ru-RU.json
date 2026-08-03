@@ -112,7 +112,8 @@
     "openMenu": "Открыть меню",
     "pinSidebar": "Закрепить боковую панель",
     "unpinSidebar": "Открепить боковую панель",
-    "profiles": "Profiles"
+    "profiles": "Profiles",
+    "protocolLibrary": "Библиотека протоколов"
   },
   "pages": {
     "login": {
@@ -1897,6 +1898,33 @@
         "clone": "Profile cloned",
         "delete": "Profile deleted",
         "invalidJson": "Profile must be valid JSON"
+      }
+    },
+    "protocolLibrary": {
+      "title": "Библиотека протоколов",
+      "subtitle": "Импорт, нормализация, предпросмотр и экспорт managed-подключений Mihomo.",
+      "importTitle": "Импорт подключения",
+      "connectionsTitle": "Сохранённые подключения",
+      "previewTitle": "Предпросмотр managed-блока Mihomo",
+      "preview": "Предпросмотр",
+      "previewPlaceholder": "Предпросмотр появится после запуска.",
+      "exportYaml": "Экспорт YAML",
+      "importFile": "Импорт файла",
+      "saveConnection": "Сохранить подключение",
+      "namePlaceholder": "Имя подключения",
+      "selectorsPlaceholder": "Selectors через запятую",
+      "contentPlaceholder": "Вставьте поддерживаемую ссылку или конфиг.",
+      "mihomoReady": "Готово для Mihomo",
+      "storedOnly": "Только хранение",
+      "copyYaml": "Копировать YAML",
+      "copyId": "Копировать ID",
+      "deleteConfirm": "Удалить протокольное подключение?",
+      "empty": "Для этого протокола подключений нет",
+      "fields": {
+        "enabled": "Включено",
+        "name": "Имя",
+        "selectors": "Selectors",
+        "actions": "Действия"
       }
     }
   },

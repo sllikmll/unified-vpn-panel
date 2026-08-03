@@ -1599,6 +1599,68 @@ export const sections: readonly Section[] = [
   },
 
   {
+    id: 'protocol-connections',
+    title: 'Protocol Library',
+    description:
+      'Managed Mihomo protocol connection registry. List endpoints redact raw source and credentials; use reveal or YAML export only when plaintext secrets are explicitly required.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/panel/api/proxy-connections/protocols',
+        summary: 'List the supported protocol matrix and accepted URI schemes.',
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/proxy-connections',
+        summary: 'List normalized protocol connections without raw sources or plaintext credentials.',
+        responseSchema: 'ProtocolConnection',
+        responseSchemaArray: true,
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/proxy-connections/:id',
+        summary: 'Fetch one connection without raw source or plaintext credentials.',
+        params: [{ name: 'id', in: 'path', type: 'string', desc: 'Protocol connection ID.' }],
+        responseSchema: 'ProtocolConnection',
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/proxy-connections/:id/reveal',
+        summary: 'Explicitly reveal one stored raw source and full normalized Mihomo data.',
+        params: [{ name: 'id', in: 'path', type: 'string', desc: 'Protocol connection ID.' }],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/proxy-connections/import',
+        summary: 'Import a WireGuard, Amnezia, Hysteria2, VLESS, Trojan, Mieru, NaiveProxy, VMess, or Shadowsocks connection.',
+        body: '{\n  "protocol": "vless",\n  "name": "de-frankfurt",\n  "content": "vless://...",\n  "selectors": ["GLOBAL"]\n}',
+      },
+      {
+        method: 'PATCH',
+        path: '/panel/api/proxy-connections/:id',
+        summary: 'Update name, enabled state, or selector metadata.',
+        params: [{ name: 'id', in: 'path', type: 'string', desc: 'Protocol connection ID.' }],
+      },
+      {
+        method: 'DELETE',
+        path: '/panel/api/proxy-connections/:id',
+        summary: 'Delete a stored protocol connection.',
+        params: [{ name: 'id', in: 'path', type: 'string', desc: 'Protocol connection ID.' }],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/proxy-connections/preview',
+        summary: 'Preview the complete managed Mihomo block generated from enabled supported connections.',
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/proxy-connections/export.yaml',
+        summary: 'Export enabled supported connections as Mihomo YAML. This is an explicit secret-revealing operation.',
+      },
+    ],
+  },
+
+  {
     id: 'websocket',
     title: 'WebSocket',
     description:

@@ -14,6 +14,7 @@ import {
   DatabaseOutlined,
   ExportOutlined,
   FileTextOutlined,
+  FolderOpenOutlined,
   GithubOutlined,
   GlobalOutlined,
   HeartOutlined,
@@ -52,7 +53,7 @@ const SIDEBAR_PINNED_KEY = 'sidebar-pinned';
 
 let hoveredAcrossRemounts = false;
 
-type IconName = 'dashboard' | 'inbound' | 'team' | 'groups' | 'setting' | 'tool' | 'cluster' | 'hosts' | 'profiles' | 'logout' | 'apidocs' | 'outbound' | 'routing';
+type IconName = 'dashboard' | 'inbound' | 'team' | 'groups' | 'setting' | 'tool' | 'cluster' | 'hosts' | 'profiles' | 'protocolLibrary' | 'logout' | 'apidocs' | 'outbound' | 'routing';
 
 const iconByName: Record<IconName, ComponentType> = {
   dashboard: DashboardOutlined,
@@ -64,6 +65,7 @@ const iconByName: Record<IconName, ComponentType> = {
   cluster: ClusterOutlined,
   hosts: GlobalOutlined,
   profiles: FileTextOutlined,
+  protocolLibrary: FolderOpenOutlined,
   logout: LogoutOutlined,
   apidocs: ApiOutlined,
   outbound: ExportOutlined,
@@ -202,6 +204,7 @@ export default function AppSidebar() {
     { key: '/nodes', icon: 'cluster', title: t('menu.nodes') },
     { key: '/hosts', icon: 'hosts', title: t('menu.hosts') },
     { key: '/profiles', icon: 'profiles', title: t('menu.profiles') },
+    { key: '/protocol-library', icon: 'protocolLibrary', title: t('menu.protocolLibrary') },
     { key: '/outbound', icon: 'outbound', title: t('menu.outbounds') },
     { key: '/routing', icon: 'routing', title: t('menu.routing') },
     { key: '/settings', icon: 'setting', title: t('menu.settings') },
