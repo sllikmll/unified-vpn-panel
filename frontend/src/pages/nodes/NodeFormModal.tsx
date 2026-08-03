@@ -10,14 +10,17 @@ import {
   Modal,
   Row,
   Select,
+  Space,
   Switch,
+  Tag,
+  Typography,
   message,
 } from 'antd';
 import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import type { NodeRecord } from '@/api/queries/useNodesQuery';
 import type { RemoteInboundOption } from '@/api/queries/useNodeMutations';
 import type { Msg } from '@/utils';
-import { NodeFormSchema, type NodeFormValues, type ProbeResult } from '@/schemas/node';
+import { NodeFormSchema, type NodeFormValues, type NodePreflightResult, type ProbeResult } from '@/schemas/node';
 import { FormField, rhfZodValidate } from '@/components/form/rhf';
 import { useOutboundTagGroups } from '@/api/queries/useOutboundTags';
 import './NodeFormModal.css';
@@ -31,6 +34,7 @@ interface NodeFormModalProps {
   testConnection: (payload: Partial<NodeRecord>) => Promise<Msg<ProbeResult>>;
   fetchFingerprint: (payload: Partial<NodeRecord>) => Promise<Msg<string>>;
   fetchInbounds: (payload: Partial<NodeRecord>) => Promise<Msg<RemoteInboundOption[]>>;
+  preflight: (payload: Record<string, unknown>) => Promise<Msg<NodePreflightResult>>;
   save: (payload: Partial<NodeRecord>) => Promise<Msg<unknown>>;
   onOpenChange: (open: boolean) => void;
 }
@@ -53,6 +57,15 @@ function defaultValues(): NodeFormValues {
     inboundSyncMode: 'all',
     inboundTags: [],
     outboundTag: '',
+    sshUsername: 'root',
+    sshPort: 22,
+    sshAuthMethod: 'privateKey',
+    sshPassword: '',
+    sshPrivateKey: '',
+    sshPrivateKeyPassphrase: '',
+    sshHostKeyMode: 'known_hosts',
+    sshKnownHosts: '',
+    sshHostKeyFingerprint: '',
   };
 }
 
@@ -63,6 +76,7 @@ export default function NodeFormModal({
   testConnection,
   fetchFingerprint,
   fetchInbounds,
+  preflight,
   save,
   onOpenChange,
 }: NodeFormModalProps) {
@@ -74,11 +88,15 @@ export default function NodeFormModal({
   const [testing, setTesting] = useState(false);
   const [fetchingPin, setFetchingPin] = useState(false);
   const [fetchingInbounds, setFetchingInbounds] = useState(false);
+  const [preflighting, setPreflighting] = useState(false);
   const [inboundOptions, setInboundOptions] = useState<RemoteInboundOption[]>([]);
   const [testResult, setTestResult] = useState<ProbeResult | null>(null);
+  const [preflightResult, setPreflightResult] = useState<NodePreflightResult | null>(null);
   const scheme = useWatch({ control: methods.control, name: 'scheme' }) ?? 'https';
   const tlsVerifyMode = useWatch({ control: methods.control, name: 'tlsVerifyMode' }) ?? 'verify';
   const inboundSyncMode = useWatch({ control: methods.control, name: 'inboundSyncMode' }) ?? 'all';
+  const sshAuthMethod = useWatch({ control: methods.control, name: 'sshAuthMethod' }) ?? 'privateKey';
+  const sshHostKeyMode = useWatch({ control: methods.control, name: 'sshHostKeyMode' }) ?? 'known_hosts';
   const { data: outboundGroups } = useOutboundTagGroups({ excludeBlackhole: true });
 
   // Outbounds and balancers share one picker (like the panel-outbound selector);
@@ -116,6 +134,7 @@ export default function NodeFormModal({
     methods.reset(next);
     setInboundOptions((next.inboundTags || []).map((tag) => ({ tag })));
     setTestResult(null);
+    setPreflightResult(null);
   }, [open, mode, node, methods]);
 
   const title = useMemo(
@@ -144,6 +163,26 @@ export default function NodeFormModal({
       outboundTag: values.outboundTag || '',
     };
     if (token) payload.apiToken = token;
+    return payload;
+  }
+
+  function buildPreflightPayload(values: NodeFormValues): Record<string, unknown> {
+    const payload: Record<string, unknown> = {
+      address: values.address.trim(),
+      port: values.sshPort || 22,
+      username: values.sshUsername?.trim() || 'root',
+      authMethod: values.sshAuthMethod || 'privateKey',
+      hostKeyMode: values.sshHostKeyMode || 'known_hosts',
+      timeoutSeconds: 12,
+    };
+    if (values.sshAuthMethod === 'password') {
+      payload.password = values.sshPassword || '';
+    } else {
+      payload.privateKey = values.sshPrivateKey || '';
+      if (values.sshPrivateKeyPassphrase) payload.privateKeyPassphrase = values.sshPrivateKeyPassphrase;
+    }
+    if (values.sshHostKeyMode === 'known_hosts') payload.knownHosts = values.sshKnownHosts || '';
+    if (values.sshHostKeyMode === 'pin') payload.hostKeyFingerprint = values.sshHostKeyFingerprint || '';
     return payload;
   }
 
@@ -194,6 +233,23 @@ export default function NodeFormModal({
       }
     } finally {
       setFetchingInbounds(false);
+    }
+  }
+
+  async function onPreflight() {
+    if (!(await methods.trigger(['address', 'sshPort', 'sshUsername']))) return;
+    setPreflighting(true);
+    setPreflightResult(null);
+    try {
+      const msg = await preflight(buildPreflightPayload(methods.getValues()));
+      if (msg?.success && msg.obj) {
+        setPreflightResult(msg.obj);
+        messageApi.success(t('pages.nodes.preflightComplete'));
+      } else {
+        messageApi.error(msg?.msg || t('pages.nodes.preflightFailed'));
+      }
+    } finally {
+      setPreflighting(false);
     }
   }
 
@@ -382,6 +438,120 @@ export default function NodeFormModal({
                 placeholder={editingWithToken ? t('pages.nodes.apiTokenKeepHint') : t('pages.nodes.apiTokenPlaceholder')}
               />
             </FormField>
+
+            <Typography.Title level={5}>{t('pages.nodes.sshPreflight')}</Typography.Title>
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <FormField label={t('pages.nodes.sshUsername')} name="sshUsername">
+                  <Input placeholder="root" />
+                </FormField>
+              </Col>
+              <Col xs={24} md={12}>
+                <FormField label={t('pages.nodes.sshPort')} name="sshPort">
+                  <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+                </FormField>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <FormField label={t('pages.nodes.sshAuthMethod')} name="sshAuthMethod">
+                  <Select
+                    options={[
+                      { value: 'privateKey', label: t('pages.nodes.sshPrivateKey') },
+                      { value: 'password', label: t('pages.nodes.sshPassword') },
+                    ]}
+                  />
+                </FormField>
+              </Col>
+              <Col xs={24} md={12}>
+                <FormField label={t('pages.nodes.sshHostKeyMode')} name="sshHostKeyMode">
+                  <Select
+                    options={[
+                      { value: 'known_hosts', label: t('pages.nodes.sshKnownHosts') },
+                      { value: 'pin', label: t('pages.nodes.sshHostKeyPin') },
+                      { value: 'insecure', label: t('pages.nodes.sshHostKeyInsecure') },
+                    ]}
+                  />
+                </FormField>
+              </Col>
+            </Row>
+
+            {sshAuthMethod === 'password' ? (
+              <FormField label={t('pages.nodes.sshPassword')} name="sshPassword">
+                <Input.Password />
+              </FormField>
+            ) : (
+              <>
+                <FormField label={t('pages.nodes.sshPrivateKey')} name="sshPrivateKey">
+                  <Input.TextArea rows={5} style={{ fontFamily: 'monospace' }} />
+                </FormField>
+                <FormField label={t('pages.nodes.sshPrivateKeyPassphrase')} name="sshPrivateKeyPassphrase">
+                  <Input.Password />
+                </FormField>
+              </>
+            )}
+
+            {sshHostKeyMode === 'known_hosts' && (
+              <FormField label={t('pages.nodes.sshKnownHosts')} name="sshKnownHosts">
+                <Input.TextArea rows={3} style={{ fontFamily: 'monospace' }} />
+              </FormField>
+            )}
+
+            {sshHostKeyMode === 'pin' && (
+              <FormField label={t('pages.nodes.sshHostKeyFingerprint')} name="sshHostKeyFingerprint">
+                <Input placeholder="SHA256:..." />
+              </FormField>
+            )}
+
+            {sshHostKeyMode === 'insecure' && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 16 }}
+                title={t('pages.nodes.sshHostKeyInsecureWarning')}
+              />
+            )}
+
+            <div className="test-row">
+              <Button type="default" loading={preflighting} onClick={onPreflight}>
+                {t('pages.nodes.runPreflight')}
+              </Button>
+              {preflightResult && (
+                <div className="test-result">
+                  <Alert
+                    type={preflightResult.provisioning?.canInstall ? 'success' : 'warning'}
+                    showIcon
+                    title={preflightResult.provisioning?.canInstall ? t('pages.nodes.preflightReady') : t('pages.nodes.preflightNeedsAttention')}
+                    description={(
+                      <Space direction="vertical" size={6}>
+                        <Typography.Text>
+                          {[preflightResult.hostname, preflightResult.os, preflightResult.arch].filter(Boolean).join(' / ')}
+                        </Typography.Text>
+                        <Space wrap>
+                          <Tag color={preflightResult.root || preflightResult.sudo ? 'green' : 'red'}>{t('pages.nodes.preflightPrivilege')}</Tag>
+                          <Tag color={preflightResult.systemd ? 'green' : 'red'}>systemd</Tag>
+                          <Tag color={preflightResult.docker ? 'green' : 'gold'}>Docker</Tag>
+                          <Tag>{t('pages.nodes.preflightDisk', { gb: (((preflightResult.freeDiskBytes ?? 0) / 1024 / 1024 / 1024).toFixed(1)) })}</Tag>
+                        </Space>
+                        {(preflightResult.occupiedPorts?.length ?? 0) > 0 && (
+                          <Typography.Text type="secondary">
+                            {t('pages.nodes.preflightPorts', { ports: preflightResult.occupiedPorts?.join(', ') })}
+                          </Typography.Text>
+                        )}
+                        {(preflightResult.errors?.length ?? 0) > 0 && (
+                          <Space direction="vertical" size={2}>
+                            {preflightResult.errors?.map((err) => (
+                              <Typography.Text type="danger" key={err.code}>{err.message}</Typography.Text>
+                            ))}
+                          </Space>
+                        )}
+                      </Space>
+                    )}
+                  />
+                </div>
+              )}
+            </div>
 
             <FormField
               label={t('pages.nodes.outboundTag')}

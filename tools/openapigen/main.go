@@ -79,6 +79,10 @@ func run(root, outDir string) error {
 			StructAllow: setOf(
 				"InboundOption",
 				"NodeMutationRequest",
+				"NodePreflightError",
+				"NodePreflightRequest",
+				"NodePreflightResult",
+				"NodeProvisioningPlan",
 				"NodeView",
 				"ProbeResultUI",
 				"RealityScanResult",

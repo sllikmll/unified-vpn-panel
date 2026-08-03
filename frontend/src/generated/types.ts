@@ -3,6 +3,7 @@ export type OnlineAPISupport = number;
 export type ProcessState = string;
 export type Protocol = string;
 export type SubLinkProvider = unknown;
+export type nodeSSHRunner = unknown;
 export type staticEgressResolver = string;
 export type transportBits = number;
 
@@ -536,6 +537,44 @@ export interface NodeMutationRequest {
   remark: string;
   scheme: string;
   tlsVerifyMode: string;
+}
+
+export interface NodePreflightError {
+  code: string;
+  message: string;
+}
+
+export interface NodePreflightRequest {
+  address: string;
+  authMethod: string;
+  hostKeyFingerprint: string;
+  hostKeyMode: string;
+  knownHosts: string;
+  password?: string | null;
+  port: number;
+  privateKey?: string | null;
+  privateKeyPassphrase?: string | null;
+  timeoutSeconds: number;
+  username: string;
+}
+
+export interface NodePreflightResult {
+  arch: string;
+  docker: boolean;
+  errors: NodePreflightError[];
+  freeDiskBytes: number;
+  hostname: string;
+  occupiedPorts: number[];
+  os: string;
+  provisioning: NodeProvisioningPlan;
+  root: boolean;
+  sudo: boolean;
+  systemd: boolean;
+}
+
+export interface NodeProvisioningPlan {
+  canInstall: boolean;
+  warnings: string[];
 }
 
 export interface NodeView {

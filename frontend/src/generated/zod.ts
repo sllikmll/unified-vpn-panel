@@ -12,6 +12,9 @@ export type Protocol = z.infer<typeof ProtocolSchema>;
 export const SubLinkProviderSchema = z.unknown();
 export type SubLinkProvider = z.infer<typeof SubLinkProviderSchema>;
 
+export const nodeSSHRunnerSchema = z.unknown();
+export type nodeSSHRunner = z.infer<typeof nodeSSHRunnerSchema>;
+
 export const staticEgressResolverSchema = z.string();
 export type staticEgressResolver = z.infer<typeof staticEgressResolverSchema>;
 
@@ -569,6 +572,48 @@ export const NodeMutationRequestSchema = z.object({
   tlsVerifyMode: z.enum(['verify', 'skip', 'pin', 'mtls']),
 });
 export type NodeMutationRequest = z.infer<typeof NodeMutationRequestSchema>;
+
+export const NodePreflightErrorSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+});
+export type NodePreflightError = z.infer<typeof NodePreflightErrorSchema>;
+
+export const NodePreflightRequestSchema = z.object({
+  address: z.string(),
+  authMethod: z.enum(['password', 'privateKey']),
+  hostKeyFingerprint: z.string(),
+  hostKeyMode: z.enum(['known_hosts', 'pin', 'insecure']),
+  knownHosts: z.string(),
+  password: z.string().nullable().optional(),
+  port: z.number().int().min(1).max(65535),
+  privateKey: z.string().nullable().optional(),
+  privateKeyPassphrase: z.string().nullable().optional(),
+  timeoutSeconds: z.number().int(),
+  username: z.string(),
+});
+export type NodePreflightRequest = z.infer<typeof NodePreflightRequestSchema>;
+
+export const NodePreflightResultSchema = z.object({
+  arch: z.string(),
+  docker: z.boolean(),
+  errors: z.array(z.lazy(() => NodePreflightErrorSchema)),
+  freeDiskBytes: z.number().int(),
+  hostname: z.string(),
+  occupiedPorts: z.array(z.number().int()),
+  os: z.string(),
+  provisioning: z.lazy(() => NodeProvisioningPlanSchema),
+  root: z.boolean(),
+  sudo: z.boolean(),
+  systemd: z.boolean(),
+});
+export type NodePreflightResult = z.infer<typeof NodePreflightResultSchema>;
+
+export const NodeProvisioningPlanSchema = z.object({
+  canInstall: z.boolean(),
+  warnings: z.array(z.string()),
+});
+export type NodeProvisioningPlan = z.infer<typeof NodeProvisioningPlanSchema>;
 
 export const NodeViewSchema = z.object({
   activeCount: z.number().int(),

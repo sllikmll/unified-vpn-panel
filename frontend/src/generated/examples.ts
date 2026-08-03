@@ -557,6 +557,56 @@ export const EXAMPLES: Record<string, unknown> = {
     "scheme": "http",
     "tlsVerifyMode": "verify"
   },
+  "NodePreflightError": {
+    "code": "docker_missing",
+    "message": "Docker is not installed"
+  },
+  "NodePreflightRequest": {
+    "address": "node1.example.com",
+    "authMethod": "privateKey",
+    "hostKeyFingerprint": "SHA256:abc...",
+    "hostKeyMode": "known_hosts",
+    "knownHosts": "node1.example.com ssh-ed25519 AAAA...",
+    "password": "\u003cwrite-only password\u003e",
+    "port": 22,
+    "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----",
+    "privateKeyPassphrase": "\u003cwrite-only passphrase\u003e",
+    "timeoutSeconds": 12,
+    "username": "root"
+  },
+  "NodePreflightResult": {
+    "arch": "amd64",
+    "docker": false,
+    "errors": [
+      {
+        "code": "docker_missing",
+        "message": "Docker is not installed"
+      }
+    ],
+    "freeDiskBytes": 10737418240,
+    "hostname": "edge-1",
+    "occupiedPorts": [
+      22,
+      80,
+      443
+    ],
+    "os": "ubuntu",
+    "provisioning": {
+      "canInstall": true,
+      "warnings": [
+        "Docker will be installed"
+      ]
+    },
+    "root": true,
+    "sudo": true,
+    "systemd": true
+  },
+  "NodeProvisioningPlan": {
+    "canInstall": true,
+    "warnings": [
+      "Docker will be installed"
+    ]
+  },
   "NodeView": {
     "activeCount": 20,
     "address": "node.example.com",

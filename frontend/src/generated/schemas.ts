@@ -2346,6 +2346,189 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "NodePreflightError": {
+    "properties": {
+      "code": {
+        "example": "docker_missing",
+        "type": "string"
+      },
+      "message": {
+        "example": "Docker is not installed",
+        "type": "string"
+      }
+    },
+    "required": [
+      "code",
+      "message"
+    ],
+    "type": "object"
+  },
+  "NodePreflightRequest": {
+    "properties": {
+      "address": {
+        "example": "node1.example.com",
+        "type": "string"
+      },
+      "authMethod": {
+        "enum": [
+          "password",
+          "privateKey"
+        ],
+        "example": "privateKey",
+        "type": "string"
+      },
+      "hostKeyFingerprint": {
+        "example": "SHA256:abc...",
+        "type": "string"
+      },
+      "hostKeyMode": {
+        "enum": [
+          "known_hosts",
+          "pin",
+          "insecure"
+        ],
+        "example": "known_hosts",
+        "type": "string"
+      },
+      "knownHosts": {
+        "example": "node1.example.com ssh-ed25519 AAAA...",
+        "type": "string"
+      },
+      "password": {
+        "example": "\u003cwrite-only password\u003e",
+        "nullable": true,
+        "type": "string"
+      },
+      "port": {
+        "example": 22,
+        "maximum": 65535,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "privateKey": {
+        "example": "-----BEGIN OPENSSH PRIVATE KEY-----",
+        "nullable": true,
+        "type": "string"
+      },
+      "privateKeyPassphrase": {
+        "example": "\u003cwrite-only passphrase\u003e",
+        "nullable": true,
+        "type": "string"
+      },
+      "timeoutSeconds": {
+        "example": 12,
+        "type": "integer"
+      },
+      "username": {
+        "example": "root",
+        "type": "string"
+      }
+    },
+    "required": [
+      "address",
+      "authMethod",
+      "hostKeyFingerprint",
+      "hostKeyMode",
+      "knownHosts",
+      "port",
+      "timeoutSeconds",
+      "username"
+    ],
+    "type": "object"
+  },
+  "NodePreflightResult": {
+    "properties": {
+      "arch": {
+        "example": "amd64",
+        "type": "string"
+      },
+      "docker": {
+        "example": false,
+        "type": "boolean"
+      },
+      "errors": {
+        "items": {
+          "$ref": "#/components/schemas/NodePreflightError"
+        },
+        "type": "array"
+      },
+      "freeDiskBytes": {
+        "example": 10737418240,
+        "format": "int64",
+        "type": "integer"
+      },
+      "hostname": {
+        "example": "edge-1",
+        "type": "string"
+      },
+      "occupiedPorts": {
+        "example": [
+          22,
+          80,
+          443
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "os": {
+        "example": "ubuntu",
+        "type": "string"
+      },
+      "provisioning": {
+        "$ref": "#/components/schemas/NodeProvisioningPlan"
+      },
+      "root": {
+        "example": true,
+        "type": "boolean"
+      },
+      "sudo": {
+        "example": true,
+        "type": "boolean"
+      },
+      "systemd": {
+        "example": true,
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "arch",
+      "docker",
+      "errors",
+      "freeDiskBytes",
+      "hostname",
+      "occupiedPorts",
+      "os",
+      "provisioning",
+      "root",
+      "sudo",
+      "systemd"
+    ],
+    "type": "object"
+  },
+  "NodeProvisioningPlan": {
+    "properties": {
+      "canInstall": {
+        "example": true,
+        "type": "boolean"
+      },
+      "warnings": {
+        "example": [
+          "Docker will be installed"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "canInstall",
+      "warnings"
+    ],
+    "type": "object"
+  },
   "NodeView": {
     "description": "NodeView is the browser/API read contract for nodes. Credentials are\nwrite-only: responses expose only whether a node has a token configured.",
     "properties": {

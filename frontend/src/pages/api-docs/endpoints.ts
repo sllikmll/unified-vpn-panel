@@ -996,6 +996,13 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'POST',
+        path: '/panel/api/nodes/preflight',
+        summary: 'Run an ephemeral SSH preflight against a candidate node without saving credentials. Supports write-only password or private-key auth, strict host-key verification by known_hosts or fingerprint pin, and explicit insecure opt-in. Returns OS, arch, hostname, privilege capability, systemd/Docker, free disk, occupied ports, and provisioning readiness.',
+        body: '{\n  "address": "node1.example.com",\n  "port": 22,\n  "username": "root",\n  "authMethod": "privateKey",\n  "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----\\n...\\n-----END OPENSSH PRIVATE KEY-----",\n  "hostKeyMode": "known_hosts",\n  "knownHosts": "node1.example.com ssh-ed25519 AAAA..."\n}',
+        responseSchema: 'NodePreflightResult',
+      },
+      {
+        method: 'POST',
         path: '/panel/api/nodes/certFingerprint',
         summary: "Connect to the node over HTTPS without verifying its certificate and return the leaf certificate's SHA-256 (base64). Used by the Add/Edit Node dialog to fetch and pin a self-signed certificate. Uses the same body as /test.",
         body: '{\n  "scheme": "https",\n  "address": "node1.example.com",\n  "port": 2053,\n  "basePath": "/"\n}',
