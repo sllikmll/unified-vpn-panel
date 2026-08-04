@@ -16,6 +16,10 @@ export const ManagedEndpointViewSchema = GeneratedManagedEndpointViewSchema.exte
   traffic: ManagedTrafficViewSchema,
   health: ManagedHealthViewSchema,
   secretSummary: ManagedSecretSummarySchema,
+  config: z.unknown().optional(),
+  installPlan: z.unknown().optional(),
+  capabilities: z.unknown().optional(),
+  actionPlan: z.unknown().optional(),
 }).strict();
 export const ManagedEndpointCapabilitySchema = GeneratedManagedEndpointCapabilitySchema.strict();
 export const ManagedEndpointCapabilitiesSchema = GeneratedManagedEndpointCapabilitiesSchema.extend({
