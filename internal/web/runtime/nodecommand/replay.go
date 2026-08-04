@@ -203,7 +203,9 @@ func requestReplayHashErr(req Request) (string, error) {
 	if err := validateSecretInput(req.SecretInput); err != nil {
 		return "", err
 	}
-	wire, err := req.MarshalJSON()
+	hashReq := req
+	hashReq.SealedPayload = ""
+	wire, err := hashReq.MarshalJSON()
 	if err != nil {
 		return "", err
 	}

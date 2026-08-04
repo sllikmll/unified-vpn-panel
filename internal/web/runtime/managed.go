@@ -3,8 +3,10 @@ package runtime
 import (
 	"fmt"
 
+	awg "github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver"
+	awgdriver "github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver/amneziawg"
 )
 
 type ManagedRuntime interface {
@@ -13,6 +15,9 @@ type ManagedRuntime interface {
 }
 
 func (l *Local) Driver(kind model.RuntimeKind) (driver.Driver, error) {
+	if kind == model.RuntimeAmneziaWG {
+		return awgdriver.New(awg.NewRuntime(awg.NewCommandBackend(), nil)), nil
+	}
 	return legacyDriverFor(kind, l)
 }
 

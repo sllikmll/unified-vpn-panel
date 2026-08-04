@@ -53,11 +53,16 @@ func (a *APIController) checkAPIAuth(c *gin.Context) {
 				session.SetAPIAuthUser(c, u)
 			}
 			c.Set("api_authed", true)
+			c.Set("api_bearer_token", tok)
 			c.Next()
 			return
 		}
 	}
 	if !session.IsLogin(c) {
+		if strings.HasSuffix(c.Request.URL.Path, "/panel/api/node-command/v1") {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
 		if c.GetHeader("X-Requested-With") == "XMLHttpRequest" {
 			c.AbortWithStatus(http.StatusUnauthorized)
 		} else {
@@ -98,6 +103,7 @@ func (a *APIController) initRouter(g *gin.RouterGroup) {
 	// Nodes API — multi-panel management
 	nodes := api.Group("/nodes")
 	a.nodeController = NewNodeController(nodes)
+	api.POST("/node-command/v1", handleNodeCommand)
 
 	// Hosts API — per-inbound override endpoints for subscription links
 	hosts := api.Group("/hosts")

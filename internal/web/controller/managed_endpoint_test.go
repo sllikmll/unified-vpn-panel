@@ -64,3 +64,16 @@ func TestManagedEndpointReadOnlyRoutesRedactOutput(t *testing.T) {
 		}
 	}
 }
+
+func TestManagedEndpointInstallPlanRoute(t *testing.T) {
+	engine := initManagedEndpointController(t)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/panel/api/managed-endpoints/install-plan/amneziawg", nil)
+	engine.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), `"imageRef"`) || !strings.Contains(rec.Body.String(), "pinned by digest") {
+		t.Fatalf("install plan did not report blocked digest-pinned image state: %s", rec.Body.String())
+	}
+}

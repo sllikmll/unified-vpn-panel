@@ -58,6 +58,7 @@ const (
 	OperationClientEnable      Operation = "client.enable"
 	OperationClientDisable     Operation = "client.disable"
 	OperationClientStatus      Operation = "client.status"
+	OperationClientExport      Operation = "client.export"
 )
 
 type Payload interface {
@@ -99,6 +100,7 @@ type Request struct {
 	ExpiresAt          time.Time         `json:"expiresAt"`
 	Payload            Payload           `json:"-"`
 	SecretInput        *SecretInput      `json:"-"`
+	SealedPayload      string            `json:"sealedPayload,omitempty"`
 	rawPayload         json.RawMessage
 	negotiatedProtocol ProtocolVersion
 }
@@ -117,6 +119,7 @@ type requestWire struct {
 	IssuedAt          time.Time         `json:"issuedAt"`
 	ExpiresAt         time.Time         `json:"expiresAt"`
 	Payload           json.RawMessage   `json:"payload,omitempty"`
+	SealedPayload     string            `json:"sealedPayload,omitempty"`
 }
 
 func NegotiateVersion(offered []ProtocolVersion) (ProtocolVersion, error) {
@@ -155,6 +158,7 @@ func (r Request) MarshalJSON() ([]byte, error) {
 		IssuedAt          time.Time         `json:"issuedAt"`
 		ExpiresAt         time.Time         `json:"expiresAt"`
 		Payload           any               `json:"payload,omitempty"`
+		SealedPayload     string            `json:"sealedPayload,omitempty"`
 	}{
 		Version:           r.Version,
 		SupportedVersions: r.SupportedVersions,
@@ -169,6 +173,7 @@ func (r Request) MarshalJSON() ([]byte, error) {
 		IssuedAt:          r.IssuedAt,
 		ExpiresAt:         r.ExpiresAt,
 		Payload:           payload,
+		SealedPayload:     r.SealedPayload,
 	})
 }
 
@@ -238,6 +243,9 @@ func (r Request) Validate(now time.Time) error {
 	if err := validateSecretInput(r.SecretInput); err != nil {
 		return err
 	}
+	if r.SealedPayload != "" && !isSafeSealedPayload(r.SealedPayload) {
+		return fmt.Errorf("%w: sealedPayload", ErrInvalidField)
+	}
 	return nil
 }
 
@@ -252,7 +260,7 @@ func isSupportedRuntime(kind model.RuntimeKind) bool {
 
 func isSupportedOperation(operation Operation) bool {
 	switch operation {
-	case OperationEndpointApply, OperationEndpointDelete, OperationEndpointEnable, OperationEndpointDisable, OperationEndpointStart, OperationEndpointStop, OperationEndpointRestart, OperationEndpointReconcile, OperationEndpointStatus, OperationEndpointHealth, OperationEndpointDetect, OperationClientCreate, OperationClientUpdate, OperationClientDelete, OperationClientEnable, OperationClientDisable, OperationClientStatus:
+	case OperationEndpointApply, OperationEndpointDelete, OperationEndpointEnable, OperationEndpointDisable, OperationEndpointStart, OperationEndpointStop, OperationEndpointRestart, OperationEndpointReconcile, OperationEndpointStatus, OperationEndpointHealth, OperationEndpointDetect, OperationClientCreate, OperationClientUpdate, OperationClientDelete, OperationClientEnable, OperationClientDisable, OperationClientStatus, OperationClientExport:
 		return true
 	default:
 		return false
@@ -290,7 +298,7 @@ func validatePayloadForOperation(operation Operation, payload Payload) error {
 			return fmt.Errorf("%w: %s rejects payload", ErrPayloadMismatch, operation)
 		}
 		return nil
-	case OperationClientCreate, OperationClientUpdate, OperationClientDelete, OperationClientEnable, OperationClientDisable, OperationClientStatus:
+	case OperationClientCreate, OperationClientUpdate, OperationClientDelete, OperationClientEnable, OperationClientDisable, OperationClientStatus, OperationClientExport:
 		p, ok := payload.(ClientPayload)
 		if !ok {
 			return fmt.Errorf("%w: %s requires client payload", ErrPayloadMismatch, operation)
@@ -338,7 +346,7 @@ func validateClientPayload(operation Operation, payload ClientPayload) error {
 			return validateEmail(payload.Email)
 		}
 		return nil
-	case OperationClientDelete, OperationClientStatus:
+	case OperationClientDelete, OperationClientStatus, OperationClientExport:
 		if strings.TrimSpace(payload.Email) != "" || payload.Enable != nil {
 			return fmt.Errorf("%w: client delete/status field", ErrForbiddenField)
 		}
@@ -396,6 +404,19 @@ func validateSecretInput(secret *SecretInput) error {
 		}
 	}
 	return nil
+}
+
+func isSafeSealedPayload(value string) bool {
+	if len(value) > MaxSecretMaterialBytes*2 {
+		return false
+	}
+	for _, r := range value {
+		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func isSafeBoundedToken(value string, maxLen int) bool {

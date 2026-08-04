@@ -272,6 +272,51 @@ func TestRequestSecretInputDoesNotSerialize(t *testing.T) {
 	}
 }
 
+func TestSealedSecretInputRoundTripsRefsWithoutPlaintext(t *testing.T) {
+	key := []byte("token")
+	secret := &SecretInput{
+		Material: []byte("private-config"),
+		Refs:     map[string]string{"interfaceName": "awg0"},
+	}
+	sealed, err := SealSecretInput(key, secret)
+	if err != nil {
+		t.Fatalf("SealSecretInput: %v", err)
+	}
+	if strings.Contains(sealed, "private-config") || strings.Contains(sealed, "interfaceName") || strings.Contains(sealed, "awg0") {
+		t.Fatalf("sealed secret leaked plaintext: %q", sealed)
+	}
+	opened, err := OpenSealedSecretInput(key, sealed)
+	if err != nil {
+		t.Fatalf("OpenSealedSecretInput: %v", err)
+	}
+	if string(opened.Material) != "private-config" || opened.Refs["interfaceName"] != "awg0" {
+		t.Fatalf("opened secret = %+v", opened)
+	}
+}
+
+func TestClientExportOperationValidation(t *testing.T) {
+	now := time.Unix(100, 0).UTC()
+	req := validRequest(now)
+	req.Operation = OperationClientExport
+	req.Payload = ClientPayload{ClientID: "client-1"}
+	if err := req.Validate(now); err != nil {
+		t.Fatalf("client export request: %v", err)
+	}
+
+	resp := validResponse(req)
+	resp.SummaryCode = SummaryExported
+	resp.Result.State = ResultStateExported
+	resp.SealedResult = "abc123_-"
+	if err := resp.ValidateFor(req); err != nil {
+		t.Fatalf("client export response: %v", err)
+	}
+
+	resp.SealedResult = "abc/123"
+	if err := resp.ValidateFor(req); !errors.Is(err, ErrUnsafeResponse) {
+		t.Fatalf("unsafe sealed result error = %v, want ErrUnsafeResponse", err)
+	}
+}
+
 func TestRequestSecretInputBounds(t *testing.T) {
 	now := time.Unix(100, 0).UTC()
 	base := validRequest(now)

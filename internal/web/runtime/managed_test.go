@@ -27,6 +27,13 @@ func TestLocalManagedRuntimeDrivers(t *testing.T) {
 		t.Fatalf("mtproto kind = %q, want %q", mtproto.Kind(), model.RuntimeMTProto)
 	}
 
+	awg, err := local.Driver(model.RuntimeAmneziaWG)
+	if err != nil {
+		t.Fatalf("amneziawg driver: %v", err)
+	}
+	if awg.Kind() != model.RuntimeAmneziaWG {
+		t.Fatalf("amneziawg kind = %q, want %q", awg.Kind(), model.RuntimeAmneziaWG)
+	}
 	if _, err := local.Driver(model.RuntimeWireGuard); !errors.Is(err, driver.ErrUnsupportedRuntime) {
 		t.Fatalf("wireguard driver err = %v, want ErrUnsupportedRuntime", err)
 	}

@@ -134,6 +134,30 @@ func TestManagedEndpointCapabilitiesPhase0ReadOnly(t *testing.T) {
 	}
 }
 
+func TestManagedEndpointInstallPlanBlocksUnpinnedAWGImage(t *testing.T) {
+	plan := ManagedEndpointService{}.InstallPlan(model.RuntimeAmneziaWG)
+	if plan.Supported || !plan.Blocked || !plan.RequiresPinnedImage {
+		t.Fatalf("AWG install plan must be blocked until a pinned image exists: %#v", plan)
+	}
+	if strings.Contains(plan.ImageRef, ":latest") {
+		t.Fatalf("install plan must not advertise latest image: %#v", plan)
+	}
+	if !strings.Contains(plan.Reason, "pinned by digest") {
+		t.Fatalf("install plan reason must name digest blocker: %#v", plan)
+	}
+	foundDocker := false
+	for _, profile := range plan.BackendProfiles {
+		if profile.Kind == "docker-amnezia-awg2" {
+			foundDocker = profile.ContainerName == "amnezia-awg2" &&
+				profile.HostConfigDir == "/opt/amnezia/state/amnezia-awg2" &&
+				profile.ContainerConfigDir == "/opt/amnezia/awg"
+		}
+	}
+	if !foundDocker {
+		t.Fatalf("install plan missing fixed docker profile: %#v", plan.BackendProfiles)
+	}
+}
+
 func TestManagedEndpointGetDoesNotExposeAnotherUsersRows(t *testing.T) {
 	initManagedEndpointServiceDB(t)
 	db := database.GetDB()

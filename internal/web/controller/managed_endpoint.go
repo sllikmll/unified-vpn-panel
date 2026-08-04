@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/session"
 )
@@ -23,6 +24,7 @@ func NewManagedEndpointController(g *gin.RouterGroup) *ManagedEndpointController
 func (a *ManagedEndpointController) initRouter(g *gin.RouterGroup) {
 	g.GET("/list", a.list)
 	g.GET("/capabilities", a.capabilities)
+	g.GET("/install-plan/:runtimeKind", a.installPlan)
 	g.GET("/:id", a.get)
 }
 
@@ -57,4 +59,8 @@ func (a *ManagedEndpointController) get(c *gin.Context) {
 
 func (a *ManagedEndpointController) capabilities(c *gin.Context) {
 	jsonObj(c, a.managedEndpointService.Capabilities(), nil)
+}
+
+func (a *ManagedEndpointController) installPlan(c *gin.Context) {
+	jsonObj(c, a.managedEndpointService.InstallPlan(model.RuntimeKind(c.Param("runtimeKind"))), nil)
 }

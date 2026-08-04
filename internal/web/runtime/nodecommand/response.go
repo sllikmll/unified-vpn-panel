@@ -38,6 +38,7 @@ const (
 	SummaryAccepted             SummaryCode = "accepted"
 	SummaryApplied              SummaryCode = "applied"
 	SummaryDeleted              SummaryCode = "deleted"
+	SummaryExported             SummaryCode = "exported"
 	SummaryStatusAvailable      SummaryCode = "status_available"
 	SummaryUnsupportedOperation SummaryCode = "unsupported_operation"
 	SummaryValidationFailed     SummaryCode = "validation_failed"
@@ -57,6 +58,7 @@ const (
 	ResultStateStopped   ResultState = "stopped"
 	ResultStateApplied   ResultState = "applied"
 	ResultStateDeleted   ResultState = "deleted"
+	ResultStateExported  ResultState = "exported"
 	ResultStateHealthy   ResultState = "healthy"
 	ResultStateUnhealthy ResultState = "unhealthy"
 	ResultStateEnabled   ResultState = "enabled"
@@ -76,6 +78,8 @@ type Response struct {
 	ErrorCode          ErrorCode       `json:"errorCode,omitempty"`
 	SummaryCode        SummaryCode     `json:"summaryCode,omitempty"`
 	Result             Result          `json:"result,omitempty"`
+	SealedResult       string          `json:"sealedResult,omitempty"`
+	SecretOutput       []byte          `json:"-"`
 }
 
 type Result struct {
@@ -125,6 +129,9 @@ func (r Response) Validate() error {
 	}
 	if err := r.Result.Validate(); err != nil {
 		return err
+	}
+	if r.SealedResult != "" && !isSafeSealedPayload(r.SealedResult) {
+		return fmt.Errorf("%w: sealedResult", ErrUnsafeResponse)
 	}
 	return validateResponseStatusConsistency(r)
 }
@@ -193,7 +200,7 @@ func isAllowedErrorCode(code ErrorCode) bool {
 
 func isAllowedSummaryCode(code SummaryCode) bool {
 	switch code {
-	case SummaryNone, SummaryAccepted, SummaryApplied, SummaryDeleted, SummaryStatusAvailable, SummaryUnsupportedOperation, SummaryValidationFailed, SummaryExpired, SummaryReplayConflict, SummaryRuntimeFailed, SummaryUnavailable, SummaryUnauthorized:
+	case SummaryNone, SummaryAccepted, SummaryApplied, SummaryDeleted, SummaryExported, SummaryStatusAvailable, SummaryUnsupportedOperation, SummaryValidationFailed, SummaryExpired, SummaryReplayConflict, SummaryRuntimeFailed, SummaryUnavailable, SummaryUnauthorized:
 		return true
 	default:
 		return false
@@ -248,7 +255,7 @@ func isFailureSummaryCode(code SummaryCode) bool {
 
 func isSuccessSummaryCode(code SummaryCode) bool {
 	switch code {
-	case SummaryNone, SummaryAccepted, SummaryApplied, SummaryDeleted, SummaryStatusAvailable:
+	case SummaryNone, SummaryAccepted, SummaryApplied, SummaryDeleted, SummaryExported, SummaryStatusAvailable:
 		return true
 	default:
 		return false
@@ -257,7 +264,7 @@ func isSuccessSummaryCode(code SummaryCode) bool {
 
 func isSuccessResultState(state ResultState) bool {
 	switch state {
-	case ResultStateUnknown, ResultStatePending, ResultStateRunning, ResultStateStopped, ResultStateApplied, ResultStateDeleted, ResultStateHealthy, ResultStateUnhealthy, ResultStateEnabled, ResultStateDisabled:
+	case ResultStateUnknown, ResultStatePending, ResultStateRunning, ResultStateStopped, ResultStateApplied, ResultStateDeleted, ResultStateExported, ResultStateHealthy, ResultStateUnhealthy, ResultStateEnabled, ResultStateDisabled:
 		return true
 	default:
 		return false
@@ -286,7 +293,7 @@ func (r Result) hasFields() bool {
 
 func isAllowedResultState(state ResultState) bool {
 	switch state {
-	case ResultStateUnknown, ResultStatePending, ResultStateRunning, ResultStateStopped, ResultStateApplied, ResultStateDeleted, ResultStateHealthy, ResultStateUnhealthy, ResultStateEnabled, ResultStateDisabled:
+	case ResultStateUnknown, ResultStatePending, ResultStateRunning, ResultStateStopped, ResultStateApplied, ResultStateDeleted, ResultStateExported, ResultStateHealthy, ResultStateUnhealthy, ResultStateEnabled, ResultStateDisabled:
 		return true
 	default:
 		return false

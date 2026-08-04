@@ -22,6 +22,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/util/netsafe"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/wirecodec"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/entity"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/nodecommand"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 )
 
@@ -96,6 +97,41 @@ type Remote struct {
 	clientErr  error
 
 	egressResolver NodeEgressResolver
+}
+
+func (r *Remote) nodeCommandTransport() {}
+
+func (r *Remote) Send(ctx context.Context, session nodecommand.AuthenticatedSession, req nodecommand.Request) (nodecommand.Response, error) {
+	if r.node.ApiToken == "" {
+		return nodecommand.Response{}, errors.New("node command requires bearer token for sealed payloads")
+	}
+	if req.SecretInput != nil && (len(req.SecretInput.Material) > 0 || len(req.SecretInput.Refs) > 0) {
+		sealed, err := nodecommand.SealSecretInput([]byte(r.node.ApiToken), req.SecretInput)
+		if err != nil {
+			return nodecommand.Response{}, err
+		}
+		req.SealedPayload = sealed
+		req.SecretInput = nil
+	}
+	transport := nodecommand.TransportFunc(func(ctx context.Context, _ nodecommand.AuthenticatedSession, req nodecommand.Request) (nodecommand.Response, error) {
+		env, err := r.do(ctx, http.MethodPost, "panel/api/node-command/v1", req)
+		if err != nil {
+			return nodecommand.Response{}, err
+		}
+		var out nodecommand.Response
+		if err := json.Unmarshal(env.Obj, &out); err != nil {
+			return nodecommand.Response{}, fmt.Errorf("decode node command response: %w", err)
+		}
+		if out.SealedResult != "" {
+			opened, err := nodecommand.OpenSealedMaterial([]byte(r.node.ApiToken), out.SealedResult)
+			if err != nil {
+				return nodecommand.Response{}, fmt.Errorf("decode node command sealed result: %w", err)
+			}
+			out.SecretOutput = opened
+		}
+		return out, nil
+	})
+	return transport.Send(ctx, session, req)
 }
 
 type RemoteInboundOption struct {

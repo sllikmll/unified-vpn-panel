@@ -73,6 +73,23 @@ type ManagedEndpointCapabilities struct {
 	RuntimeKinds []ManagedEndpointCapability `json:"runtimeKinds"`
 }
 
+type InstallPlanBackendProfile struct {
+	Kind               string `json:"kind"`
+	ContainerName      string `json:"containerName,omitempty"`
+	HostConfigDir      string `json:"hostConfigDir,omitempty"`
+	ContainerConfigDir string `json:"containerConfigDir,omitempty"`
+}
+
+type InstallPlan struct {
+	RuntimeKind         model.RuntimeKind           `json:"runtimeKind"`
+	Supported           bool                        `json:"supported"`
+	Blocked             bool                        `json:"blocked"`
+	RequiresPinnedImage bool                        `json:"requiresPinnedImage"`
+	ImageRef            string                      `json:"imageRef,omitempty"`
+	Reason              string                      `json:"reason,omitempty"`
+	BackendProfiles     []InstallPlanBackendProfile `json:"backendProfiles,omitempty"`
+}
+
 type ManagedEndpointService struct{}
 
 func (s ManagedEndpointService) List(userId int) ([]ManagedEndpointView, error) {
@@ -145,6 +162,28 @@ func (ManagedEndpointService) Capabilities() ManagedEndpointCapabilities {
 		phase0Capability(model.RuntimeMieru, "mieru"),
 		phase0Capability(model.RuntimeNaiveProxy, "naiveproxy"),
 	}}
+}
+
+func (ManagedEndpointService) InstallPlan(kind model.RuntimeKind) InstallPlan {
+	if kind != model.RuntimeAmneziaWG {
+		return InstallPlan{
+			RuntimeKind: kind,
+			Supported:   false,
+			Blocked:     true,
+			Reason:      "install planning is currently defined only for amneziawg",
+		}
+	}
+	return InstallPlan{
+		RuntimeKind:         model.RuntimeAmneziaWG,
+		Supported:           false,
+		Blocked:             true,
+		RequiresPinnedImage: true,
+		Reason:              "real install is blocked until this repo builds and publishes a reproducible GHCR AWG2 runtime image pinned by digest; current fleets use local amnezia-awg2:latest images with inconsistent IDs",
+		BackendProfiles: []InstallPlanBackendProfile{
+			{Kind: "docker-amnezia-awg2", ContainerName: "amnezia-awg2", HostConfigDir: "/opt/amnezia/state/amnezia-awg2", ContainerConfigDir: "/opt/amnezia/awg"},
+			{Kind: "native-awg", HostConfigDir: "/etc/amnezia/amneziawg"},
+		},
+	}
 }
 
 func phase0Capability(kind model.RuntimeKind, protocols ...model.ManagedProtocol) ManagedEndpointCapability {

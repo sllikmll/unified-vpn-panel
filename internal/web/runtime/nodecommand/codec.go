@@ -15,13 +15,14 @@ const DefaultMaxRequestBytes int64 = 1 << 20
 var allowedJSONFields = map[string]struct{}{
 	"version": {}, "supportedVersions": {}, "commandId": {}, "idempotencyKey": {},
 	"nodeId": {}, "targetGuid": {}, "endpointId": {}, "runtimeKind": {}, "operation": {},
-	"desiredGeneration": {}, "issuedAt": {}, "expiresAt": {}, "payload": {},
+	"desiredGeneration": {}, "issuedAt": {}, "expiresAt": {}, "payload": {}, "sealedPayload": {},
 	"tag": {}, "enable": {}, "clientId": {}, "email": {},
 }
 
 type DecodeOptions struct {
 	MaxBytes int64
 	Now      func() time.Time
+	SealKey  []byte
 }
 
 func DecodeRequest(r io.Reader, opts DecodeOptions) (Request, error) {
@@ -75,8 +76,16 @@ func DecodeRequest(r io.Reader, opts DecodeOptions) (Request, error) {
 		IssuedAt:           wire.IssuedAt,
 		ExpiresAt:          wire.ExpiresAt,
 		Payload:            payload,
+		SealedPayload:      wire.SealedPayload,
 		rawPayload:         append(json.RawMessage(nil), wire.Payload...),
 		negotiatedProtocol: negotiated,
+	}
+	if wire.SealedPayload != "" {
+		secret, err := OpenSealedSecretInput(opts.SealKey, wire.SealedPayload)
+		if err != nil {
+			return Request{}, err
+		}
+		req.SecretInput = secret
 	}
 	now := time.Now().UTC()
 	if opts.Now != nil {
