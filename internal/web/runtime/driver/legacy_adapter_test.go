@@ -206,8 +206,8 @@ func TestAdaptersHandleCancellationAndNilDependencies(t *testing.T) {
 	if len(rt.addInboundCalls) != 0 {
 		t.Fatalf("canceled call delegated %d times, want 0", len(rt.addInboundCalls))
 	}
-	if _, err := driver.Create(nil, &model.Inbound{Protocol: model.VLESS}); !errors.Is(err, ErrNilContext) {
-		t.Fatalf("Create nil context err = %v, want ErrNilContext", err)
+	if _, err := driver.Create(nil, &model.Inbound{Protocol: model.VLESS}); !errors.Is(err, ErrNilContext) { //nolint:staticcheck
+		t.Fatalf("nil context err = %v, want ErrNilContext", err)
 	}
 	if len(rt.addInboundCalls) != 0 {
 		t.Fatalf("nil context delegated %d times, want 0", len(rt.addInboundCalls))

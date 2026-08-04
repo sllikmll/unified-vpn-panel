@@ -17,18 +17,23 @@ func (d stubDriver) Kind() model.RuntimeKind { return d.kind }
 func (d stubDriver) Capabilities() Capabilities {
 	return Capabilities{}
 }
+
 func (d stubDriver) Create(context.Context, *model.Inbound) (EndpointResult, error) {
 	return EndpointResult{}, nil
 }
+
 func (d stubDriver) Update(context.Context, *model.Inbound, *model.Inbound) (EndpointResult, error) {
 	return EndpointResult{}, nil
 }
+
 func (d stubDriver) Delete(context.Context, *model.Inbound) (EndpointResult, error) {
 	return EndpointResult{}, nil
 }
+
 func (d stubDriver) Enable(context.Context, *model.Inbound) (EndpointResult, error) {
 	return EndpointResult{}, nil
 }
+
 func (d stubDriver) Disable(context.Context, *model.Inbound) (EndpointResult, error) {
 	return EndpointResult{}, nil
 }
