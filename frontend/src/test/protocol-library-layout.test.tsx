@@ -39,10 +39,11 @@ describe('ProtocolLibraryPage layout', () => {
     const rootLayout = getByTestId('sidebar').parentElement;
     const contentShell = container.querySelector('.content-shell');
     const contentArea = container.querySelector('.content-area');
-    const page = container.querySelector('main.protocol-library-page');
+    const page = container.querySelector('.protocol-library-page');
 
     expect(rootLayout?.classList.contains('ant-layout')).toBe(true);
     expect(contentShell?.parentElement).toBe(rootLayout);
     expect(contentArea?.contains(page)).toBe(true);
+    expect(page?.tagName).toBe('DIV');
   });
 });

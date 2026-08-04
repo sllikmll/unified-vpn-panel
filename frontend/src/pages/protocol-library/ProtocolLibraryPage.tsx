@@ -205,7 +205,7 @@ export default function ProtocolLibraryPage() {
         <AppSidebar />
         <Layout className="content-shell">
           <Layout.Content id="content-layout" className="content-area">
-            <main className="page-shell protocol-library-page">
+            <div className="page-shell protocol-library-page">
         <div className="page-header-row">
           <div>
             <h1>{t('pages.protocolLibrary.title')}</h1>
@@ -292,7 +292,7 @@ export default function ProtocolLibraryPage() {
             placeholder={t('pages.protocolLibrary.previewPlaceholder')}
           />
         </Card>
-            </main>
+            </div>
           </Layout.Content>
         </Layout>
       </Layout>
