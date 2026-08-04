@@ -1,6 +1,7 @@
 package protocolconnections
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -169,6 +170,43 @@ func TestMalformedInputRejected(t *testing.T) {
 				t.Fatalf("expected malformed input to be rejected")
 			}
 		})
+	}
+}
+
+func TestParseConnectionRejectsExplicitUnsupportedProtocol(t *testing.T) {
+	_, err := ParseConnection("not-a-protocol", "trojan://password@example.com:443", "bad")
+	if err == nil || !strings.Contains(err.Error(), "unsupported protocol") {
+		t.Fatalf("explicit unsupported protocol must be rejected, got %v", err)
+	}
+}
+
+func TestParseAmneziaDataURLSchemes(t *testing.T) {
+	config := "[Interface]\nPrivateKey = private-key\nAddress = 10.0.0.2/32\nJc = 4\nJmin = 40\nJmax = 70\nS1 = 0\nS2 = 0\nH1 = 1\nH2 = 2\nH3 = 3\nH4 = 4\n[Peer]\nPublicKey = public-key\nEndpoint = vpn.example.com:51820\nAllowedIPs = 0.0.0.0/0\n"
+	payload := base64.RawURLEncoding.EncodeToString([]byte(config))
+	for _, scheme := range []string{"awg://", "amneziawg://"} {
+		t.Run(scheme, func(t *testing.T) {
+			conn, err := ParseConnection("amnezia", scheme+payload, "awg")
+			if err != nil {
+				t.Fatalf("parse %s: %v", scheme, err)
+			}
+			if !strings.Contains(conn.MihomoYAML, "amnezia-wg-option:") {
+				t.Fatalf("AWG options missing from YAML:\n%s", conn.MihomoYAML)
+			}
+		})
+	}
+}
+
+func TestParseNaiveRequiresPassword(t *testing.T) {
+	_, err := ParseConnection("naiveproxy", "naive+https://user@naive.example.com:443", "naive")
+	if err == nil {
+		t.Fatal("NaiveProxy URI without password must be rejected")
+	}
+}
+
+func TestRedactHysteriaObfsPassword(t *testing.T) {
+	redacted := Redact("- name: hy\n  password: auth-secret\n  obfs-password: obfs-secret\n")
+	if strings.Contains(redacted, "auth-secret") || strings.Contains(redacted, "obfs-secret") {
+		t.Fatalf("redaction leaked Hysteria2 credentials: %s", redacted)
 	}
 }
 

@@ -253,7 +253,10 @@ func ParseConnection(protocol, raw, customName string) (*model.ProtocolConnectio
 		return nil, fmt.Errorf("connection content exceeds %d bytes", MaxRawBytes)
 	}
 	proto := strings.ToLower(strings.TrimSpace(protocol))
-	if proto == "" || !IsAllowedProtocol(proto) {
+	if proto != "" && !IsAllowedProtocol(proto) {
+		return nil, fmt.Errorf("unsupported protocol")
+	}
+	if proto == "" {
 		proto = DetectProtocol(text)
 	}
 	if !IsAllowedProtocol(proto) {
@@ -451,13 +454,13 @@ func parseNaive(raw, customName string) (map[string]any, bool, error) {
 	if scheme != "naive" && scheme != "naive+https" && scheme != "https" {
 		return nil, true, fmt.Errorf("not a NaiveProxy URI")
 	}
-	password, _ := u.User.Password()
+	password, hasPassword := u.User.Password()
 	p := baseProxy(customName, u, "http")
 	p["username"] = unescape(u.User.Username())
 	p["password"] = unescape(password)
 	p["tls"] = true
 	p["sni"] = u.Hostname()
-	if p["username"] == "" {
+	if p["username"] == "" || !hasPassword || password == "" {
 		return nil, true, fmt.Errorf("invalid NaiveProxy URI")
 	}
 	return p, true, nil
@@ -776,7 +779,7 @@ func slug(s string) string {
 }
 
 func Redact(text string) string {
-	out := regexp.MustCompile(`(?im)^(\s*(?:password|private-key|presharedkey|pre-shared-key|uuid|token|secret)\s*[:=]\s*)(.+)$`).ReplaceAllString(text, `${1}<redacted>`)
+	out := regexp.MustCompile(`(?im)^(\s*(?:password|obfs-password|obfs_password|private-key|presharedkey|pre-shared-key|uuid|token|secret)\s*[:=]\s*)(.+)$`).ReplaceAllString(text, `${1}<redacted>`)
 	out = regexp.MustCompile(`(?i)(://)[^/@\s]+@`).ReplaceAllString(out, `${1}<redacted>@`)
 	return out
 }
@@ -786,7 +789,7 @@ func redactJSONSecrets(raw string) string {
 	if json.Unmarshal([]byte(raw), &m) != nil {
 		return Redact(raw)
 	}
-	for _, key := range []string{"password", "private-key", "pre-shared-key", "uuid", "token", "secret", "username"} {
+	for _, key := range []string{"password", "obfs-password", "obfs_password", "private-key", "pre-shared-key", "uuid", "token", "secret", "username"} {
 		if _, ok := m[key]; ok {
 			m[key] = "<redacted>"
 		}
@@ -801,10 +804,19 @@ func redactJSONSecrets(raw string) string {
 }
 
 func wireguardFromDataURL(link string) string {
-	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(link)), "wireguard://") {
+	trimmed := strings.TrimSpace(link)
+	lower := strings.ToLower(trimmed)
+	scheme := ""
+	for _, candidate := range []string{"wireguard://", "awg://", "amneziawg://"} {
+		if strings.HasPrefix(lower, candidate) {
+			scheme = candidate
+			break
+		}
+	}
+	if scheme == "" {
 		return link
 	}
-	payload := strings.TrimPrefix(strings.TrimSpace(link), "wireguard://")
+	payload := trimmed[len(scheme):]
 	payload = strings.Split(strings.Split(payload, "#")[0], "?")[0]
 	if decoded, err := decodeBase64(payload); err == nil {
 		return string(decoded)

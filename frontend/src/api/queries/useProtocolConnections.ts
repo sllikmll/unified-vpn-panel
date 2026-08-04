@@ -40,10 +40,25 @@ export interface UpdateProtocolConnectionPayload {
   selectors?: string[];
 }
 
+export function buildProtocolExportURL(basePath: string): string {
+  const prefix = basePath ? `${basePath.replace(/\/+$/, '')}/` : '';
+  return `${prefix}panel/api/proxy-connections/export.yaml`;
+}
+
 async function fetchProtocolConnections(): Promise<ListResponse> {
   const msg = await HttpUtil.get<ListResponse>('/panel/api/proxy-connections', undefined, { silent: true });
   if (!msg?.success) throw new Error(msg?.msg || 'Failed to fetch protocol connections');
   return msg.obj ?? { connections: [], count: 0, protocols: [] };
+}
+
+export async function fetchProtocolConnectionReveal(id: string): Promise<ProtocolConnectionView> {
+  const msg = await HttpUtil.get<ProtocolConnectionView>(
+    `/panel/api/proxy-connections/${encodeURIComponent(id)}/reveal`,
+    undefined,
+    { silent: true },
+  );
+  if (!msg?.success || !msg.obj) throw new Error(msg?.msg || 'Failed to reveal protocol connection');
+  return msg.obj;
 }
 
 export function useProtocolConnectionsQuery() {
@@ -89,10 +104,15 @@ export function useProtocolConnectionMutations() {
     mutationFn: () => HttpUtil.post<{ block: string; configPreview: string }>('/panel/api/proxy-connections/preview', {}, JSON_HEADERS),
   });
 
+  const revealMut = useMutation({
+    mutationFn: fetchProtocolConnectionReveal,
+  });
+
   return {
     importConnection: (payload: ImportProtocolConnectionPayload) => importMut.mutateAsync(payload),
     update: (id: string, payload: UpdateProtocolConnectionPayload) => updateMut.mutateAsync({ id, payload }),
     remove: (id: string) => deleteMut.mutateAsync(id),
     preview: () => previewMut.mutateAsync(),
+    reveal: (id: string) => revealMut.mutateAsync(id),
   };
 }

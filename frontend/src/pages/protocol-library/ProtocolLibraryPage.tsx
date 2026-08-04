@@ -31,6 +31,7 @@ import {
 } from '@ant-design/icons';
 
 import {
+  buildProtocolExportURL,
   useProtocolConnectionMutations,
   useProtocolConnectionsQuery,
   type ProtocolConnectionView,
@@ -68,6 +69,7 @@ export default function ProtocolLibraryPage() {
 
   const { connections, protocols, loading, fetchError, refetch } = useProtocolConnectionsQuery();
   const mutations = useProtocolConnectionMutations();
+  const exportURL = buildProtocolExportURL(window.X_UI_BASE_PATH || '');
   const specs = protocols.length ? protocols : DEFAULT_PROTOCOLS.map((id) => ({ id, label: id, schemes: [], mihomoSupported: id !== 'mieru' }));
   const [active, setActive] = useState(specs[0]?.id || 'wireguard');
   const [name, setName] = useState('');
@@ -131,6 +133,11 @@ export default function ProtocolLibraryPage() {
     if (msg.success) setPreview(msg.obj?.configPreview || msg.obj?.block || '');
   };
 
+  const copyConnectionYAML = async (conn: ProtocolConnectionView) => {
+    const revealed = await mutations.reveal(conn.id);
+    await copyText(revealed.mihomoYaml || '');
+  };
+
   const columns: ColumnsType<ProtocolConnectionView> = [
     {
       title: t('pages.protocolLibrary.fields.enabled'),
@@ -167,7 +174,7 @@ export default function ProtocolLibraryPage() {
       render: (_, conn) => (
         <Space size={2}>
           <Tooltip title={t('pages.protocolLibrary.copyYaml')}>
-            <Button type="text" icon={<CopyOutlined />} aria-label={t('pages.protocolLibrary.copyYaml')} onClick={() => copyText(conn.mihomoYaml || '')} />
+            <Button type="text" icon={<CopyOutlined />} aria-label={t('pages.protocolLibrary.copyYaml')} onClick={() => copyConnectionYAML(conn)} />
           </Tooltip>
           <Tooltip title={t('pages.protocolLibrary.copyId')}>
             <Button type="text" icon={<EyeOutlined />} aria-label={t('pages.protocolLibrary.copyId')} onClick={() => copyText(conn.id)} />
@@ -194,7 +201,7 @@ export default function ProtocolLibraryPage() {
             <Tooltip title={t('refresh')}>
               <Button icon={<ReloadOutlined />} onClick={() => refetch()} />
             </Tooltip>
-            <Button icon={<DownloadOutlined />} href="/panel/api/proxy-connections/export.yaml">
+            <Button icon={<DownloadOutlined />} href={exportURL}>
               {t('pages.protocolLibrary.exportYaml')}
             </Button>
           </Space>
