@@ -40,7 +40,7 @@ type HeartbeatPatch struct {
 	CpuPct        float64
 	CpuCores      int
 	LogicalPro    int
-	CpuSpeedMhz   int
+	CpuSpeedMhz   float64
 	MemCurrent    uint64
 	MemTotal      uint64
 	MemPct        float64
@@ -1217,7 +1217,7 @@ func decodeHeartbeatStatus(r io.Reader) (HeartbeatPatch, error) {
 			CpuPct      float64 `json:"cpu"`
 			CpuCores    int     `json:"cpuCores"`
 			LogicalPro  int     `json:"logicalPro"`
-			CpuSpeedMhz int     `json:"cpuSpeedMhz"`
+			CpuSpeedMhz float64 `json:"cpuSpeedMhz"`
 			Mem         struct {
 				Current uint64 `json:"current"`
 				Total   uint64 `json:"total"`
@@ -1325,7 +1325,7 @@ type ProbeResultUI struct {
 	CpuPct          float64 `json:"cpuPct" example:"12.5"`
 	CpuCores        int     `json:"cpuCores" example:"4"`
 	LogicalPro      int     `json:"logicalPro" example:"8"`
-	CpuSpeedMhz     int     `json:"cpuSpeedMhz" example:"2400"`
+	CpuSpeedMhz     float64 `json:"cpuSpeedMhz" example:"2396.4"`
 	MemCurrent      uint64  `json:"memCurrent" example:"1073741824"`
 	MemTotal        uint64  `json:"memTotal" example:"2147483648"`
 	MemPct          float64 `json:"memPct" example:"45.2"`

@@ -2609,8 +2609,8 @@
             "type": "number"
           },
           "cpuSpeedMhz": {
-            "example": 2400,
-            "type": "integer"
+            "example": 2396.4,
+            "type": "number"
           },
           "createdAt": {
             "example": 1700000000,
@@ -3212,8 +3212,8 @@
             "type": "number"
           },
           "cpuSpeedMhz": {
-            "example": 2400,
-            "type": "integer"
+            "example": 2396.4,
+            "type": "number"
           },
           "createdAt": {
             "example": 1700000000,
@@ -3561,8 +3561,8 @@
             "type": "number"
           },
           "cpuSpeedMhz": {
-            "example": 2400,
-            "type": "integer"
+            "example": 2396.4,
+            "type": "number"
           },
           "diskCurrent": {
             "example": 10737418240,
@@ -9139,7 +9139,7 @@
                       "configDirtyAt": 0,
                       "cpuCores": 4,
                       "cpuPct": 12.5,
-                      "cpuSpeedMhz": 2400,
+                      "cpuSpeedMhz": 2396.4,
                       "createdAt": 1700000000,
                       "depletedCount": 1,
                       "disabledCount": 2,
@@ -9328,7 +9328,7 @@
                     "configDirtyAt": 0,
                     "cpuCores": 4,
                     "cpuPct": 12.5,
-                    "cpuSpeedMhz": 2400,
+                    "cpuSpeedMhz": 2396.4,
                     "createdAt": 1700000000,
                     "depletedCount": 1,
                     "disabledCount": 2,
@@ -9496,7 +9496,7 @@
                     "configDirtyAt": 0,
                     "cpuCores": 4,
                     "cpuPct": 12.5,
-                    "cpuSpeedMhz": 2400,
+                    "cpuSpeedMhz": 2396.4,
                     "createdAt": 1700000000,
                     "depletedCount": 1,
                     "disabledCount": 2,
@@ -9762,7 +9762,7 @@
                     "appStatsUptime": 3600,
                     "cpuCores": 4,
                     "cpuPct": 12.5,
-                    "cpuSpeedMhz": 2400,
+                    "cpuSpeedMhz": 2396.4,
                     "diskCurrent": 10737418240,
                     "diskTotal": 21474836480,
                     "error": "",

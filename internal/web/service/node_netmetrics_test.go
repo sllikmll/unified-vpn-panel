@@ -11,14 +11,14 @@ import (
 )
 
 func TestProbeParsesNetIO(t *testing.T) {
-	patch, err := decodeHeartbeatStatus(strings.NewReader(`{"success":true,"obj":{"cpu":5,"cpuCores":4,"logicalPro":8,"cpuSpeedMhz":2400,"mem":{"current":1,"total":2},"swap":{"current":3,"total":4},"disk":{"current":5,"total":6},"netIO":{"up":1000,"down":2000},"netTraffic":{"sent":3000,"recv":4000},"tcpCount":9,"udpCount":10,"appStats":{"mem":11,"threads":12,"uptime":13},"publicIP":{"ipv4":"203.0.113.9","ipv6":"2001:db8::9"},"xray":{"version":"26.6.27","state":"running","errorMsg":""},"panelVersion":"0.0.1","panelGuid":"g","uptime":42}}`))
+	patch, err := decodeHeartbeatStatus(strings.NewReader(`{"success":true,"obj":{"cpu":5,"cpuCores":4,"logicalPro":8,"cpuSpeedMhz":2396.4,"mem":{"current":1,"total":2},"swap":{"current":3,"total":4},"disk":{"current":5,"total":6},"netIO":{"up":1000,"down":2000},"netTraffic":{"sent":3000,"recv":4000},"tcpCount":9,"udpCount":10,"appStats":{"mem":11,"threads":12,"uptime":13},"publicIP":{"ipv4":"203.0.113.9","ipv6":"2001:db8::9"},"xray":{"version":"26.6.27","state":"running","errorMsg":""},"panelVersion":"0.0.1","panelGuid":"g","uptime":42}}`))
 	if err != nil {
 		t.Fatalf("decodeHeartbeatStatus: %v", err)
 	}
 	if patch.NetUp != 1000 || patch.NetDown != 2000 {
 		t.Fatalf("net throughput not parsed from status: up=%d down=%d", patch.NetUp, patch.NetDown)
 	}
-	if patch.CpuCores != 4 || patch.LogicalPro != 8 || patch.CpuSpeedMhz != 2400 {
+	if patch.CpuCores != 4 || patch.LogicalPro != 8 || patch.CpuSpeedMhz != 2396.4 {
 		t.Fatalf("cpu details not parsed: %+v", patch)
 	}
 	if patch.MemCurrent != 1 || patch.MemTotal != 2 || patch.SwapCurrent != 3 || patch.SwapTotal != 4 || patch.DiskCurrent != 5 || patch.DiskTotal != 6 {

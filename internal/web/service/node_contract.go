@@ -34,7 +34,7 @@ type NodeView struct {
 	CpuPct              float64  `json:"cpuPct" example:"12.5"`
 	CpuCores            int      `json:"cpuCores" example:"4"`
 	LogicalPro          int      `json:"logicalPro" example:"8"`
-	CpuSpeedMhz         int      `json:"cpuSpeedMhz" example:"2400"`
+	CpuSpeedMhz         float64  `json:"cpuSpeedMhz" example:"2396.4"`
 	MemCurrent          uint64   `json:"memCurrent" example:"1073741824"`
 	MemTotal            uint64   `json:"memTotal" example:"2147483648"`
 	MemPct              float64  `json:"memPct" example:"45.2"`

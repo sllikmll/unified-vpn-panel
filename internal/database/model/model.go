@@ -799,7 +799,7 @@ type Node struct {
 	CpuPct          float64 `json:"cpuPct" example:"23.5"`
 	CpuCores        int     `json:"cpuCores" gorm:"column:cpu_cores" example:"4"`
 	LogicalPro      int     `json:"logicalPro" gorm:"column:logical_pro" example:"8"`
-	CpuSpeedMhz     int     `json:"cpuSpeedMhz" gorm:"column:cpu_speed_mhz" example:"2400"`
+	CpuSpeedMhz     float64 `json:"cpuSpeedMhz" gorm:"column:cpu_speed_mhz" example:"2396.4"`
 	MemCurrent      uint64  `json:"memCurrent" gorm:"column:mem_current" example:"1073741824"`
 	MemTotal        uint64  `json:"memTotal" gorm:"column:mem_total" example:"2147483648"`
 	MemPct          float64 `json:"memPct" example:"45.1"`

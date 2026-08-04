@@ -2583,8 +2583,8 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "number"
       },
       "cpuSpeedMhz": {
-        "example": 2400,
-        "type": "integer"
+        "example": 2396.4,
+        "type": "number"
       },
       "createdAt": {
         "example": 1700000000,
@@ -3186,8 +3186,8 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "number"
       },
       "cpuSpeedMhz": {
-        "example": 2400,
-        "type": "integer"
+        "example": 2396.4,
+        "type": "number"
       },
       "createdAt": {
         "example": 1700000000,
@@ -3535,8 +3535,8 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "number"
       },
       "cpuSpeedMhz": {
-        "example": 2400,
-        "type": "integer"
+        "example": 2396.4,
+        "type": "number"
       },
       "diskCurrent": {
         "example": 10737418240,
