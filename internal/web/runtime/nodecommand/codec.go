@@ -3,6 +3,7 @@ package nodecommand
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -221,10 +222,10 @@ func classifyJSONError(err error) error {
 		return nil
 	}
 	if strings.Contains(err.Error(), "unknown field") {
-		return fmt.Errorf("%w: %v", ErrUnknownField, err)
+		return fmt.Errorf("%w: %w", ErrUnknownField, err)
 	}
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return fmt.Errorf("%w: eof", ErrInvalidJSON)
 	}
-	return fmt.Errorf("%w: %v", ErrInvalidJSON, err)
+	return fmt.Errorf("%w: %w", ErrInvalidJSON, err)
 }

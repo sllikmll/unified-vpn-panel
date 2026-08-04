@@ -615,7 +615,7 @@ func TestMemoryReplayGuardConcurrentSingleWinner(t *testing.T) {
 func TestMemoryReplayGuardRejectsBeforeInsertAndCommitValidates(t *testing.T) {
 	now := time.Unix(100, 0).UTC()
 	guard := NewMemoryReplayGuard(1, time.Minute, func() time.Time { return now })
-	_, _, err := guard.Begin(nil, validRequest(now))
+	_, _, err := guard.Begin(nil, validRequest(now)) //nolint:staticcheck
 	if !errors.Is(err, ErrInvalidContext) {
 		t.Fatalf("nil context error = %v, want ErrInvalidContext", err)
 	}
@@ -652,7 +652,7 @@ func TestMemoryReplayGuardAbortValidation(t *testing.T) {
 	if _, _, err := guard.Begin(context.Background(), req); err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	if err := guard.Abort(nil, req); !errors.Is(err, ErrInvalidContext) {
+	if err := guard.Abort(nil, req); !errors.Is(err, ErrInvalidContext) { //nolint:staticcheck
 		t.Fatalf("nil abort error = %v, want ErrInvalidContext", err)
 	}
 	if _, _, err := guard.Begin(context.Background(), req); !errors.Is(err, ErrReplayInProgress) {
