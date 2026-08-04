@@ -414,7 +414,9 @@ func StripVmessClientSecurity(settings string) (string, bool) {
 // full-config path (XrayService.GetXrayConfig) and the live AddInbound path
 // (WireguardClientsToPeers), so both emit identical peers. The client's
 // privateKey is intentionally omitted — it is the client's secret, not part of
-// the server-side peer.
+// the server-side peer. KeepAlive is also client-side only: an inbound peer has
+// no endpoint to dial, so passing it to xray causes endless "no known endpoint"
+// handshake warnings. Subscription exporters still read Client.KeepAlive.
 func WireguardPeerFromClient(c Client) map[string]any {
 	peer := map[string]any{"email": c.Email, "level": 0}
 	if c.PublicKey != "" {
@@ -425,9 +427,6 @@ func WireguardPeerFromClient(c Client) map[string]any {
 	}
 	if c.PreSharedKey != "" {
 		peer["preSharedKey"] = c.PreSharedKey
-	}
-	if c.KeepAlive > 0 {
-		peer["keepAlive"] = c.KeepAlive
 	}
 	return peer
 }

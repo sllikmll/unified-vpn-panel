@@ -52,8 +52,8 @@ func TestWireguardClientsToPeers(t *testing.T) {
 	if peer["preSharedKey"] != "cHNr" {
 		t.Errorf("peer preSharedKey = %v, want cHNr", peer["preSharedKey"])
 	}
-	if peer["keepAlive"].(float64) != 25 {
-		t.Errorf("peer keepAlive = %v, want 25", peer["keepAlive"])
+	if _, ok := peer["keepAlive"]; ok {
+		t.Errorf("server-side inbound peer must omit client-only keepAlive: %v", peer["keepAlive"])
 	}
 	ips, ok := peer["allowedIPs"].([]any)
 	if !ok || len(ips) != 1 || ips[0] != "10.0.0.2/32" {
