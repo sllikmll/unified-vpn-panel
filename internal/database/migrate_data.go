@@ -59,6 +59,11 @@ func migrationModels() []any {
 		&model.ClientGlobalTraffic{},
 		&model.OutboundSubscription{},
 		&model.ProtocolConnection{},
+		&model.ManagedEndpoint{},
+		&model.ManagedEndpointClient{},
+		&model.ManagedEndpointClientTraffic{},
+		&model.ManagedSecret{},
+		&model.ManagedEndpointApplyLog{},
 	}
 }
 

@@ -43,7 +43,7 @@ func run(root, outDir string) error {
 				"Host",
 				"ProtocolConnection",
 			),
-			AliasAllow: setOf("Protocol"),
+			AliasAllow: setOf("Protocol", "RuntimeKind", "ManagedProtocol", "EndpointStatus", "EndpointClientState"),
 			Overrides: map[string][]walkOverride{
 				"Inbound": {
 					{Field: "Settings", Kind: KindAny},
@@ -94,6 +94,12 @@ func run(root, outDir string) error {
 				"NodeView",
 				"ProbeResultUI",
 				"RealityScanResult",
+				"ManagedEndpointView",
+				"ManagedEndpointCapabilities",
+				"ManagedEndpointCapability",
+				"ManagedTrafficView",
+				"ManagedHealthView",
+				"ManagedSecretSummary",
 			),
 		},
 		{

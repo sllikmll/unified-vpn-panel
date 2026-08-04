@@ -32,6 +32,12 @@ export const keys = {
     slim: () => ['inbounds', 'slim'] as const,
     options: () => ['inbounds', 'options'] as const,
   },
+  managedEndpoints: {
+    root: () => ['managedEndpoints'] as const,
+    list: () => ['managedEndpoints', 'list'] as const,
+    detail: (id: string) => ['managedEndpoints', 'detail', id] as const,
+    capabilities: () => ['managedEndpoints', 'capabilities'] as const,
+  },
   clients: {
     root: () => ['clients'] as const,
     list: (params: unknown) => ['clients', 'list', params] as const,
