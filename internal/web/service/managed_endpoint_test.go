@@ -648,6 +648,33 @@ func (t *managedTx) Rollback(context.Context) (provisioner.Result, error) {
 	return provisioner.Result{RuntimeKind: model.RuntimeMieru, ArtifactRef: "test-ref", Version: "test", State: "rolled_back", RolledBack: true}, nil
 }
 
+func TestManagedEndpointCreateInstallsBeforeApplyAndCommits(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	tx := &managedTx{}
+	mutations := ManagedEndpointMutationService{Drivers: managedTestProvider{
+		driver: managedTestDriver{kind: model.RuntimeMieru},
+		prov:   managedTxProvisioner{tx: tx},
+	}}
+	enable := true
+	view, err := mutations.Create(context.Background(), 1, ManagedEndpointCreateRequest{
+		RuntimeKind: model.RuntimeMieru,
+		Protocol:    "mieru",
+		Tag:         "mieru-create",
+		Port:        2999,
+		Enable:      &enable,
+		Mieru:       &ManagedMieruConfig{MTU: 1400, PortBindings: []ManagedMieruPortBinding{{Port: 2999, Protocol: "TCP"}}},
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if view == nil || view.Status != model.EndpointActive {
+		t.Fatalf("view = %+v, want active", view)
+	}
+	if tx.commits != 1 || tx.rollbacks != 0 {
+		t.Fatalf("tx commits=%d rollbacks=%d, want one commit", tx.commits, tx.rollbacks)
+	}
+}
+
 func TestManagedEndpointInstallApplyFailureRollsBackProvisioner(t *testing.T) {
 	initManagedEndpointServiceDB(t)
 	desired := `{"portBindings":[{"port":2999,"protocol":"TCP"}],"users":[{"name":"u","password":"p"}]}`

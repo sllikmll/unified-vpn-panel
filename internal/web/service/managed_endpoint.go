@@ -408,7 +408,7 @@ func (s ManagedEndpointMutationService) Create(ctx context.Context, userId int, 
 	if replayed {
 		return ManagedEndpointService{}.Get(userId, fmt.Sprintf("managed-%d", endpoint.Id))
 	}
-	if err := s.applyEndpoint(ctx, &endpoint, "create"); err != nil {
+	if err := s.installAndApplyOnCreate(ctx, &endpoint); err != nil {
 		return nil, err
 	}
 	return ManagedEndpointService{}.Get(userId, fmt.Sprintf("managed-%d", endpoint.Id))
@@ -1881,6 +1881,56 @@ func managedRequestHash(scope string, req any) string {
 	}{Scope: scope, Req: req})
 	sum := sha256.Sum256(raw)
 	return fmt.Sprintf("%x", sum[:])
+}
+
+func (s ManagedEndpointMutationService) installAndApplyOnCreate(ctx context.Context, endpoint *model.ManagedEndpoint) error {
+	if endpoint.RuntimeKind != model.RuntimeAmneziaWG && endpoint.RuntimeKind != model.RuntimeMieru && endpoint.RuntimeKind != model.RuntimeNaiveProxy {
+		return s.applyEndpoint(ctx, endpoint, "create")
+	}
+	p, err := s.resolveProvisioner(*endpoint)
+	if err != nil {
+		return err
+	}
+	plan := p.Plan(endpoint.RuntimeKind)
+	if !plan.Supported || plan.Blocked {
+		reason := strings.TrimSpace(plan.Reason)
+		if reason == "" {
+			reason = "runtime provisioning is unavailable"
+		}
+		err := fmt.Errorf("managed runtime install blocked: %s", reason)
+		code := safeManagedErrorCode(err)
+		_ = database.GetDB().Model(&model.ManagedEndpoint{}).Where("id = ?", endpoint.Id).Updates(map[string]any{"status": model.EndpointFailed, "last_error": code}).Error
+		return err
+	}
+	var tx provisioner.Transaction
+	if tp, ok := p.(provisioner.TransactionalProvisioner); ok {
+		tx, err = tp.BeginInstall(ctx, endpoint.RuntimeKind)
+	} else {
+		_, err = p.Install(ctx, endpoint.RuntimeKind)
+	}
+	if err != nil {
+		code := safeManagedErrorCode(err)
+		_ = database.GetDB().Model(&model.ManagedEndpoint{}).Where("id = ?", endpoint.Id).Updates(map[string]any{"status": model.EndpointFailed, "last_error": code}).Error
+		return err
+	}
+	if err := s.applyEndpoint(ctx, endpoint, "create"); err != nil {
+		if tx != nil {
+			_, _ = tx.Rollback(ctx)
+		} else {
+			_, _ = p.Uninstall(ctx, endpoint.RuntimeKind)
+		}
+		code := safeManagedErrorCode(err)
+		_ = database.GetDB().Model(&model.ManagedEndpoint{}).Where("id = ?", endpoint.Id).Updates(map[string]any{"status": model.EndpointRolledBack, "last_error": code}).Error
+		return err
+	}
+	if tx != nil {
+		if err := tx.Commit(ctx); err != nil {
+			code := safeManagedErrorCode(err)
+			_ = database.GetDB().Model(&model.ManagedEndpoint{}).Where("id = ?", endpoint.Id).Updates(map[string]any{"status": model.EndpointFailed, "last_error": code}).Error
+			return err
+		}
+	}
+	return nil
 }
 
 func (s ManagedEndpointMutationService) applyEndpoint(ctx context.Context, endpoint *model.ManagedEndpoint, action string) error {
