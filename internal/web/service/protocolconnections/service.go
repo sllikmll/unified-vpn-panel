@@ -226,6 +226,14 @@ func (s *Service) ManagedBlock() (string, error) {
 	return text, nil
 }
 
+func (s *Service) ManagedBlockRedacted() (string, error) {
+	block, err := s.ManagedBlock()
+	if err != nil {
+		return "", err
+	}
+	return Redact(block), nil
+}
+
 func (s *Service) ExportYAML() (string, error) {
 	block, err := s.ManagedBlock()
 	if err != nil {
@@ -808,7 +816,7 @@ func slug(s string) string {
 }
 
 func Redact(text string) string {
-	out := regexp.MustCompile(`(?im)^(\s*(?:password|obfs-password|obfs_password|private-key|presharedkey|pre-shared-key|uuid|token|secret)\s*[:=]\s*)(.+)$`).ReplaceAllString(text, `${1}<redacted>`)
+	out := regexp.MustCompile(`(?im)^(\s*(?:username|password|obfs-password|obfs_password|private-key|presharedkey|pre-shared-key|uuid|token|secret)\s*[:=]\s*)(.+)$`).ReplaceAllString(text, `${1}<redacted>`)
 	out = regexp.MustCompile(`(?i)(://)[^/@\s]+@`).ReplaceAllString(out, `${1}<redacted>@`)
 	return out
 }

@@ -312,3 +312,105 @@ func TestManagedBlockAndRoundTripExport(t *testing.T) {
 		t.Fatalf("bad export:\n%s", exported)
 	}
 }
+
+func TestProtocolSecretBoundariesAcrossGeneratedCredentialKeys(t *testing.T) {
+	svc := NewService(testDB(t))
+	fixtures := []struct {
+		protocol string
+		name     string
+		content  string
+		secrets  []string
+	}{
+		{
+			protocol: "naiveproxy",
+			name:     "naive-boundary",
+			content:  "naive+https://naive-user-secret:naive-password-secret@naive.example.com:443",
+			secrets:  []string{"naive-user-secret", "naive-password-secret"},
+		},
+		{
+			protocol: "vless",
+			name:     "vless-boundary",
+			content:  "vless://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee@vless.example.com:443?security=tls&type=tcp",
+			secrets:  []string{"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"},
+		},
+		{
+			protocol: "hysteria2",
+			name:     "hysteria-boundary",
+			content:  "hy2://hysteria-password-secret@hy.example.com:443?obfs=salamander&obfs-password=hysteria-obfs-secret",
+			secrets:  []string{"hysteria-password-secret", "hysteria-obfs-secret"},
+		},
+		{
+			protocol: "wireguard",
+			name:     "wireguard-boundary",
+			content:  "[Interface]\nPrivateKey = wireguard-private-secret\nAddress = 10.0.0.2/32\n[Peer]\nPublicKey = public-key\nPresharedKey = wireguard-psk-secret\nEndpoint = wg.example.com:51820\nAllowedIPs = 0.0.0.0/0\n",
+			secrets:  []string{"wireguard-private-secret", "wireguard-psk-secret"},
+		},
+	}
+
+	ids := make(map[string]string, len(fixtures))
+	allSecrets := make([]string, 0, 7)
+	for _, fixture := range fixtures {
+		view, _, err := svc.Import(ImportRequest{
+			Protocol:  fixture.protocol,
+			Name:      fixture.name,
+			Content:   fixture.content,
+			Selectors: []string{"GLOBAL"},
+		})
+		if err != nil {
+			t.Fatalf("import %s: %v", fixture.protocol, err)
+		}
+		ids[fixture.name] = view.Id
+		allSecrets = append(allSecrets, fixture.secrets...)
+		assertNoSecrets(t, "import response", view, fixture.secrets)
+	}
+
+	list, err := svc.List("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNoSecrets(t, "list", list, allSecrets)
+
+	preview, err := svc.ManagedBlockRedacted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNoSecrets(t, "preview", preview, allSecrets)
+	if !strings.Contains(preview, "<redacted>") {
+		t.Fatalf("redacted managed block does not contain redaction marker:\n%s", preview)
+	}
+
+	exported, err := svc.ExportYAML()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range allSecrets {
+		if !strings.Contains(exported, secret) {
+			t.Fatalf("explicit export unexpectedly hid credential %q", secret)
+		}
+	}
+
+	for _, fixture := range fixtures {
+		revealed, err := svc.Get(ids[fixture.name], true)
+		if err != nil {
+			t.Fatalf("reveal %s: %v", fixture.protocol, err)
+		}
+		for _, secret := range fixture.secrets {
+			if !strings.Contains(revealed.RawSource+revealed.MihomoYAML, secret) {
+				t.Fatalf("explicit reveal unexpectedly hid %s credential %q", fixture.protocol, secret)
+			}
+		}
+	}
+}
+
+func assertNoSecrets(t *testing.T, boundary string, value any, secrets []string) {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal %s: %v", boundary, err)
+	}
+	for _, secret := range secrets {
+		if strings.Contains(string(encoded), secret) {
+			t.Fatalf("%s leaked credential %q", boundary, secret)
+		}
+	}
+}
