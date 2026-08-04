@@ -104,7 +104,7 @@ func (a *ProtocolConnectionController) delete(c *gin.Context) {
 }
 
 func (a *ProtocolConnectionController) preview(c *gin.Context) {
-	block, err := a.service.ManagedBlock()
+	block, err := a.service.ManagedBlockRedacted()
 	if err != nil {
 		jsonMsg(c, "Failed to preview protocol connections", err)
 		return
