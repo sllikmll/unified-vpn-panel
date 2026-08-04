@@ -34,6 +34,20 @@ func TestLocalManagedRuntimeDrivers(t *testing.T) {
 	if awg.Kind() != model.RuntimeAmneziaWG {
 		t.Fatalf("amneziawg kind = %q, want %q", awg.Kind(), model.RuntimeAmneziaWG)
 	}
+	mieru, err := local.Driver(model.RuntimeMieru)
+	if err != nil {
+		t.Fatalf("mieru driver: %v", err)
+	}
+	if mieru.Kind() != model.RuntimeMieru || !mieru.Capabilities().EndpointLifecycle || !mieru.Capabilities().Detect {
+		t.Fatalf("mieru driver/capabilities = %q/%+v", mieru.Kind(), mieru.Capabilities())
+	}
+	naive, err := local.Driver(model.RuntimeNaiveProxy)
+	if err != nil {
+		t.Fatalf("naiveproxy driver: %v", err)
+	}
+	if naive.Kind() != model.RuntimeNaiveProxy || !naive.Capabilities().EndpointLifecycle || !naive.Capabilities().Detect {
+		t.Fatalf("naiveproxy driver/capabilities = %q/%+v", naive.Kind(), naive.Capabilities())
+	}
 	if _, err := local.Driver(model.RuntimeWireGuard); !errors.Is(err, driver.ErrUnsupportedRuntime) {
 		t.Fatalf("wireguard driver err = %v, want ErrUnsupportedRuntime", err)
 	}

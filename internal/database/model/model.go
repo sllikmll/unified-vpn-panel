@@ -783,6 +783,11 @@ type Node struct {
 	// Observed-state only — never user-edited.
 	Guid string `json:"guid" gorm:"column:guid;index"`
 
+	// RuntimeCapabilities is a JSON array of managed runtime kinds the node
+	// explicitly advertised. Empty means the node has not advertised managed
+	// endpoint support and must not receive managed runtime commands.
+	RuntimeCapabilities string `json:"runtimeCapabilities" gorm:"column:runtime_capabilities;type:text"`
+
 	// Heartbeat-updated fields. UpdatedAt advances on every probe even when
 	// the row is otherwise unchanged so the UI's "last seen" tooltip is
 	// truthful without us having to read LastHeartbeat separately.

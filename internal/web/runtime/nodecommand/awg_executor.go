@@ -7,6 +7,8 @@ import (
 
 	awg "github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/mieru"
+	"github.com/mhsanaei/3x-ui/v3/internal/naiveproxy"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver"
 )
 
@@ -27,19 +29,13 @@ func (e AWGExecutor) Execute(ctx context.Context, session AuthenticatedSession, 
 
 func (e AWGExecutor) execute(ctx context.Context, _ AuthenticatedSession, req Request) (Response, error) {
 	resp := baseResponse(req)
-	if req.RuntimeKind != model.RuntimeAmneziaWG {
-		resp.Status = StatusFailed
-		resp.ErrorCode = ErrorCodeUnsupportedRuntime
-		resp.SummaryCode = SummaryUnsupportedOperation
-		return resp, nil
-	}
 	if e.Provider == nil {
 		resp.Status = StatusFailed
 		resp.ErrorCode = ErrorCodeUnavailable
 		resp.SummaryCode = SummaryUnavailable
 		return resp, nil
 	}
-	d, err := e.Provider.Driver(model.RuntimeAmneziaWG)
+	d, err := e.Provider.Driver(req.RuntimeKind)
 	if err != nil {
 		resp.Status = StatusFailed
 		resp.ErrorCode = ErrorCodeUnsupportedRuntime
@@ -180,20 +176,52 @@ func inboundFromRequest(req Request) (*model.Inbound, error) {
 	if req.SecretInput == nil || len(req.SecretInput.Material) == 0 {
 		return nil, errors.New("missing sealed material")
 	}
-	var desired awg.DesiredConfig
-	if err := json.Unmarshal(req.SecretInput.Material, &desired); err != nil {
-		return nil, err
-	}
-	raw, _ := json.Marshal(desired)
 	payload, _ := req.Payload.(EndpointPayload)
-	tag := payload.Tag
-	if tag == "" {
-		tag = desired.Server.InterfaceName
+	switch req.RuntimeKind {
+	case model.RuntimeAmneziaWG:
+		var desired awg.DesiredConfig
+		if err := json.Unmarshal(req.SecretInput.Material, &desired); err != nil {
+			return nil, err
+		}
+		raw, _ := json.Marshal(desired)
+		tag := payload.Tag
+		if tag == "" {
+			tag = desired.Server.InterfaceName
+		}
+		return &model.Inbound{Id: req.EndpointID, Tag: tag, Port: desired.Server.ListenPort, Protocol: model.Protocol("amneziawg"), Enable: desired.Server.Enable, Settings: string(raw)}, nil
+	case model.RuntimeMieru:
+		var desired mieru.ServerConfig
+		if err := json.Unmarshal(req.SecretInput.Material, &desired); err != nil {
+			return nil, err
+		}
+		raw, _ := json.Marshal(desired)
+		port := 0
+		if len(desired.PortBindings) > 0 {
+			port = desired.PortBindings[0].Port
+		}
+		return &model.Inbound{Id: req.EndpointID, Tag: payload.Tag, Port: port, Protocol: model.Protocol("mieru"), Enable: true, Settings: string(raw)}, nil
+	case model.RuntimeNaiveProxy:
+		var desired struct {
+			Endpoint naiveproxy.Endpoint `json:"endpoint"`
+			Users    []naiveproxy.User   `json:"users"`
+		}
+		if err := json.Unmarshal(req.SecretInput.Material, &desired); err != nil {
+			return nil, err
+		}
+		raw, _ := json.Marshal(desired)
+		return &model.Inbound{Id: req.EndpointID, Tag: payload.Tag, Port: desired.Endpoint.Port, Protocol: model.Protocol("naiveproxy"), Enable: true, Settings: string(raw)}, nil
+	default:
+		return nil, driver.ErrUnsupportedRuntime
 	}
-	return &model.Inbound{Id: req.EndpointID, Tag: tag, Port: desired.Server.ListenPort, Protocol: model.Protocol("amneziawg"), Enable: desired.Server.Enable, Settings: string(raw)}, nil
 }
 
 func inboundFromRefs(req Request) (*model.Inbound, error) {
+	if req.RuntimeKind == model.RuntimeMieru {
+		return &model.Inbound{Id: req.EndpointID, Tag: "mieru", Port: 0, Protocol: model.Protocol("mieru"), Enable: true, Settings: `{"portBindings":[{"port":1,"protocol":"TCP"}]}`}, nil
+	}
+	if req.RuntimeKind == model.RuntimeNaiveProxy {
+		return &model.Inbound{Id: req.EndpointID, Tag: "naiveproxy", Port: 443, Protocol: model.Protocol("naiveproxy"), Enable: true, Settings: `{"endpoint":{"Domain":"example.test","ListenIP":"127.0.0.1","Port":443},"users":[{"ID":"placeholder","Username":"placeholder","Password":"placeholder-password","Enabled":true}]}`}, nil
+	}
 	if req.SecretInput == nil || req.SecretInput.Refs == nil || req.SecretInput.Refs["interfaceName"] == "" {
 		return nil, errors.New("missing interface ref")
 	}

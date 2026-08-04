@@ -9,6 +9,8 @@ import (
 
 	awg "github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/mieru"
+	"github.com/mhsanaei/3x-ui/v3/internal/naiveproxy"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver"
 	awgdriver "github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver/amneziawg"
 )
@@ -18,7 +20,7 @@ type awgProvider struct {
 }
 
 func (p awgProvider) Driver(kind model.RuntimeKind) (driver.Driver, error) {
-	if kind != model.RuntimeAmneziaWG {
+	if p.driver == nil || kind != p.driver.Kind() {
 		return nil, driver.ErrUnsupportedRuntime
 	}
 	return p.driver, nil
@@ -57,6 +59,109 @@ func TestAWGExecutorEndpointAndClientLifecycle(t *testing.T) {
 	if resp.Status != StatusFailed || resp.ErrorCode != ErrorCodeUnsupportedOperation {
 		t.Fatalf("client delete response = %+v", resp)
 	}
+}
+
+func TestExecutorAppliesMieruAndNaiveProxyFullDesired(t *testing.T) {
+	now := time.Now().UTC()
+	session := newAuthenticatedSession(7, "550e8400-e29b-41d4-a716-446655440000", "node-7", "channel-1", now.Add(-time.Second), now.Add(time.Minute))
+
+	for _, tt := range []struct {
+		name string
+		kind model.RuntimeKind
+		body []byte
+	}{
+		{
+			name: "mieru",
+			kind: model.RuntimeMieru,
+			body: mustJSON(t, mieru.ServerConfig{
+				PortBindings: []mieru.PortBinding{{Port: 2999, Protocol: mieru.TransportTCP}},
+				Users:        []mieru.User{{Name: "alice", Password: "secret-123456"}},
+			}),
+		},
+		{
+			name: "naiveproxy",
+			kind: model.RuntimeNaiveProxy,
+			body: mustJSON(t, map[string]any{
+				"endpoint": naiveproxy.Endpoint{Domain: "example.test", ListenIP: "127.0.0.1", Port: 443, ACMEEmail: "ops@example.test"},
+				"users":    []naiveproxy.User{{ID: "u1", Username: "alice", Password: "secret-123456", Enabled: true}},
+			}),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			d := &captureDriver{kind: tt.kind}
+			exec := AWGExecutor{Provider: awgProvider{driver: d}, ResponseSealKey: []byte("token")}
+			req := awgRequest(now, OperationEndpointApply, EndpointPayload{Tag: tt.name}, tt.body)
+			req.RuntimeKind = tt.kind
+			resp, err := exec.Execute(context.Background(), session, req)
+			if err != nil {
+				t.Fatalf("execute: %v", err)
+			}
+			if resp.Status != StatusSucceeded {
+				t.Fatalf("response = %+v", resp)
+			}
+			if !strings.Contains(d.settings, "secret-123456") {
+				t.Fatalf("full desired config was not passed to driver: %s", d.settings)
+			}
+		})
+	}
+}
+
+type captureDriver struct {
+	kind     model.RuntimeKind
+	settings string
+}
+
+func (d *captureDriver) Kind() model.RuntimeKind { return d.kind }
+func (d *captureDriver) Capabilities() driver.Capabilities {
+	return driver.Capabilities{EndpointLifecycle: true}
+}
+func (d *captureDriver) Create(_ context.Context, inbound *model.Inbound) (driver.EndpointResult, error) {
+	d.settings = inbound.Settings
+	return driver.EndpointResult{RuntimeKind: d.kind, InboundId: inbound.Id, Tag: inbound.Tag, Status: model.EndpointActive}, nil
+}
+func (d *captureDriver) Update(context.Context, *model.Inbound, *model.Inbound) (driver.EndpointResult, error) {
+	return driver.EndpointResult{}, nil
+}
+func (d *captureDriver) Delete(context.Context, *model.Inbound) (driver.EndpointResult, error) {
+	return driver.EndpointResult{}, nil
+}
+func (d *captureDriver) Enable(context.Context, *model.Inbound) (driver.EndpointResult, error) {
+	return driver.EndpointResult{}, nil
+}
+func (d *captureDriver) Disable(context.Context, *model.Inbound) (driver.EndpointResult, error) {
+	return driver.EndpointResult{}, nil
+}
+func (d *captureDriver) Restart(context.Context) error { return nil }
+func (d *captureDriver) Status(context.Context, *model.Inbound) (driver.StatusResult, error) {
+	return driver.StatusResult{}, nil
+}
+func (d *captureDriver) Detect(context.Context) (driver.DetectResult, error) {
+	return driver.DetectResult{}, nil
+}
+func (d *captureDriver) Health(context.Context, *model.Inbound) (driver.HealthResult, error) {
+	return driver.HealthResult{}, nil
+}
+func (d *captureDriver) Clients() driver.ClientDriver { return managedNoopClient{} }
+
+type managedNoopClient struct{}
+
+func (managedNoopClient) Create(context.Context, *model.Inbound, model.Client) (driver.ClientResult, error) {
+	return driver.ClientResult{}, driver.ErrUnsupportedOperation
+}
+func (managedNoopClient) Update(context.Context, *model.Inbound, string, model.Client) (driver.ClientResult, error) {
+	return driver.ClientResult{}, driver.ErrUnsupportedOperation
+}
+func (managedNoopClient) Delete(context.Context, *model.Inbound, string) (driver.ClientResult, error) {
+	return driver.ClientResult{}, driver.ErrUnsupportedOperation
+}
+func (managedNoopClient) Enable(context.Context, *model.Inbound, model.Client) (driver.ClientResult, error) {
+	return driver.ClientResult{}, driver.ErrUnsupportedOperation
+}
+func (managedNoopClient) Disable(context.Context, *model.Inbound, string) (driver.ClientResult, error) {
+	return driver.ClientResult{}, driver.ErrUnsupportedOperation
+}
+func (managedNoopClient) Status(context.Context, *model.Inbound, string) (driver.ClientStatusResult, error) {
+	return driver.ClientStatusResult{}, driver.ErrUnsupportedOperation
 }
 
 func TestAWGExecutorClientCreateUpdateExportUnsupported(t *testing.T) {
