@@ -39,7 +39,7 @@ var Protocols = []ProtocolSpec{
 	{Id: "hysteria2", Label: "Hysteria2", Schemes: []string{"hysteria2://", "hy2://", "hysteria://"}, MihomoSupported: true},
 	{Id: "vless", Label: "VLESS", Schemes: []string{"vless://"}, MihomoSupported: true},
 	{Id: "trojan", Label: "Trojan", Schemes: []string{"trojan://"}, MihomoSupported: true},
-	{Id: "mieru", Label: "Meiru", Schemes: []string{"mieru://", "mierus://"}, MihomoSupported: false},
+	{Id: "mieru", Label: "Mieru", Schemes: []string{"mieru://", "mierus://"}, MihomoSupported: false},
 	{Id: "naiveproxy", Label: "NaiveProxy", Schemes: []string{"naive://", "naive+https://", "https://"}, MihomoSupported: true},
 	{Id: "vmess", Label: "VMess", Schemes: []string{"vmess://"}, MihomoSupported: true},
 	{Id: "shadowsocks", Label: "Shadowsocks", Schemes: []string{"ss://"}, MihomoSupported: true},

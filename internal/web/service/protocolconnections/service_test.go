@@ -210,6 +210,18 @@ func TestRedactHysteriaObfsPassword(t *testing.T) {
 	}
 }
 
+func TestMieruProtocolLabelIsSpelledCorrectly(t *testing.T) {
+	for _, spec := range Protocols {
+		if spec.Id == "mieru" {
+			if spec.Label != "Mieru" {
+				t.Fatalf("Mieru label = %q", spec.Label)
+			}
+			return
+		}
+	}
+	t.Fatal("Mieru protocol missing")
+}
+
 func TestManagedBlockAndRoundTripExport(t *testing.T) {
 	svc := NewService(testDB(t))
 	if _, _, err := svc.Import(ImportRequest{Protocol: "trojan", Name: "tr", Content: "trojan://pass@tr.example.com:443", Selectors: []string{"GLOBAL"}}); err != nil {
