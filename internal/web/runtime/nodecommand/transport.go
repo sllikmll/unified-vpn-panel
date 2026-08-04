@@ -15,15 +15,17 @@ const (
 
 type AuthenticatedSession struct {
 	nodeID          int
+	targetGUID      string
 	channelID       string
 	principal       string
 	authenticatedAt time.Time
 	expiresAt       time.Time
 }
 
-func newAuthenticatedSession(nodeID int, principal, channelID string, authenticatedAt, expiresAt time.Time) AuthenticatedSession {
+func newAuthenticatedSession(nodeID int, targetGUID, principal, channelID string, authenticatedAt, expiresAt time.Time) AuthenticatedSession {
 	return AuthenticatedSession{
 		nodeID:          nodeID,
+		targetGUID:      targetGUID,
 		channelID:       channelID,
 		principal:       principal,
 		authenticatedAt: authenticatedAt,
@@ -33,6 +35,10 @@ func newAuthenticatedSession(nodeID int, principal, channelID string, authentica
 
 func (s AuthenticatedSession) NodeID() int {
 	return s.nodeID
+}
+
+func (s AuthenticatedSession) TargetGUID() string {
+	return s.targetGUID
 }
 
 func (s AuthenticatedSession) ChannelID() string {
@@ -52,21 +58,27 @@ func (s AuthenticatedSession) ExpiresAt() time.Time {
 }
 
 func (s AuthenticatedSession) Valid() bool {
-	return s.validate(time.Now().UTC(), s.nodeID) == nil
+	return s.validate(time.Now().UTC(), s.nodeID, s.targetGUID) == nil
 }
 
-func (s AuthenticatedSession) validate(now time.Time, requestNodeID int) error {
-	if s.nodeID <= 0 || strings.TrimSpace(s.channelID) == "" || strings.TrimSpace(s.principal) == "" || s.authenticatedAt.IsZero() || s.expiresAt.IsZero() {
+func (s AuthenticatedSession) validate(now time.Time, requestNodeID int, requestTargetGUID string) error {
+	if s.nodeID <= 0 || strings.TrimSpace(s.targetGUID) == "" || strings.TrimSpace(s.channelID) == "" || strings.TrimSpace(s.principal) == "" || s.authenticatedAt.IsZero() || s.expiresAt.IsZero() {
 		return ErrUnauthenticated
 	}
-	if !isSafeBoundedToken(s.channelID, MaxSessionChannelIDLength) || !isSafeBoundedToken(s.principal, MaxSessionPrincipalLength) {
+	if !isSafeBoundedToken(s.targetGUID, MaxTargetGUIDLength) || !isSafeBoundedToken(s.channelID, MaxSessionChannelIDLength) || !isSafeBoundedToken(s.principal, MaxSessionPrincipalLength) {
 		return ErrUnauthenticated
 	}
 	if requestNodeID <= 0 {
 		return fmt.Errorf("%w: request nodeId", ErrInvalidField)
 	}
+	if !isSafeBoundedToken(requestTargetGUID, MaxTargetGUIDLength) {
+		return fmt.Errorf("%w: request targetGuid", ErrInvalidField)
+	}
 	if s.nodeID != requestNodeID {
 		return ErrNodeMismatch
+	}
+	if s.targetGUID != requestTargetGUID {
+		return ErrTargetMismatch
 	}
 	if !s.authenticatedAt.Before(s.expiresAt) {
 		return fmt.Errorf("%w: authenticatedAt/expiresAt", ErrUnauthenticated)
@@ -105,7 +117,7 @@ func (f TransportFunc) Send(ctx context.Context, session AuthenticatedSession, r
 	if err := req.Validate(now); err != nil {
 		return Response{}, err
 	}
-	if err := session.validate(now, req.NodeID); err != nil {
+	if err := session.validate(now, req.NodeID, req.TargetGUID); err != nil {
 		return Response{}, err
 	}
 	if f == nil {
@@ -141,7 +153,7 @@ func (f ExecutorFunc) Execute(ctx context.Context, session AuthenticatedSession,
 	if err := req.Validate(now); err != nil {
 		return Response{}, err
 	}
-	if err := session.validate(now, req.NodeID); err != nil {
+	if err := session.validate(now, req.NodeID, req.TargetGUID); err != nil {
 		return Response{}, err
 	}
 	if f == nil {

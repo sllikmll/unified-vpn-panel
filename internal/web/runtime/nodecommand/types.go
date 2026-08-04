@@ -20,6 +20,7 @@ const ProtocolV1 ProtocolVersion = "v1"
 const (
 	MaxCommandIDLength      = 128
 	MaxIdempotencyKeyLength = 128
+	MaxTargetGUIDLength     = 128
 	MaxClientIDLength       = 128
 	MaxEndpointTagLength    = 128
 	MaxEmailLength          = 254
@@ -89,6 +90,7 @@ type Request struct {
 	CommandID          string            `json:"commandId"`
 	IdempotencyKey     string            `json:"idempotencyKey"`
 	NodeID             int               `json:"nodeId"`
+	TargetGUID         string            `json:"targetGuid"`
 	EndpointID         int               `json:"endpointId"`
 	RuntimeKind        model.RuntimeKind `json:"runtimeKind"`
 	Operation          Operation         `json:"operation"`
@@ -107,6 +109,7 @@ type requestWire struct {
 	CommandID         string            `json:"commandId"`
 	IdempotencyKey    string            `json:"idempotencyKey"`
 	NodeID            int               `json:"nodeId"`
+	TargetGUID        string            `json:"targetGuid"`
 	EndpointID        int               `json:"endpointId"`
 	RuntimeKind       model.RuntimeKind `json:"runtimeKind"`
 	Operation         Operation         `json:"operation"`
@@ -144,6 +147,7 @@ func (r Request) MarshalJSON() ([]byte, error) {
 		CommandID         string            `json:"commandId"`
 		IdempotencyKey    string            `json:"idempotencyKey"`
 		NodeID            int               `json:"nodeId"`
+		TargetGUID        string            `json:"targetGuid"`
 		EndpointID        int               `json:"endpointId"`
 		RuntimeKind       model.RuntimeKind `json:"runtimeKind"`
 		Operation         Operation         `json:"operation"`
@@ -157,6 +161,7 @@ func (r Request) MarshalJSON() ([]byte, error) {
 		CommandID:         r.CommandID,
 		IdempotencyKey:    r.IdempotencyKey,
 		NodeID:            r.NodeID,
+		TargetGUID:        r.TargetGUID,
 		EndpointID:        r.EndpointID,
 		RuntimeKind:       r.RuntimeKind,
 		Operation:         r.Operation,
@@ -188,6 +193,12 @@ func (r Request) Validate(now time.Time) error {
 	}
 	if r.NodeID <= 0 {
 		return fmt.Errorf("%w: nodeId", ErrInvalidField)
+	}
+	if strings.TrimSpace(r.TargetGUID) == "" {
+		return fmt.Errorf("%w: targetGuid", ErrMissingField)
+	}
+	if !isSafeBoundedToken(r.TargetGUID, MaxTargetGUIDLength) {
+		return fmt.Errorf("%w: targetGuid", ErrInvalidField)
 	}
 	if r.EndpointID <= 0 || r.EndpointID > MaxEndpointID {
 		return fmt.Errorf("%w: endpointId", ErrInvalidField)

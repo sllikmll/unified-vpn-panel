@@ -17,7 +17,7 @@ func TestAuthenticatedSessionIsOpaqueOutsidePackage(t *testing.T) {
 	}
 
 	var session nodecommand.AuthenticatedSession
-	if session.NodeID() != 0 || session.Principal() != "" || session.ChannelID() != "" {
+	if session.NodeID() != 0 || session.TargetGUID() != "" || session.Principal() != "" || session.ChannelID() != "" {
 		t.Fatalf("zero session accessors should expose only empty bindings")
 	}
 	if !session.AuthenticatedAt().IsZero() || !session.ExpiresAt().IsZero() {

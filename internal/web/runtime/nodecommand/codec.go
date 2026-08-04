@@ -13,7 +13,7 @@ const DefaultMaxRequestBytes int64 = 1 << 20
 
 var allowedJSONFields = map[string]struct{}{
 	"version": {}, "supportedVersions": {}, "commandId": {}, "idempotencyKey": {},
-	"nodeId": {}, "endpointId": {}, "runtimeKind": {}, "operation": {},
+	"nodeId": {}, "targetGuid": {}, "endpointId": {}, "runtimeKind": {}, "operation": {},
 	"desiredGeneration": {}, "issuedAt": {}, "expiresAt": {}, "payload": {},
 	"tag": {}, "enable": {}, "clientId": {}, "email": {},
 }
@@ -66,6 +66,7 @@ func DecodeRequest(r io.Reader, opts DecodeOptions) (Request, error) {
 		CommandID:          wire.CommandID,
 		IdempotencyKey:     wire.IdempotencyKey,
 		NodeID:             wire.NodeID,
+		TargetGUID:         wire.TargetGUID,
 		EndpointID:         wire.EndpointID,
 		RuntimeKind:        wire.RuntimeKind,
 		Operation:          wire.Operation,

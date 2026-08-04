@@ -7,7 +7,8 @@ import (
 )
 
 func FuzzDecodeRequestStrict(f *testing.F) {
-	f.Add(`{"version":"v1","supportedVersions":["v1"],"commandId":"cmd","idempotencyKey":"idem","nodeId":1,"endpointId":2,"runtimeKind":"wireguard","operation":"endpoint.status","desiredGeneration":1,"issuedAt":"1970-01-01T00:00:01Z","expiresAt":"1970-01-01T00:01:01Z"}`)
+	f.Add(`{"version":"v1","supportedVersions":["v1"],"commandId":"cmd","idempotencyKey":"idem","nodeId":1,"targetGuid":"550e8400-e29b-41d4-a716-446655440000","endpointId":2,"runtimeKind":"wireguard","operation":"endpoint.status","desiredGeneration":1,"issuedAt":"1970-01-01T00:00:01Z","expiresAt":"1970-01-01T00:01:01Z"}`)
+	f.Add(`{"version":"v1","supportedVersions":["v1"],"commandId":"cmd","idempotencyKey":"idem","nodeId":1,"targetGUID":"550e8400-e29b-41d4-a716-446655440000","endpointId":2,"runtimeKind":"wireguard","operation":"endpoint.status","desiredGeneration":1,"issuedAt":"1970-01-01T00:00:01Z","expiresAt":"1970-01-01T00:01:01Z"}`)
 	f.Add(`{"version":"v1","version":"v1"}`)
 	f.Add(`{"version":"v1","command":"sh"}`)
 	f.Add(`{"version":"v1"} trailing`)

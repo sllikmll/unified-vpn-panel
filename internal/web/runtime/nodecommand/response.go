@@ -67,6 +67,8 @@ type Response struct {
 	Version            ProtocolVersion `json:"version"`
 	CommandID          string          `json:"commandId"`
 	IdempotencyKey     string          `json:"idempotencyKey,omitempty"`
+	NodeID             int             `json:"nodeId"`
+	TargetGUID         string          `json:"targetGuid"`
 	Status             Status          `json:"status"`
 	Operation          Operation       `json:"operation,omitempty"`
 	DesiredGeneration  int64           `json:"desiredGeneration,omitempty"`
@@ -96,6 +98,12 @@ func (r Response) Validate() error {
 	}
 	if r.IdempotencyKey != "" && !isSafeBoundedToken(r.IdempotencyKey, MaxIdempotencyKeyLength) {
 		return fmt.Errorf("%w: idempotencyKey", ErrUnsafeResponse)
+	}
+	if r.NodeID <= 0 {
+		return fmt.Errorf("%w: nodeId", ErrUnsafeResponse)
+	}
+	if !isSafeBoundedToken(r.TargetGUID, MaxTargetGUIDLength) {
+		return fmt.Errorf("%w: targetGuid", ErrUnsafeResponse)
 	}
 	if !isAllowedStatus(r.Status) {
 		return fmt.Errorf("%w: status", ErrUnsafeResponse)
@@ -130,6 +138,12 @@ func (r Response) ValidateFor(req Request) error {
 	}
 	if r.IdempotencyKey != req.IdempotencyKey {
 		return fmt.Errorf("%w: idempotencyKey correlation", ErrUnsafeResponse)
+	}
+	if r.NodeID != req.NodeID {
+		return fmt.Errorf("%w: nodeId correlation", ErrUnsafeResponse)
+	}
+	if r.TargetGUID != req.TargetGUID {
+		return fmt.Errorf("%w: targetGuid correlation", ErrUnsafeResponse)
 	}
 	if r.Operation != req.Operation {
 		return fmt.Errorf("%w: operation correlation", ErrUnsafeResponse)

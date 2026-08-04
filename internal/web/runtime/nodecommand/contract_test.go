@@ -48,6 +48,7 @@ func TestDecodeRequestStrictValidation(t *testing.T) {
 		"commandId":"cmd-1",
 		"idempotencyKey":"idem-1",
 		"nodeId":7,
+		"targetGuid":"550e8400-e29b-41d4-a716-446655440000",
 		"endpointId":9,
 		"runtimeKind":"wireguard",
 		"operation":"client.create",
@@ -66,6 +67,8 @@ func TestDecodeRequestStrictValidation(t *testing.T) {
 		{name: "unknown envelope field", body: replace(valid, `"payload":`, `"extra":1,"payload":`), wantError: ErrUnknownField},
 		{name: "duplicate field", body: replace(valid, `"nodeId":7`, `"nodeId":7,"nodeId":8`), wantError: ErrDuplicateField},
 		{name: "case alias node id", body: replace(valid, `"nodeId":7`, `"nodeId":7,"nodeID":8`), wantError: ErrUnknownField},
+		{name: "case alias target guid mixed", body: replace(valid, `"targetGuid":"550e8400-e29b-41d4-a716-446655440000"`, `"targetGuid":"550e8400-e29b-41d4-a716-446655440000","TargetGuid":"550e8400-e29b-41d4-a716-446655440001"`), wantError: ErrUnknownField},
+		{name: "case alias target guid acronym", body: replace(valid, `"targetGuid":"550e8400-e29b-41d4-a716-446655440000"`, `"targetGuid":"550e8400-e29b-41d4-a716-446655440000","targetGUID":"550e8400-e29b-41d4-a716-446655440001"`), wantError: ErrUnknownField},
 		{name: "case alias command id", body: replace(valid, `"commandId":"cmd-1"`, `"commandId":"cmd-1","CommandId":"cmd-2"`), wantError: ErrUnknownField},
 		{name: "case alias payload client id", body: replace(valid, `"clientId":"client-1"`, `"clientId":"client-1","ClientID":"client-2"`), wantError: ErrUnknownField},
 		{name: "trailing json", body: valid + `{}`, wantError: ErrTrailingJSON},
@@ -114,6 +117,7 @@ func TestValidateRequestExactFailures(t *testing.T) {
 		CommandID:         "cmd-1",
 		IdempotencyKey:    "idem-1",
 		NodeID:            7,
+		TargetGUID:        "550e8400-e29b-41d4-a716-446655440000",
 		EndpointID:        9,
 		RuntimeKind:       model.RuntimeWireGuard,
 		Operation:         OperationEndpointStatus,
@@ -132,6 +136,9 @@ func TestValidateRequestExactFailures(t *testing.T) {
 		{name: "empty idempotency", mutate: func(r *Request) { r.IdempotencyKey = "" }, wantError: ErrMissingField},
 		{name: "negative node", mutate: func(r *Request) { r.NodeID = -1 }, wantError: ErrInvalidField},
 		{name: "zero node", mutate: func(r *Request) { r.NodeID = 0 }, wantError: ErrInvalidField},
+		{name: "empty target guid", mutate: func(r *Request) { r.TargetGUID = "" }, wantError: ErrMissingField},
+		{name: "target guid path-like", mutate: func(r *Request) { r.TargetGUID = "../target" }, wantError: ErrInvalidField},
+		{name: "target guid too long", mutate: func(r *Request) { r.TargetGUID = strings.Repeat("a", MaxTargetGUIDLength+1) }, wantError: ErrInvalidField},
 		{name: "zero endpoint", mutate: func(r *Request) { r.EndpointID = 0 }, wantError: ErrInvalidField},
 		{name: "endpoint too large", mutate: func(r *Request) { r.EndpointID = MaxEndpointID + 1 }, wantError: ErrInvalidField},
 		{name: "zero generation", mutate: func(r *Request) { r.DesiredGeneration = 0 }, wantError: ErrInvalidField},
@@ -166,6 +173,7 @@ func TestValidateRequestOperationPayloadRules(t *testing.T) {
 		CommandID:         "cmd-1",
 		IdempotencyKey:    "idem-1",
 		NodeID:            7,
+		TargetGUID:        "550e8400-e29b-41d4-a716-446655440000",
 		EndpointID:        9,
 		RuntimeKind:       model.RuntimeWireGuard,
 		DesiredGeneration: 1,
@@ -219,6 +227,7 @@ func TestDecodeRequestOperationPayloadStrictExtras(t *testing.T) {
 		"commandId":"cmd-1",
 		"idempotencyKey":"idem-1",
 		"nodeId":7,
+		"targetGuid":"550e8400-e29b-41d4-a716-446655440000",
 		"endpointId":9,
 		"runtimeKind":"wireguard",
 		"operation":"client.delete",
@@ -240,6 +249,7 @@ func TestRequestSecretInputDoesNotSerialize(t *testing.T) {
 		CommandID:         "cmd-1",
 		IdempotencyKey:    "idem-1",
 		NodeID:            7,
+		TargetGUID:        "550e8400-e29b-41d4-a716-446655440000",
 		EndpointID:        9,
 		RuntimeKind:       model.RuntimeWireGuard,
 		Operation:         OperationEndpointApply,
@@ -303,7 +313,7 @@ func TestResponseRejectsUnsafeErrorDetails(t *testing.T) {
 		response  Response
 		wantError error
 	}{
-		{name: "safe failed", response: Response{Version: ProtocolV1, CommandID: req.CommandID, IdempotencyKey: req.IdempotencyKey, Status: StatusFailed, Operation: req.Operation, DesiredGeneration: req.DesiredGeneration, ErrorCode: ErrorCodeUnsupportedOperation, SummaryCode: SummaryUnsupportedOperation}},
+		{name: "safe failed", response: Response{Version: ProtocolV1, CommandID: req.CommandID, IdempotencyKey: req.IdempotencyKey, NodeID: req.NodeID, TargetGUID: req.TargetGUID, Status: StatusFailed, Operation: req.Operation, DesiredGeneration: req.DesiredGeneration, ErrorCode: ErrorCodeUnsupportedOperation, SummaryCode: SummaryUnsupportedOperation}},
 		{name: "unknown summary code", response: Response{Version: ProtocolV1, CommandID: "cmd-1", Status: StatusFailed, ErrorCode: ErrorCodeRuntimeFailed, SummaryCode: SummaryCode("stderr: private key failed")}, wantError: ErrUnsafeResponse},
 		{name: "unknown code", response: Response{Version: ProtocolV1, CommandID: "cmd-1", Status: StatusFailed, ErrorCode: ErrorCode("panic stack"), SummaryCode: SummaryRuntimeFailed}, wantError: ErrUnsafeResponse},
 		{name: "unknown state", response: Response{Version: ProtocolV1, CommandID: "cmd-1", Status: StatusSucceeded, Result: Result{State: ResultState("running; cat /etc/passwd")}}, wantError: ErrUnsafeResponse},
@@ -340,6 +350,10 @@ func TestResponseValidateForRequiresExactCorrelation(t *testing.T) {
 		{name: "wrong command", mutate: func(r *Response) { r.CommandID = "cmd-2" }, wantError: ErrUnsafeResponse},
 		{name: "wrong key", mutate: func(r *Response) { r.IdempotencyKey = "idem-2" }, wantError: ErrUnsafeResponse},
 		{name: "missing key", mutate: func(r *Response) { r.IdempotencyKey = "" }, wantError: ErrUnsafeResponse},
+		{name: "wrong node", mutate: func(r *Response) { r.NodeID = req.NodeID + 1 }, wantError: ErrUnsafeResponse},
+		{name: "missing node", mutate: func(r *Response) { r.NodeID = 0 }, wantError: ErrUnsafeResponse},
+		{name: "wrong target guid", mutate: func(r *Response) { r.TargetGUID = "550e8400-e29b-41d4-a716-446655440001" }, wantError: ErrUnsafeResponse},
+		{name: "missing target guid", mutate: func(r *Response) { r.TargetGUID = "" }, wantError: ErrUnsafeResponse},
 		{name: "wrong operation", mutate: func(r *Response) { r.Operation = OperationEndpointStatus }, wantError: ErrUnsafeResponse},
 		{name: "missing operation", mutate: func(r *Response) { r.Operation = "" }, wantError: ErrUnsafeResponse},
 		{name: "wrong desired generation", mutate: func(r *Response) { r.DesiredGeneration = req.DesiredGeneration + 1 }, wantError: ErrUnsafeResponse},
@@ -376,25 +390,27 @@ func TestResponseValidateForRejectsClientResultOnEndpointOperation(t *testing.T)
 
 func TestExecutorRequiresAuthenticatedSession(t *testing.T) {
 	now := time.Now().UTC()
+	req := validRequest(now)
 	executor := ExecutorFunc(func(context.Context, AuthenticatedSession, Request) (Response, error) {
 		return Response{
 			Version:           ProtocolV1,
 			CommandID:         "cmd-1",
 			IdempotencyKey:    "idem-1",
+			NodeID:            req.NodeID,
+			TargetGUID:        req.TargetGUID,
 			Status:            StatusAccepted,
 			Operation:         OperationClientCreate,
 			DesiredGeneration: 1,
 			SummaryCode:       SummaryAccepted,
 		}, nil
 	})
-	req := validRequest(now)
 
 	_, err := executor.Execute(context.Background(), AuthenticatedSession{}, req)
 	if !errors.Is(err, ErrUnauthenticated) {
 		t.Fatalf("empty session error = %v, want ErrUnauthenticated", err)
 	}
 
-	resp, err := executor.Execute(context.Background(), newAuthenticatedSession(7, "node-7", "mtls:node-7", now.Add(-time.Second), now.Add(time.Minute)), req)
+	resp, err := executor.Execute(context.Background(), newAuthenticatedSession(7, req.TargetGUID, "node-7", "mtls:node-7", now.Add(-time.Second), now.Add(time.Minute)), req)
 	if err != nil {
 		t.Fatalf("authenticated execute: %v", err)
 	}
@@ -405,31 +421,33 @@ func TestExecutorRequiresAuthenticatedSession(t *testing.T) {
 
 func TestAuthenticatedSessionAccessorsAndValidation(t *testing.T) {
 	now := time.Unix(100, 0).UTC()
-	session := newAuthenticatedSession(7, "node-7", "channel-1", now.Add(-time.Second), now.Add(time.Minute))
-	if session.NodeID() != 7 || session.Principal() != "node-7" || session.ChannelID() != "channel-1" {
+	session := newAuthenticatedSession(7, "550e8400-e29b-41d4-a716-446655440000", "node-7", "channel-1", now.Add(-time.Second), now.Add(time.Minute))
+	if session.NodeID() != 7 || session.TargetGUID() != "550e8400-e29b-41d4-a716-446655440000" || session.Principal() != "node-7" || session.ChannelID() != "channel-1" {
 		t.Fatalf("session accessors returned wrong binding")
 	}
 	if !session.AuthenticatedAt().Equal(now.Add(-time.Second)) || !session.ExpiresAt().Equal(now.Add(time.Minute)) {
 		t.Fatalf("session time accessors returned wrong binding")
 	}
-	if err := session.validate(now, 7); err != nil {
+	if err := session.validate(now, 7, "550e8400-e29b-41d4-a716-446655440000"); err != nil {
 		t.Fatalf("valid session: %v", err)
 	}
 	tests := []struct {
 		name      string
 		session   AuthenticatedSession
 		nodeID    int
+		target    string
 		wantError error
 	}{
-		{name: "zero", session: AuthenticatedSession{}, nodeID: 7, wantError: ErrUnauthenticated},
-		{name: "node mismatch", session: session, nodeID: 8, wantError: ErrNodeMismatch},
-		{name: "future", session: newAuthenticatedSession(7, "node-7", "channel-1", now.Add(time.Second), now.Add(time.Minute)), nodeID: 7, wantError: ErrNotYetValid},
-		{name: "expired", session: newAuthenticatedSession(7, "node-7", "channel-1", now.Add(-time.Minute), now), nodeID: 7, wantError: ErrExpired},
-		{name: "zero node", session: newAuthenticatedSession(0, "node-7", "channel-1", now.Add(-time.Second), now.Add(time.Minute)), nodeID: 7, wantError: ErrUnauthenticated},
+		{name: "zero", session: AuthenticatedSession{}, nodeID: 7, target: "550e8400-e29b-41d4-a716-446655440000", wantError: ErrUnauthenticated},
+		{name: "node mismatch", session: session, nodeID: 8, target: "550e8400-e29b-41d4-a716-446655440000", wantError: ErrNodeMismatch},
+		{name: "target mismatch", session: session, nodeID: 7, target: "550e8400-e29b-41d4-a716-446655440001", wantError: ErrTargetMismatch},
+		{name: "future", session: newAuthenticatedSession(7, "550e8400-e29b-41d4-a716-446655440000", "node-7", "channel-1", now.Add(time.Second), now.Add(time.Minute)), nodeID: 7, target: "550e8400-e29b-41d4-a716-446655440000", wantError: ErrNotYetValid},
+		{name: "expired", session: newAuthenticatedSession(7, "550e8400-e29b-41d4-a716-446655440000", "node-7", "channel-1", now.Add(-time.Minute), now), nodeID: 7, target: "550e8400-e29b-41d4-a716-446655440000", wantError: ErrExpired},
+		{name: "zero node", session: newAuthenticatedSession(0, "550e8400-e29b-41d4-a716-446655440000", "node-7", "channel-1", now.Add(-time.Second), now.Add(time.Minute)), nodeID: 7, target: "550e8400-e29b-41d4-a716-446655440000", wantError: ErrUnauthenticated},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.session.validate(now, tt.nodeID)
+			err := tt.session.validate(now, tt.nodeID, tt.target)
 			if !errors.Is(err, tt.wantError) {
 				t.Fatalf("error = %v, want %v", err, tt.wantError)
 			}
@@ -439,7 +457,7 @@ func TestAuthenticatedSessionAccessorsAndValidation(t *testing.T) {
 
 func TestTransportAndExecutorValidationGates(t *testing.T) {
 	now := time.Now().UTC()
-	session := newAuthenticatedSession(7, "node-7", "channel-1", now.Add(-time.Second), now.Add(time.Minute))
+	session := newAuthenticatedSession(7, "550e8400-e29b-41d4-a716-446655440000", "node-7", "channel-1", now.Add(-time.Second), now.Add(time.Minute))
 	req := validRequest(now)
 	tests := []struct {
 		name      string
@@ -452,7 +470,8 @@ func TestTransportAndExecutorValidationGates(t *testing.T) {
 		{name: "nil context", ctx: nil, session: session, req: req, resp: validResponse(req), wantError: ErrInvalidContext},
 		{name: "canceled context", ctx: canceledContext(), session: session, req: req, resp: validResponse(req), wantError: context.Canceled},
 		{name: "invalid session", ctx: context.Background(), session: AuthenticatedSession{}, req: req, resp: validResponse(req), wantError: ErrUnauthenticated},
-		{name: "node mismatch", ctx: context.Background(), session: newAuthenticatedSession(8, "node-8", "channel-8", now.Add(-time.Second), now.Add(time.Minute)), req: req, resp: validResponse(req), wantError: ErrNodeMismatch},
+		{name: "node mismatch", ctx: context.Background(), session: newAuthenticatedSession(8, req.TargetGUID, "node-8", "channel-8", now.Add(-time.Second), now.Add(time.Minute)), req: req, resp: validResponse(req), wantError: ErrNodeMismatch},
+		{name: "target mismatch", ctx: context.Background(), session: newAuthenticatedSession(7, "550e8400-e29b-41d4-a716-446655440001", "node-7", "channel-7", now.Add(-time.Second), now.Add(time.Minute)), req: req, resp: validResponse(req), wantError: ErrTargetMismatch},
 		{name: "invalid request", ctx: context.Background(), session: session, req: Request{CommandID: "cmd-1"}, resp: validResponse(req), wantError: ErrUnsupportedVersion},
 		{name: "unsafe response", ctx: context.Background(), session: session, req: req, resp: Response{Version: ProtocolV1, CommandID: "cmd-1", Status: Status("raw")}, wantError: ErrUnsafeResponse},
 		{name: "wrong-command response", ctx: context.Background(), session: session, req: req, resp: func() Response {
@@ -490,6 +509,25 @@ func TestTransportAndExecutorValidationGates(t *testing.T) {
 	_, err = (ExecutorFunc(nil)).Execute(context.Background(), session, req)
 	if !errors.Is(err, ErrInvalidField) {
 		t.Fatalf("nil executor func error = %v, want ErrInvalidField", err)
+	}
+}
+
+func TestSessionTargetMismatchBlocksCallback(t *testing.T) {
+	now := time.Now().UTC()
+	req := validRequest(now)
+	session := newAuthenticatedSession(7, "550e8400-e29b-41d4-a716-446655440001", "node-7", "channel-1", now.Add(-time.Second), now.Add(time.Minute))
+	called := false
+	transport := TransportFunc(func(context.Context, AuthenticatedSession, Request) (Response, error) {
+		called = true
+		return validResponse(req), nil
+	})
+
+	_, err := transport.Send(context.Background(), session, req)
+	if !errors.Is(err, ErrTargetMismatch) {
+		t.Fatalf("error = %v, want ErrTargetMismatch", err)
+	}
+	if called {
+		t.Fatal("transport callback was called for target mismatch")
 	}
 }
 
@@ -660,6 +698,7 @@ func TestMemoryReplayGuardReplayHashConflictsIncludePayloadTimeVersionsAndSecret
 		mutate func(*Request)
 	}{
 		{name: "version", mutate: func(r *Request) { r.SupportedVersions = []ProtocolVersion{ProtocolV1, "v-next"} }},
+		{name: "target guid", mutate: func(r *Request) { r.TargetGUID = "550e8400-e29b-41d4-a716-446655440001" }},
 		{name: "payload", mutate: func(r *Request) { r.Payload = ClientPayload{ClientID: "client-1", Email: "b@example.com"} }},
 		{name: "issued", mutate: func(r *Request) { r.IssuedAt = r.IssuedAt.Add(time.Second); r.ExpiresAt = r.ExpiresAt.Add(time.Second) }},
 		{name: "secret material", mutate: func(r *Request) {
@@ -690,22 +729,25 @@ func TestMemoryReplayGuardReplayHashConflictsIncludePayloadTimeVersionsAndSecret
 
 func TestAuthenticatedSessionBounds(t *testing.T) {
 	now := time.Unix(100, 0).UTC()
-	valid := newAuthenticatedSession(7, "node-7", "channel-1", now.Add(-time.Second), now.Add(time.Minute))
+	targetGUID := "550e8400-e29b-41d4-a716-446655440000"
+	valid := newAuthenticatedSession(7, targetGUID, "node-7", "channel-1", now.Add(-time.Second), now.Add(time.Minute))
 	tests := []struct {
 		name      string
 		session   AuthenticatedSession
 		wantError error
 	}{
 		{name: "valid", session: valid},
-		{name: "channel too long", session: newAuthenticatedSession(7, "node-7", strings.Repeat("a", MaxSessionChannelIDLength+1), now.Add(-time.Second), now.Add(time.Minute)), wantError: ErrUnauthenticated},
-		{name: "principal too long", session: newAuthenticatedSession(7, strings.Repeat("a", MaxSessionPrincipalLength+1), "channel-1", now.Add(-time.Second), now.Add(time.Minute)), wantError: ErrUnauthenticated},
-		{name: "bad channel token", session: newAuthenticatedSession(7, "node-7", "../channel", now.Add(-time.Second), now.Add(time.Minute)), wantError: ErrUnauthenticated},
-		{name: "bad principal token", session: newAuthenticatedSession(7, "node 7", "channel-1", now.Add(-time.Second), now.Add(time.Minute)), wantError: ErrUnauthenticated},
-		{name: "lifetime too long", session: newAuthenticatedSession(7, "node-7", "channel-1", now, now.Add(MaxSessionLifetime+time.Second)), wantError: ErrUnauthenticated},
+		{name: "target guid too long", session: newAuthenticatedSession(7, strings.Repeat("a", MaxTargetGUIDLength+1), "node-7", "channel-1", now.Add(-time.Second), now.Add(time.Minute)), wantError: ErrUnauthenticated},
+		{name: "bad target guid token", session: newAuthenticatedSession(7, "../target", "node-7", "channel-1", now.Add(-time.Second), now.Add(time.Minute)), wantError: ErrUnauthenticated},
+		{name: "channel too long", session: newAuthenticatedSession(7, targetGUID, "node-7", strings.Repeat("a", MaxSessionChannelIDLength+1), now.Add(-time.Second), now.Add(time.Minute)), wantError: ErrUnauthenticated},
+		{name: "principal too long", session: newAuthenticatedSession(7, targetGUID, strings.Repeat("a", MaxSessionPrincipalLength+1), "channel-1", now.Add(-time.Second), now.Add(time.Minute)), wantError: ErrUnauthenticated},
+		{name: "bad channel token", session: newAuthenticatedSession(7, targetGUID, "node-7", "../channel", now.Add(-time.Second), now.Add(time.Minute)), wantError: ErrUnauthenticated},
+		{name: "bad principal token", session: newAuthenticatedSession(7, targetGUID, "node 7", "channel-1", now.Add(-time.Second), now.Add(time.Minute)), wantError: ErrUnauthenticated},
+		{name: "lifetime too long", session: newAuthenticatedSession(7, targetGUID, "node-7", "channel-1", now, now.Add(MaxSessionLifetime+time.Second)), wantError: ErrUnauthenticated},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.session.validate(now, 7)
+			err := tt.session.validate(now, 7, targetGUID)
 			if !errors.Is(err, tt.wantError) {
 				t.Fatalf("error = %v, want %v", err, tt.wantError)
 			}
@@ -750,6 +792,7 @@ func validRequest(now time.Time) Request {
 		CommandID:         "cmd-1",
 		IdempotencyKey:    "idem-1",
 		NodeID:            7,
+		TargetGUID:        "550e8400-e29b-41d4-a716-446655440000",
 		EndpointID:        9,
 		RuntimeKind:       model.RuntimeWireGuard,
 		Operation:         OperationClientCreate,
@@ -765,6 +808,8 @@ func validResponse(req Request) Response {
 		Version:           ProtocolV1,
 		CommandID:         req.CommandID,
 		IdempotencyKey:    req.IdempotencyKey,
+		NodeID:            req.NodeID,
+		TargetGUID:        req.TargetGUID,
 		Status:            StatusSucceeded,
 		Operation:         req.Operation,
 		DesiredGeneration: req.DesiredGeneration,

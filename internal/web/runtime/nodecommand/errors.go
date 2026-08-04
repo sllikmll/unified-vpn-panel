@@ -19,6 +19,7 @@ var (
 	ErrNotYetValid          = errors.New("node command not yet valid")
 	ErrUnauthenticated      = errors.New("node command unauthenticated")
 	ErrNodeMismatch         = errors.New("node command node mismatch")
+	ErrTargetMismatch       = errors.New("node command target mismatch")
 	ErrInvalidContext       = errors.New("node command invalid context")
 	ErrUnsafeResponse       = errors.New("node command unsafe response")
 	ErrReplayInProgress     = errors.New("node command replay in progress")
