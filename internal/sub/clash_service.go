@@ -10,6 +10,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	wgutil "github.com/mhsanaei/3x-ui/v3/internal/util/wireguard"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/service/protocolconnections"
 )
 
 type SubClashService struct {
@@ -33,7 +34,11 @@ func (s *SubClashService) GetClash(subId string, host string) (string, string, e
 	if err != nil {
 		return "", "", err
 	}
-	if len(inbounds) == 0 && len(externalLinks) == 0 {
+	managedLinks, managedEmails, err := subReq.getManagedRawLinksBySubId(subId)
+	if err != nil {
+		return "", "", err
+	}
+	if len(inbounds) == 0 && len(externalLinks) == 0 && len(managedLinks) == 0 {
 		return "", "", nil
 	}
 
@@ -64,6 +69,16 @@ func (s *SubClashService) GetClash(subId string, host string) (string, string, e
 				seenEmails[ext.Email] = struct{}{}
 				proxies = append(proxies, proxy)
 			}
+		}
+	}
+	for i, link := range managedLinks {
+		name := fmt.Sprintf("managed-%d", i+1)
+		if i < len(managedEmails) && managedEmails[i] != "" {
+			seenEmails[managedEmails[i]] = struct{}{}
+			name = managedEmails[i]
+		}
+		if proxy := managedClashProxyFromRaw(link, name); proxy != nil {
+			proxies = append(proxies, proxy)
 		}
 	}
 
@@ -110,6 +125,18 @@ func (s *SubClashService) GetClash(subId string, host string) (string, string, e
 
 	header := fmt.Sprintf("upload=%d; download=%d; total=%d; expire=%d", traffic.Up, traffic.Down, traffic.Total, traffic.ExpiryTime/1000)
 	return string(finalYAML), header, nil
+}
+
+func managedClashProxyFromRaw(rawLink, name string) map[string]any {
+	conn, err := protocolconnections.ParseConnection("", rawLink, name)
+	if err != nil || strings.TrimSpace(conn.MihomoJSON) == "" {
+		return nil
+	}
+	var proxy map[string]any
+	if err := json.Unmarshal([]byte(conn.MihomoJSON), &proxy); err != nil {
+		return nil
+	}
+	return proxy
 }
 
 // ensureUniqueProxyNames keeps every proxy "name" non-empty and unique:

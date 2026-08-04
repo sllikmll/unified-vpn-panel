@@ -56,8 +56,11 @@ export function useManagedEndpointCapabilitiesQuery() {
 
 export interface ManagedEndpointClient {
   id: string;
+  clientId?: number;
+  subId?: string;
   email?: string;
   username?: string;
+  publicIdentity?: string;
   address?: string;
   enable: boolean;
   enabled?: boolean;
@@ -68,6 +71,7 @@ export interface ManagedEndpointClient {
 }
 
 export interface ManagedClientPayload {
+  subId?: string;
   email?: string;
   username?: string;
   address?: string;
@@ -80,8 +84,6 @@ export interface ManagedClientPayload {
 export interface ManagedExportResponse {
   content?: string;
   filename?: string;
-  links?: string[];
-  qr?: string;
   subscriptions?: Partial<Record<'raw' | 'json' | 'clash', string>>;
 }
 

@@ -102,7 +102,7 @@ function pickActionBlockReason(endpoint: ManagedEndpoint, action: string): strin
 }
 
 function downloadExport(exported: ManagedExportResponse) {
-  const content = exported.content ?? exported.links?.join('\n') ?? exported.qr ?? '';
+  const content = exported.content ?? exported.subscriptions?.raw ?? '';
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -126,6 +126,7 @@ function ManagedClientsModal({ endpoint, open, onClose }: ClientModalProps) {
   const [clientFormOpen, setClientFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ManagedEndpointClient | null>(null);
   const [username, setUsername] = useState('');
+  const [subId, setSubId] = useState('');
   const [busyId, setBusyId] = useState('');
   const query = useQuery({
     queryKey: ['managed-endpoints', endpoint?.id, 'clients'],
@@ -138,12 +139,13 @@ function ManagedClientsModal({ endpoint, open, onClose }: ClientModalProps) {
     if (!endpoint) return;
     setError('');
     const payload = endpoint.protocol === 'naiveproxy' || endpoint.protocol === 'mieru'
-      ? { username: username || undefined, enable: true }
-      : { email: username || undefined, enable: true };
+      ? { subId: subId || undefined, username: username || undefined, enable: true }
+      : { subId: subId || undefined, enable: true };
     const msg = await actions.createClient(endpoint.id, payload);
     if (msg?.success) {
       setClientFormOpen(false);
       setUsername('');
+      setSubId('');
       await query.refetch();
     } else {
       setError(msg?.msg || t('managedProtocols.loadClientsFailed'));
@@ -153,17 +155,19 @@ function ManagedClientsModal({ endpoint, open, onClose }: ClientModalProps) {
   const openClientEdit = (client: ManagedEndpointClient) => {
     setEditingClient(client);
     setUsername(client.username || client.email || '');
+    setSubId(client.subId || '');
   };
 
   const saveClientEdit = async () => {
     if (!endpoint || !editingClient) return;
     const payload = endpoint.protocol === 'naiveproxy' || endpoint.protocol === 'mieru'
-      ? { username: username || undefined, enable: editingClient.enable ?? editingClient.enabled }
-      : { email: username || undefined, enable: editingClient.enable ?? editingClient.enabled };
+      ? { subId: subId || undefined, username: username || undefined, enable: editingClient.enable ?? editingClient.enabled }
+      : { subId: subId || undefined, enable: editingClient.enable ?? editingClient.enabled };
     const msg = await actions.patchClient(endpoint.id, editingClient.id, payload);
     if (msg?.success) {
       setEditingClient(null);
       setUsername('');
+      setSubId('');
       await query.refetch();
     } else {
       setError(msg?.msg || t('managedProtocols.loadClientsFailed'));
@@ -225,8 +229,10 @@ function ManagedClientsModal({ endpoint, open, onClose }: ClientModalProps) {
           dataSource={clients}
           columns={[
             { title: t('managedProtocols.client'), key: 'client', render: (_v, row: ManagedEndpointClient) => row.email || row.username || row.id },
+            { title: t('managedProtocols.subId'), key: 'subId', render: (_v, row: ManagedEndpointClient) => row.subId || '-' },
+            { title: t('managedProtocols.protocolUsername'), key: 'publicIdentity', render: (_v, row: ManagedEndpointClient) => row.publicIdentity || row.username || '-' },
+            { title: t('managedProtocols.address'), key: 'address', render: (_v, row: ManagedEndpointClient) => row.address || '-' },
             { title: t('managedProtocols.enabled'), key: 'enable', render: (_v, row: ManagedEndpointClient) => <Tag color={(row.enable ?? row.enabled) ? 'green' : 'default'}>{(row.enable ?? row.enabled) ? t('managedProtocols.enabled') : t('managedProtocols.disabled')}</Tag> },
-            { title: t('managedProtocols.address'), key: 'address', render: (_v, row: ManagedEndpointClient) => row.address || t('managedProtocols.serverGenerated') },
             { title: t('managedProtocols.status'), key: 'status', render: (_v, row: ManagedEndpointClient) => <Tag color={statusColor(row.status || 'unknown')}>{row.status || t('managedProtocols.unknown')}</Tag> },
             { title: t('managedProtocols.traffic'), key: 'traffic', render: (_v, row: ManagedEndpointClient) => trafficCell(row, t) },
             {
@@ -249,17 +255,23 @@ function ManagedClientsModal({ endpoint, open, onClose }: ClientModalProps) {
       <Modal open={clientFormOpen} title={t('managedProtocols.createClient')} onCancel={() => setClientFormOpen(false)} onOk={createClient}>
         <Alert type="info" showIcon message={t('managedProtocols.generatedCredentials')} />
         <Form className="mt-12" colon={false}>
-          <Form.Item label={endpoint?.protocol === 'amneziawg' ? t('managedProtocols.email') : t('managedProtocols.protocolUsername')}>
-            <Input value={username} onChange={(e) => setUsername(e.target.value)} />
+          <Form.Item label={t('managedProtocols.subId')} htmlFor="managed-client-create-sub-id" required>
+            <Input id="managed-client-create-sub-id" value={subId} onChange={(e) => setSubId(e.target.value)} />
           </Form.Item>
+          {(endpoint?.protocol === 'naiveproxy' || endpoint?.protocol === 'mieru') && <Form.Item label={t('managedProtocols.protocolUsername')}>
+            <Input value={username} onChange={(e) => setUsername(e.target.value)} />
+          </Form.Item>}
         </Form>
       </Modal>
       <Modal open={!!editingClient} title={t('managedProtocols.editClient')} onCancel={() => setEditingClient(null)} onOk={saveClientEdit}>
         <Alert type="info" showIcon message={t('managedProtocols.noSecretsInEdit')} />
         <Form className="mt-12" colon={false}>
-          <Form.Item label={endpoint?.protocol === 'amneziawg' ? t('managedProtocols.email') : t('managedProtocols.protocolUsername')}>
-            <Input value={username} onChange={(e) => setUsername(e.target.value)} />
+          <Form.Item label={t('managedProtocols.subId')} htmlFor="managed-client-edit-sub-id" required>
+            <Input id="managed-client-edit-sub-id" value={subId} onChange={(e) => setSubId(e.target.value)} />
           </Form.Item>
+          {(endpoint?.protocol === 'naiveproxy' || endpoint?.protocol === 'mieru') && <Form.Item label={t('managedProtocols.protocolUsername')}>
+            <Input value={username} onChange={(e) => setUsername(e.target.value)} />
+          </Form.Item>}
         </Form>
       </Modal>
       <Modal
@@ -275,16 +287,15 @@ function ManagedClientsModal({ endpoint, open, onClose }: ClientModalProps) {
           <Descriptions.Item label={t('managedProtocols.json')}>{subscriptionLine(t('managedProtocols.json'), exported?.subscriptions?.json, t)}</Descriptions.Item>
           <Descriptions.Item label={t('managedProtocols.clash')}>{subscriptionLine(t('managedProtocols.clash'), exported?.subscriptions?.clash, t)}</Descriptions.Item>
         </Descriptions>
-        {exported && (exported.content || exported.links?.length || exported.qr) && (
+        {exported && (exported.content || exported.subscriptions?.raw) && (
           <Button className="managed-download-button" icon={<DownloadOutlined />} onClick={() => downloadExport(exported)}>
             {t('managedProtocols.download')}
           </Button>
         )}
         {exported?.content && <pre className="managed-export-block">{exported.content}</pre>}
-        {exported?.links?.map((link) => <Input key={link} className="managed-link-input" readOnly value={link} />)}
-        {(exported?.qr || exported?.links?.[0] || exported?.content) && (
+        {(exported?.content || exported?.subscriptions?.raw) && (
           <div className="managed-qr-wrap">
-            <QRCode value={exported.qr || exported.links?.[0] || exported.content || ''} />
+            <QRCode value={exported.content || exported.subscriptions?.raw || ''} />
           </div>
         )}
       </Modal>

@@ -1599,31 +1599,43 @@ export const sections: readonly Section[] = [
   },
 
   {
+    id: 'node-command',
+    title: 'Node Command Transport',
+    description:
+      'Internal authenticated transport for sealed, typed managed-runtime commands. Arbitrary shell commands are not accepted.',
+    endpoints: [
+      {
+        method: 'POST',
+        path: '/panel/api/node-command/v1',
+        summary: 'Execute one authenticated, sealed and allowlisted managed-runtime command addressed to this node GUID.',
+      },
+    ],
+  },
+
+  {
     id: 'managed-endpoints',
     title: 'Managed Endpoints',
     description:
-      'Read-only Phase 0 unified endpoint projection. Existing inbounds are projected alongside native managed endpoint rows, with desired/observed config and secrets redacted. Native lifecycle, mutation, detection, and export endpoints are intentionally unavailable until drivers land.',
+      'Unified read model and native lifecycle API for AWG2, Mieru, and NaiveProxy endpoints. Desired/observed configuration, credentials, encrypted envelopes, and runtime errors are write-only and never returned.',
     endpoints: [
-      {
-        method: 'GET',
-        path: '/panel/api/managed-endpoints/list',
-        summary: 'List projected Xray/MTProto inbounds and native managed endpoint rows for the authenticated user. This endpoint has no runtime side effects and never returns internal desired state, observed state, or secret material.',
-        responseSchema: 'ManagedEndpointView',
-        responseSchemaArray: true,
-      },
-      {
-        method: 'GET',
-        path: '/panel/api/managed-endpoints/:id',
-        summary: 'Fetch one projected managed endpoint by its stable read-model ID. The response is redacted like the list endpoint.',
-        params: [{ name: 'id', in: 'path', type: 'string', desc: 'Read-model ID such as legacy-xray-1, legacy-mtproto-2, or managed-3.' }],
-        responseSchema: 'ManagedEndpointView',
-      },
-      {
-        method: 'GET',
-        path: '/panel/api/managed-endpoints/capabilities',
-        summary: 'Return static Phase 0 runtime capability metadata. Native lifecycle, client CRUD, traffic collection, detection, firewall policy, subscription, and export are marked unavailable until drivers are implemented.',
-        responseSchema: 'ManagedEndpointCapabilities',
-      },
+      { method: 'GET', path: '/panel/api/managed-endpoints/list', summary: 'List projected legacy inbounds and native managed endpoints.', responseSchema: 'ManagedEndpointView', responseSchemaArray: true },
+      { method: 'GET', path: '/panel/api/managed-endpoints/capabilities', summary: 'Return runtime and lifecycle capabilities.', responseSchema: 'ManagedEndpointCapabilities' },
+      { method: 'GET', path: '/panel/api/managed-endpoints/install-plan/:runtimeKind', summary: 'Return the fail-closed immutable runtime installation plan.', params: [{ name: 'runtimeKind', in: 'path', type: 'string', desc: 'amneziawg, mieru, or naiveproxy.' }] },
+      { method: 'POST', path: '/panel/api/managed-endpoints', summary: 'Create and apply a native managed endpoint.' },
+      { method: 'POST', path: '/panel/api/managed-endpoints/', summary: 'Create and apply a native managed endpoint (trailing-slash route).' },
+      { method: 'POST', path: '/panel/api/managed-endpoints/create', summary: 'Create and apply a native managed endpoint (compatibility route).' },
+      { method: 'GET', path: '/panel/api/managed-endpoints/:id', summary: 'Fetch a redacted managed endpoint view.', params: [{ name: 'id', in: 'path', type: 'string', desc: 'Stable ID such as managed-3 or legacy-xray-1.' }], responseSchema: 'ManagedEndpointView' },
+      { method: 'PUT', path: '/panel/api/managed-endpoints/:id', summary: 'Replace and apply a managed endpoint configuration.', params: [{ name: 'id', in: 'path', type: 'string', desc: 'Managed endpoint ID.' }] },
+      { method: 'PATCH', path: '/panel/api/managed-endpoints/:id', summary: 'Update and apply a managed endpoint configuration.', params: [{ name: 'id', in: 'path', type: 'string', desc: 'Managed endpoint ID.' }] },
+      { method: 'DELETE', path: '/panel/api/managed-endpoints/:id', summary: 'Delete a managed endpoint record. Runtime uninstall is a separate action.', params: [{ name: 'id', in: 'path', type: 'string', desc: 'Managed endpoint ID.' }] },
+      { method: 'POST', path: '/panel/api/managed-endpoints/:id/actions/:action', summary: 'Run start, stop, restart, status, detect, install, update, or uninstall.', params: [{ name: 'id', in: 'path', type: 'string', desc: 'Managed endpoint ID.' }, { name: 'action', in: 'path', type: 'string', desc: 'Typed lifecycle action.' }] },
+      { method: 'GET', path: '/panel/api/managed-endpoints/:id/clients', summary: 'List redacted clients bound to normalized subscription records.', params: [{ name: 'id', in: 'path', type: 'string', desc: 'Managed endpoint ID.' }] },
+      { method: 'POST', path: '/panel/api/managed-endpoints/:id/clients', summary: 'Create and apply a managed client bound by subscription ID.', params: [{ name: 'id', in: 'path', type: 'string', desc: 'Managed endpoint ID.' }] },
+      { method: 'PUT', path: '/panel/api/managed-endpoints/:id/clients/:clientId', summary: 'Replace and apply a managed client.', params: [{ name: 'id', in: 'path', type: 'string', desc: 'Managed endpoint ID.' }, { name: 'clientId', in: 'path', type: 'integer', desc: 'Managed client ID.' }] },
+      { method: 'PATCH', path: '/panel/api/managed-endpoints/:id/clients/:clientId', summary: 'Update and apply a managed client.', params: [{ name: 'id', in: 'path', type: 'string', desc: 'Managed endpoint ID.' }, { name: 'clientId', in: 'path', type: 'integer', desc: 'Managed client ID.' }] },
+      { method: 'DELETE', path: '/panel/api/managed-endpoints/:id/clients/:clientId', summary: 'Remove a managed client and reapply desired runtime state.', params: [{ name: 'id', in: 'path', type: 'string', desc: 'Managed endpoint ID.' }, { name: 'clientId', in: 'path', type: 'integer', desc: 'Managed client ID.' }] },
+      { method: 'POST', path: '/panel/api/managed-endpoints/:id/clients/:clientId/actions/:action', summary: 'Enable, disable, export, or read managed client status.', params: [{ name: 'id', in: 'path', type: 'string', desc: 'Managed endpoint ID.' }, { name: 'clientId', in: 'path', type: 'integer', desc: 'Managed client ID.' }, { name: 'action', in: 'path', type: 'string', desc: 'Typed client action.' }] },
+      { method: 'GET', path: '/panel/api/managed-endpoints/:id/clients/:clientId/export', summary: 'Export a generated client profile and enabled subscription URLs.', params: [{ name: 'id', in: 'path', type: 'string', desc: 'Managed endpoint ID.' }, { name: 'clientId', in: 'path', type: 'integer', desc: 'Managed client ID.' }] },
     ],
   },
 

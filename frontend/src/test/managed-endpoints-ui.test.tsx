@@ -80,6 +80,8 @@ describe('ManagedEndpointsPanel', () => {
         return { success: true, msg: '', obj: [{
           id: 'c1',
           email: 'phone',
+          subId: 'sub-phone',
+          publicIdentity: 'runtime-phone',
           address: '10.66.66.2/32',
           enable: true,
           status: 'unknown',
@@ -92,7 +94,6 @@ describe('ManagedEndpointsPanel', () => {
         return { success: true, msg: '', obj: {
           content: '[Interface]\\nPrivateKey = exported',
           filename: 'phone.conf',
-          qr: 'awg://server-returned',
           subscriptions: { raw: 'https://sub.example/raw' },
         } } as never;
       }
@@ -108,8 +109,25 @@ describe('ManagedEndpointsPanel', () => {
     expect(await screen.findByText('degraded')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Clients/i }));
     expect(await screen.findByText('unknown')).toBeTruthy();
+    expect(await screen.findByText('sub-phone')).toBeTruthy();
+    expect(await screen.findByText('10.66.66.2/32')).toBeTruthy();
     expect(screen.getByText('Traffic unavailable')).toBeTruthy();
     expect(document.body.textContent).not.toContain('SHOULD_NOT_RENDER');
+  });
+
+  it('submits subId when creating a managed client', async () => {
+    const postSpy = vi.spyOn(HttpUtil, 'post').mockResolvedValue({ success: true, msg: '', obj: {} } as never);
+    renderWithProviders(<ManagedEndpointsPanel />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Clients/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Create client/i }));
+    fireEvent.change(screen.getByLabelText('Subscription ID'), { target: { value: 'sub-created' } });
+    fireEvent.click(screen.getByRole('button', { name: /^OK$/i }));
+
+    await waitFor(() => expect(postSpy).toHaveBeenCalledWith('/panel/api/managed-endpoints/managed-1/clients', expect.objectContaining({
+      subId: 'sub-created',
+      enable: true,
+    })));
   });
 
   it('runs actions only after confirmation and waits for server response', async () => {

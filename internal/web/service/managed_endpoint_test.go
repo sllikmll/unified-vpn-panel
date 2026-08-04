@@ -116,14 +116,21 @@ func TestManagedEndpointCreateClientPersistsEncryptedSecretsOnly(t *testing.T) {
 	if view == nil || view.Source != ManagedEndpointSourceManaged {
 		t.Fatalf("view = %#v", view)
 	}
+	rec := model.ClientRecord{Email: "client@example.test", SubID: "sub-client", Enable: true}
+	if err := database.GetDB().Create(&rec).Error; err != nil {
+		t.Fatal(err)
+	}
 	client, err := mutations.CreateClient(context.Background(), 1, view.Id, ManagedEndpointClientCreateRequest{
-		Email:        "client@example.test",
+		SubID:        "sub-client",
 		PrivateKey:   "CLIENT_PRIVATE_SECRET",
 		PublicKey:    "CLIENT_PUBLIC",
 		PreSharedKey: "CLIENT_PSK_SECRET",
 	})
 	if err != nil {
 		t.Fatalf("CreateClient: %v", err)
+	}
+	if client.ClientId != rec.Id || client.Email != rec.Email {
+		t.Fatalf("client binding = id %d email %q, want id %d email %q", client.ClientId, client.Email, rec.Id, rec.Email)
 	}
 	if client.Address != "10.66.66.2/32" {
 		t.Fatalf("client address = %q", client.Address)
@@ -150,6 +157,217 @@ func TestManagedEndpointCreateClientPersistsEncryptedSecretsOnly(t *testing.T) {
 		if strings.Contains(dump, forbidden) {
 			t.Fatalf("secret ciphertext leaked %q", forbidden)
 		}
+	}
+}
+
+func TestManagedEndpointSecretGenerationUsesNewestForRestartReconstruction(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	key := strings.Repeat("k", 32)
+	mutations := ManagedEndpointMutationService{
+		Drivers: managedTestProvider{driver: managedTestDriver{kind: model.RuntimeAmneziaWG}},
+		Secrets: NewManagedSecretEnvelopeService(ManagedSecretStaticKeySource{Key: []byte(key), KeyID: "test-key"}),
+	}
+	endpoint := model.ManagedEndpoint{
+		UserId: 1, RuntimeKind: model.RuntimeAmneziaWG, Protocol: "amneziawg", Tag: "awg", Port: 51820, Enable: true, Status: model.EndpointActive,
+		DesiredConfig: `{"server":{"enable":true,"interfaceName":"awg0","listenPort":51820,"mtu":1420,"privateKey":"managed-secret://managed_endpoint/1/server.privateKey","publicKey":"SERVER_PUBLIC","ipv4Address":"10.66.66.1/24","ipv4Pool":"10.66.66.0/24","dns":"1.1.1.1","endpoint":"vpn.example.test"},"clients":[]}`,
+	}
+	if err := database.GetDB().Create(&endpoint).Error; err != nil {
+		t.Fatal(err)
+	}
+	serverSecret, err := mutations.encryptSecret("managed_endpoint", endpoint.Id, "server.privateKey", []byte("SERVER_PRIVATE"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := upsertManagedSecrets(database.GetDB(), []model.ManagedSecret{serverSecret}); err != nil {
+		t.Fatal(err)
+	}
+	client := model.ManagedEndpointClient{EndpointId: endpoint.Id, Email: "client@example.test", Enable: true, State: model.EndpointClientApplied, PublicIdentity: "client-1", Address: "10.66.66.2/32"}
+	if err := database.GetDB().Create(&client).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, gen := range []struct {
+		kind  string
+		value string
+	}{
+		{"privateKey", "OLD_PRIVATE"}, {"publicKey", "OLD_PUBLIC"}, {"presharedKey", "OLD_PSK"},
+		{"privateKey", "NEW_PRIVATE"}, {"publicKey", "NEW_PUBLIC"}, {"presharedKey", "NEW_PSK"},
+	} {
+		secret, err := mutations.encryptSecret("managed_endpoint_client", client.Id, gen.kind, []byte(gen.value))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := upsertManagedSecrets(database.GetDB(), []model.ManagedSecret{secret}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var count int64
+	if err := database.GetDB().Model(&model.ManagedSecret{}).Where("owner_type = ? AND owner_id = ? AND secret_kind = ?", "managed_endpoint_client", client.Id, "privateKey").Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatalf("historical privateKey generations retained = %d, want 2", count)
+	}
+	clients, err := mutations.awgClientsFromDB(database.GetDB(), endpoint.Id)
+	if err != nil {
+		t.Fatalf("awgClientsFromDB: %v", err)
+	}
+	if len(clients) != 1 {
+		t.Fatalf("clients = %d, want 1", len(clients))
+	}
+	if clients[0].PrivateKey != "NEW_PRIVATE" || clients[0].PublicKey != "NEW_PUBLIC" || clients[0].PresharedKey != "NEW_PSK" {
+		t.Fatalf("client secrets = %#v, want newest generation", clients[0])
+	}
+	inbound, err := mutations.inboundFromDurable(endpoint)
+	if err != nil {
+		t.Fatalf("inboundFromDurable: %v", err)
+	}
+	if strings.Contains(inbound.Settings, "OLD_PRIVATE") || !strings.Contains(inbound.Settings, "NEW_PRIVATE") {
+		t.Fatalf("runtime settings did not use newest generation: %s", inbound.Settings)
+	}
+}
+
+func TestManagedEndpointSecretGenerationFallsBackOnLegacyUniqueIndex(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	db := database.GetDB()
+	if err := db.Exec("CREATE UNIQUE INDEX legacy_secret_owner ON managed_secrets(owner_type, owner_id, secret_kind)").Error; err != nil {
+		t.Fatal(err)
+	}
+	mutations := ManagedEndpointMutationService{Secrets: NewManagedSecretEnvelopeService(ManagedSecretStaticKeySource{Key: []byte(strings.Repeat("k", 32)), KeyID: "test-key"})}
+	for _, value := range []string{"old", "new"} {
+		secret, err := mutations.encryptSecret("managed_endpoint_client", 9, "password", []byte(value))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := upsertManagedSecrets(db, []model.ManagedSecret{secret}); err != nil {
+			t.Fatalf("upsert %q: %v", value, err)
+		}
+	}
+	rows, err := newestManagedSecrets(db, "managed_endpoint_client", 9, "password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plaintext, err := mutations.decryptSecret(rows["password"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(plaintext) != "new" {
+		t.Fatalf("legacy unique fallback plaintext = %q, want new", plaintext)
+	}
+}
+
+func TestManagedEndpointClientCreateRejectsMissingUnknownAndDisabledSubBinding(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	mutations := ManagedEndpointMutationService{
+		Drivers: managedTestProvider{driver: managedTestDriver{kind: model.RuntimeMieru}},
+		Secrets: NewManagedSecretEnvelopeService(ManagedSecretStaticKeySource{Key: []byte(strings.Repeat("k", 32)), KeyID: "test-key"}),
+	}
+	view, err := mutations.Create(context.Background(), 1, ManagedEndpointCreateRequest{
+		RuntimeKind: model.RuntimeMieru,
+		Protocol:    "mieru",
+		Tag:         "mieru-managed",
+		Port:        2999,
+		Mieru:       &ManagedMieruConfig{Transport: "TCP"},
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	for _, req := range []ManagedEndpointClientCreateRequest{
+		{Password: "pw"},
+		{SubID: "missing", Password: "pw"},
+	} {
+		if _, err := mutations.CreateClient(context.Background(), 1, view.Id, req); err == nil {
+			t.Fatalf("CreateClient(%#v) succeeded without valid enabled subscription binding", req)
+		}
+	}
+	disabled := model.ClientRecord{Email: "off@example.test", SubID: "disabled-sub", Enable: false}
+	if err := database.GetDB().Create(&disabled).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.GetDB().Model(&model.ClientRecord{}).Where("id = ?", disabled.Id).Update("enable", false).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mutations.CreateClient(context.Background(), 1, view.Id, ManagedEndpointClientCreateRequest{SubID: disabled.SubID, Password: "pw"}); err == nil {
+		t.Fatal("CreateClient accepted disabled subscription client binding")
+	}
+}
+
+func TestManagedEndpointClientResponseRedactsRuntimeMaterialAndShowsBinding(t *testing.T) {
+	client := model.ManagedEndpointClient{
+		Id: 1, EndpointId: 2, ClientId: 3, Email: "alice@example.test", SubID: "sub-alice",
+		Enable: true, State: model.EndpointClientApplied, PublicIdentity: "runtime-user",
+		Address: "10.0.0.2/32", CredentialRef: "managed-secret://x", ClientConfig: "raw", ObservedConfig: "observed",
+	}
+	raw, err := json.Marshal(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(raw)
+	for _, want := range []string{`"subId":"sub-alice"`, `"email":"alice@example.test"`, `"state":"applied"`, `"publicIdentity":"runtime-user"`, `"address":"10.0.0.2/32"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("response missing %s in %s", want, body)
+		}
+	}
+	for _, forbidden := range []string{"CredentialRef", "credentialRef", "ClientConfig", "clientConfig", "ObservedConfig", "observedConfig", "raw", "managed-secret"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("managed client JSON leaked %q in %s", forbidden, body)
+		}
+	}
+}
+
+func TestManagedEndpointListClientsHydratesSubIDFromClientRecord(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	db := database.GetDB()
+	rec := model.ClientRecord{Email: "alice@example.test", SubID: "authoritative-sub", Enable: true}
+	if err := db.Create(&rec).Error; err != nil {
+		t.Fatal(err)
+	}
+	endpoint := model.ManagedEndpoint{UserId: 1, RuntimeKind: model.RuntimeMieru, Protocol: "mieru", Tag: "mieru", Status: model.EndpointActive}
+	if err := db.Create(&endpoint).Error; err != nil {
+		t.Fatal(err)
+	}
+	client := model.ManagedEndpointClient{EndpointId: endpoint.Id, ClientId: rec.Id, Email: "stale@example.test", Enable: true, State: model.EndpointClientApplied, PublicIdentity: "user-1", Address: "10.0.0.2/32"}
+	if err := db.Create(&client).Error; err != nil {
+		t.Fatal(err)
+	}
+	rows, err := (ManagedEndpointMutationService{}).ListClients(1, endpoint.Id)
+	if err != nil {
+		t.Fatalf("ListClients: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1", len(rows))
+	}
+	if rows[0].SubID != rec.SubID || rows[0].Status != model.EndpointClientApplied || rows[0].Address != client.Address || rows[0].PublicIdentity != client.PublicIdentity {
+		t.Fatalf("hydrated client = %#v", rows[0])
+	}
+}
+
+func TestManagedEndpointSubscriptionURLsRespectEnableFlags(t *testing.T) {
+	setupSettingTestDB(t)
+	s := SettingService{}
+	for key, value := range map[string]string{
+		"subEnable":      "true",
+		"subJsonEnable":  "false",
+		"subClashEnable": "true",
+		"subURI":         "https://sub.example/raw/",
+		"subJsonURI":     "https://sub.example/json/",
+		"subClashURI":    "https://sub.example/clash/",
+	} {
+		if err := s.saveSetting(key, value); err != nil {
+			t.Fatalf("save %s: %v", key, err)
+		}
+	}
+	urls := managedSubscriptionURLs("sub-1")
+	if urls.Raw != "https://sub.example/raw/sub-1" || urls.Clash != "https://sub.example/clash/sub-1" {
+		t.Fatalf("enabled subscription URLs = %#v", urls)
+	}
+	if urls.JSON != "" {
+		t.Fatalf("disabled JSON subscription URL was returned: %#v", urls)
+	}
+	if err := s.saveSetting("subEnable", "false"); err != nil {
+		t.Fatal(err)
+	}
+	if urls := managedSubscriptionURLs("sub-1"); urls.Raw != "" {
+		t.Fatalf("disabled raw subscription URL was returned: %#v", urls)
 	}
 }
 
@@ -306,6 +524,43 @@ func TestManagedRuntimeNodeCapabilityValidation(t *testing.T) {
 	}
 	if _, err := validateManagedRuntimeNode(7, model.RuntimeMieru); err == nil {
 		t.Fatal("node with empty guid was accepted")
+	}
+}
+
+func TestNodeAdvertisesManagedRuntimeCanonicalAndLegacyFormats(t *testing.T) {
+	for _, raw := range []string{
+		`{"managedProtocols":["mieru","naiveproxy"]}`,
+		`["amneziawg","mieru"]`,
+		`amneziawg,mieru`,
+	} {
+		if !nodeAdvertisesManagedRuntime(raw, model.RuntimeMieru) {
+			t.Fatalf("capabilities %s did not advertise mieru", raw)
+		}
+	}
+	for _, raw := range []string{"", `{}`, `{"managedProtocols":[]}`, `{"managedProtocols":"mieru"}`, `[`, `xray`} {
+		if nodeAdvertisesManagedRuntime(raw, model.RuntimeMieru) {
+			t.Fatalf("malformed/empty capabilities %s advertised mieru", raw)
+		}
+	}
+}
+
+func TestManagedEndpointCreateRejectsSecondActiveSingletonRuntime(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	mutations := ManagedEndpointMutationService{Drivers: managedTestProvider{driver: managedTestDriver{kind: model.RuntimeMieru}}}
+	req := ManagedEndpointCreateRequest{RuntimeKind: model.RuntimeMieru, Protocol: "mieru", Tag: "mieru-a", Port: 2999, Mieru: &ManagedMieruConfig{}}
+	if _, err := mutations.Create(context.Background(), 1, req); err != nil {
+		t.Fatalf("first Create: %v", err)
+	}
+	req.Tag = "mieru-b"
+	req.Port = 3000
+	if _, err := mutations.Create(context.Background(), 1, req); err == nil {
+		t.Fatal("second active singleton runtime endpoint was accepted")
+	}
+	if err := database.GetDB().Model(&model.ManagedEndpoint{}).Where("tag = ?", "mieru-a").Updates(map[string]any{"status": model.EndpointDeleted, "enable": false}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mutations.Create(context.Background(), 1, req); err != nil {
+		t.Fatalf("Create after deleting prior singleton: %v", err)
 	}
 }
 

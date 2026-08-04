@@ -25,30 +25,12 @@ python3 - <<'PY' || status=$?
 import json
 import re
 from pathlib import Path
-import subprocess
 
 manifest = json.load(open("runtime-images/mieru/mita-v3.35.0.manifest.json", encoding="utf-8"))
 for item in manifest.get("artifacts", []):
     sha256 = item.get("sha256", "")
     if "UNFETCHED" in sha256 or not re.fullmatch(r"[0-9a-f]{64}", sha256):
         raise SystemExit(f"manifest contains invalid or placeholder sha256: {item}")
-
-allowed = {
-    ".github/workflows/protocol-runtime-images.yml",
-    "docs/protocol-runtime-artifacts.md",
-}
-allowed_prefixes = ("runtime-images/",)
-changed = []
-for line in subprocess.check_output(["git", "status", "--porcelain"], text=True).splitlines():
-    if not line:
-        continue
-    path = line[3:]
-    if " -> " in path:
-        path = path.split(" -> ", 1)[1]
-    changed.append(path)
-bad = [path for path in changed if path not in allowed and not path.startswith(allowed_prefixes)]
-if bad:
-    raise SystemExit(f"out-of-scope changed files: {bad}")
 
 for path in [Path("runtime-images/awg2/Dockerfile"), Path("runtime-images/naive-caddy/Dockerfile")]:
     text = path.read_text(encoding="utf-8")

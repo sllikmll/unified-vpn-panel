@@ -38,16 +38,14 @@ func (a *ManagedEndpointController) initRouter(g *gin.RouterGroup) {
 	g.PUT("/:id", a.update)
 	g.PATCH("/:id", a.update)
 	g.DELETE("/:id", a.delete)
-	g.POST("/:id/:action", a.action)
-	g.POST("/:id/actions/:action", a.action)
 	g.GET("/:id/clients", a.listClients)
 	g.POST("/:id/clients", a.createClient)
 	g.PUT("/:id/clients/:clientId", a.updateClient)
 	g.PATCH("/:id/clients/:clientId", a.updateClient)
 	g.DELETE("/:id/clients/:clientId", a.deleteClient)
-	g.POST("/:id/clients/:clientId/:action", a.clientAction)
 	g.POST("/:id/clients/:clientId/actions/:action", a.clientAction)
 	g.GET("/:id/clients/:clientId/export", a.exportClient)
+	g.POST("/:id/actions/:action", a.action)
 }
 
 func (a *ManagedEndpointController) list(c *gin.Context) {
@@ -198,7 +196,7 @@ func (a *ManagedEndpointController) clientAction(c *gin.Context) {
 		jsonObj(c, client, err)
 	case "export":
 		out, err := managedEndpointMutations().ClientExport(user.Id, c.Param("id"), clientID)
-		jsonObj(c, gin.H{"config": out}, err)
+		jsonObj(c, out, err)
 	case "status":
 		rows, err := managedEndpointMutations().ListClients(user.Id, mustManagedNative(c.Param("id")))
 		if err != nil {
@@ -225,7 +223,7 @@ func (a *ManagedEndpointController) exportClient(c *gin.Context) {
 		return
 	}
 	out, err := managedEndpointMutations().ClientExport(user.Id, c.Param("id"), clientID)
-	jsonObj(c, gin.H{"config": out}, err)
+	jsonObj(c, out, err)
 }
 
 func managedEndpointMutations() service.ManagedEndpointMutationService {

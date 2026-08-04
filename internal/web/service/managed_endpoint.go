@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/netip"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -88,6 +89,18 @@ type ManagedEndpointCapability struct {
 
 type ManagedEndpointCapabilities struct {
 	RuntimeKinds []ManagedEndpointCapability `json:"runtimeKinds"`
+}
+
+type ManagedClientExportSubscriptions struct {
+	Raw   string `json:"raw,omitempty"`
+	JSON  string `json:"json,omitempty"`
+	Clash string `json:"clash,omitempty"`
+}
+
+type ManagedClientExportResponse struct {
+	Content       string                           `json:"content,omitempty"`
+	Filename      string                           `json:"filename,omitempty"`
+	Subscriptions ManagedClientExportSubscriptions `json:"subscriptions,omitempty"`
 }
 
 type InstallPlanBackendProfile struct {
@@ -209,6 +222,7 @@ type ManagedNaiveProxyConfig struct {
 
 type ManagedEndpointClientCreateRequest struct {
 	ClientID       string `json:"clientId,omitempty"`
+	SubID          string `json:"subId,omitempty"`
 	Email          string `json:"email"`
 	Enable         *bool  `json:"enable,omitempty"`
 	Address        string `json:"address,omitempty"`
@@ -222,6 +236,7 @@ type ManagedEndpointClientCreateRequest struct {
 
 type ManagedEndpointClientUpdateRequest struct {
 	Email          *string `json:"email,omitempty"`
+	SubID          *string `json:"subId,omitempty"`
 	Enable         *bool   `json:"enable,omitempty"`
 	Address        *string `json:"address,omitempty"`
 	Username       *string `json:"username,omitempty"`
@@ -316,6 +331,9 @@ func (s ManagedEndpointMutationService) Create(ctx context.Context, userId int, 
 			Status:      model.EndpointApplying,
 		}
 		if _, err := s.resolveDriver(endpoint); err != nil {
+			return err
+		}
+		if err := ensureSingletonManagedEndpoint(tx, endpoint); err != nil {
 			return err
 		}
 		if err := tx.Create(&endpoint).Error; err != nil {
@@ -547,8 +565,8 @@ func (s ManagedEndpointMutationService) EndpointAction(ctx context.Context, user
 }
 
 func (s ManagedEndpointMutationService) CreateClient(ctx context.Context, userId int, endpointRef string, req ManagedEndpointClientCreateRequest) (model.ManagedEndpointClient, error) {
-	if strings.TrimSpace(req.Email) == "" {
-		return model.ManagedEndpointClient{}, errors.New("email is required")
+	if strings.TrimSpace(req.SubID) == "" {
+		return model.ManagedEndpointClient{}, errors.New("subId is required")
 	}
 	endpointID, err := nativeManagedID(endpointRef)
 	if err != nil {
@@ -566,14 +584,19 @@ func (s ManagedEndpointMutationService) CreateClient(ctx context.Context, userId
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&endpoint, "id = ? AND user_id = ? AND status <> ?", endpointID, userId, model.EndpointDeleted).Error; err != nil {
 			return err
 		}
+		record, err := resolveManagedSubscriptionClient(tx, req.SubID)
+		if err != nil {
+			return err
+		}
+		req.Email = record.Email
 		if existing, ok, err := findApplyLog(tx, req.IdempotencyKey, reqHash); err != nil || ok {
 			if ok {
 				replayed = true
-				return tx.First(&client, "endpoint_id = ? AND email = ?", existing.EndpointId, strings.TrimSpace(req.Email)).Error
+				return tx.First(&client, "endpoint_id = ? AND client_id = ?", existing.EndpointId, record.Id).Error
 			}
 			return err
 		}
-		client = model.ManagedEndpointClient{EndpointId: endpoint.Id, ClientId: 0, Email: strings.TrimSpace(req.Email), Enable: enable, State: model.EndpointClientPending}
+		client = model.ManagedEndpointClient{EndpointId: endpoint.Id, ClientId: record.Id, SubID: record.SubID, Email: record.Email, Enable: enable, State: model.EndpointClientPending, Status: model.EndpointClientPending}
 		if req.ClientID != "" {
 			client.PublicIdentity = strings.TrimSpace(req.ClientID)
 		} else {
@@ -622,11 +645,15 @@ func (s ManagedEndpointMutationService) CreateClient(ctx context.Context, userId
 		return model.ManagedEndpointClient{}, err
 	}
 	if replayed {
+		client.Status = client.State
+		_ = hydrateManagedClientSubscription(database.GetDB(), &client)
 		return client, nil
 	}
 	if err := s.applyEndpoint(ctx, &endpoint, "client.create"); err != nil {
 		return model.ManagedEndpointClient{}, err
 	}
+	client.Status = client.State
+	_ = hydrateManagedClientSubscription(database.GetDB(), &client)
 	return client, nil
 }
 
@@ -636,8 +663,21 @@ func (s ManagedEndpointMutationService) ListClients(userId, endpointID int) ([]m
 		return nil, err
 	}
 	var rows []model.ManagedEndpointClient
-	err := database.GetDB().Where("endpoint_id = ? AND state <> ?", endpointID, model.EndpointClientDeleted).Order("id asc").Find(&rows).Error
-	return rows, err
+	db := database.GetDB()
+	err := db.Table("managed_endpoint_clients AS mec").
+		Select("mec.id, mec.endpoint_id, mec.client_id, mec.email, mec.enable, mec.state, mec.public_identity, mec.address, mec.credential_ref, mec.client_config, mec.observed_config, mec.last_applied_hash, mec.last_error, mec.created_at, mec.updated_at").
+		Where("mec.endpoint_id = ? AND mec.state <> ?", endpointID, model.EndpointClientDeleted).
+		Order("mec.id asc").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		if err := hydrateManagedClientSubscription(db, &rows[i]); err != nil {
+			return nil, err
+		}
+	}
+	return rows, nil
 }
 
 func (s ManagedEndpointMutationService) UpdateClient(ctx context.Context, userId int, endpointRef string, clientID int, req ManagedEndpointClientUpdateRequest) (model.ManagedEndpointClient, error) {
@@ -665,6 +705,14 @@ func (s ManagedEndpointMutationService) UpdateClient(ctx context.Context, userId
 		}
 		if req.Email != nil {
 			client.Email = strings.TrimSpace(*req.Email)
+		}
+		if req.SubID != nil {
+			record, err := resolveManagedSubscriptionClient(tx, *req.SubID)
+			if err != nil {
+				return err
+			}
+			client.ClientId = record.Id
+			client.Email = record.Email
 		}
 		if req.Enable != nil {
 			client.Enable = *req.Enable
@@ -704,11 +752,15 @@ func (s ManagedEndpointMutationService) UpdateClient(ctx context.Context, userId
 		return model.ManagedEndpointClient{}, err
 	}
 	if replayed {
+		client.Status = client.State
+		_ = hydrateManagedClientSubscription(database.GetDB(), &client)
 		return client, nil
 	}
 	if err := s.applyEndpoint(ctx, &endpoint, "client.create"); err != nil {
 		return model.ManagedEndpointClient{}, err
 	}
+	client.Status = client.State
+	_ = hydrateManagedClientSubscription(database.GetDB(), &client)
 	return client, nil
 }
 
@@ -751,42 +803,126 @@ func (s ManagedEndpointMutationService) DeleteClient(ctx context.Context, userId
 	return s.applyEndpoint(ctx, &endpoint, "client.create")
 }
 
-func (s ManagedEndpointMutationService) ClientExport(userId int, endpointRef string, clientID int) (string, error) {
+func (s ManagedEndpointMutationService) ClientExport(userId int, endpointRef string, clientID int) (ManagedClientExportResponse, error) {
 	endpointID, err := nativeManagedID(endpointRef)
 	if err != nil {
-		return "", err
+		return ManagedClientExportResponse{}, err
 	}
 	var endpoint model.ManagedEndpoint
 	if err := database.GetDB().First(&endpoint, "id = ? AND user_id = ?", endpointID, userId).Error; err != nil {
-		return "", err
+		return ManagedClientExportResponse{}, err
 	}
 	var client model.ManagedEndpointClient
 	if err := database.GetDB().First(&client, "id = ? AND endpoint_id = ?", clientID, endpoint.Id).Error; err != nil {
-		return "", err
+		return ManagedClientExportResponse{}, err
 	}
+	if err := hydrateManagedClientSubscription(database.GetDB(), &client); err != nil {
+		return ManagedClientExportResponse{}, err
+	}
+	out := ManagedClientExportResponse{Filename: strings.TrimSpace(endpoint.Tag) + "-" + strings.TrimSpace(client.SubID) + ".txt", Subscriptions: managedSubscriptionURLs(client.SubID)}
 	switch endpoint.RuntimeKind {
 	case model.RuntimeAmneziaWG:
 		clients, err := s.awgClientsFromDB(database.GetDB(), endpoint.Id)
 		if err != nil {
-			return "", err
+			return ManagedClientExportResponse{}, err
 		}
 		for _, c := range clients {
 			if c.ID == client.PublicIdentity {
-				return fmt.Sprintf("[Interface]\nPrivateKey = %s\nAddress = %s\nDNS = 1.1.1.1\n", c.PrivateKey, c.IPv4Address), nil
+				out.Content = fmt.Sprintf("[Interface]\nPrivateKey = %s\nAddress = %s\nDNS = 1.1.1.1\n", c.PrivateKey, c.IPv4Address)
+				return out, nil
 			}
 		}
 	case model.RuntimeMieru, model.RuntimeNaiveProxy:
-		var row model.ManagedSecret
-		if err := database.GetDB().First(&row, "owner_type = ? AND owner_id = ? AND secret_kind = ?", "managed_endpoint_client", client.Id, "password").Error; err != nil {
-			return "", err
-		}
-		password, err := s.decryptSecret(row)
+		rows, err := newestManagedSecrets(database.GetDB(), "managed_endpoint_client", client.Id, "password")
 		if err != nil {
-			return "", err
+			return ManagedClientExportResponse{}, err
 		}
-		return string(password), nil
+		password, err := s.decryptSecret(rows["password"])
+		if err != nil {
+			return ManagedClientExportResponse{}, err
+		}
+		out.Content = string(password)
+		return out, nil
 	}
-	return "", fmt.Errorf("client export unavailable")
+	return ManagedClientExportResponse{}, fmt.Errorf("client export unavailable")
+}
+
+func managedSubscriptionURLs(subID string) ManagedClientExportSubscriptions {
+	if strings.TrimSpace(subID) == "" {
+		return ManagedClientExportSubscriptions{}
+	}
+	settings := SettingService{}
+	rawEnable, _ := settings.GetSubEnable()
+	jsonEnable, _ := settings.GetSubJsonEnable()
+	clashEnable, _ := settings.GetSubClashEnable()
+	rawURI, _ := settings.GetSubURI()
+	jsonURI, _ := settings.GetSubJsonURI()
+	clashURI, _ := settings.GetSubClashURI()
+	subPath, _ := settings.GetSubPath()
+	jsonPath, _ := settings.GetSubJsonPath()
+	clashPath, _ := settings.GetSubClashPath()
+	base := ""
+	if d, _ := settings.GetSubDomain(); d != "" {
+		base = settings.BuildSubURIBase(d)
+	} else if d, _ := settings.GetWebDomain(); d != "" {
+		base = settings.BuildSubURIBase(d)
+	}
+	out := ManagedClientExportSubscriptions{}
+	if rawEnable {
+		out.Raw = buildManagedSubscriptionURL(rawURI, base, subPath, subID)
+	}
+	if jsonEnable {
+		out.JSON = buildManagedSubscriptionURL(jsonURI, base, jsonPath, subID)
+	}
+	if clashEnable {
+		out.Clash = buildManagedSubscriptionURL(clashURI, base, clashPath, subID)
+	}
+	return out
+}
+
+func buildManagedSubscriptionURL(configured, base, path, subID string) string {
+	if configured != "" {
+		if !strings.HasSuffix(configured, "/") {
+			configured += "/"
+		}
+		return configured + url.PathEscape(subID)
+	}
+	if base == "" {
+		return ""
+	}
+	if path == "" {
+		path = "/"
+	}
+	return strings.TrimRight(base, "/") + "/" + strings.Trim(path, "/") + "/" + url.PathEscape(subID)
+}
+
+func resolveManagedSubscriptionClient(tx *gorm.DB, subID string) (model.ClientRecord, error) {
+	subID = strings.TrimSpace(subID)
+	if subID == "" {
+		return model.ClientRecord{}, errors.New("subId is required")
+	}
+	var rows []model.ClientRecord
+	if err := tx.Where("sub_id = ? AND enable = ?", subID, true).Limit(2).Find(&rows).Error; err != nil {
+		return model.ClientRecord{}, err
+	}
+	if len(rows) != 1 {
+		return model.ClientRecord{}, errors.New("subscription client binding must resolve exactly one enabled client")
+	}
+	return rows[0], nil
+}
+
+func hydrateManagedClientSubscription(tx *gorm.DB, client *model.ManagedEndpointClient) error {
+	if client == nil || client.ClientId == 0 {
+		return nil
+	}
+	var rec model.ClientRecord
+	if err := tx.Select("id", "sub_id", "email").First(&rec, "id = ?", client.ClientId).Error; err != nil {
+		return err
+	}
+	client.SubID = rec.SubID
+	client.Email = rec.Email
+	client.Status = client.State
+	return nil
 }
 
 func deref(s *string) string {
@@ -1234,6 +1370,21 @@ func validateManagedRuntimeNode(nodeID int, kind model.RuntimeKind) (*model.Node
 }
 
 func nodeAdvertisesManagedRuntime(raw string, kind model.RuntimeKind) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return false
+	}
+	var obj struct {
+		ManagedProtocols []string `json:"managedProtocols"`
+	}
+	if err := json.Unmarshal([]byte(raw), &obj); err == nil && obj.ManagedProtocols != nil {
+		for _, cap := range obj.ManagedProtocols {
+			if model.RuntimeKind(strings.TrimSpace(cap)) == kind {
+				return true
+			}
+		}
+		return false
+	}
 	var caps []string
 	if err := json.Unmarshal([]byte(raw), &caps); err == nil {
 		for _, cap := range caps {
@@ -1241,6 +1392,10 @@ func nodeAdvertisesManagedRuntime(raw string, kind model.RuntimeKind) bool {
 				return true
 			}
 		}
+		return false
+	}
+	if strings.ContainsAny(raw, "{}[]\":") {
+		return false
 	}
 	for _, cap := range strings.Split(raw, ",") {
 		if model.RuntimeKind(strings.TrimSpace(cap)) == kind {
@@ -1255,6 +1410,32 @@ func (s ManagedEndpointMutationService) resolveDriver(endpoint model.ManagedEndp
 		return nil, fmt.Errorf("%w: managed runtime provider unavailable", driver.ErrUnsupportedRuntime)
 	}
 	return s.Drivers.DriverForEndpoint(endpoint)
+}
+
+func ensureSingletonManagedEndpoint(tx *gorm.DB, endpoint model.ManagedEndpoint) error {
+	switch endpoint.RuntimeKind {
+	case model.RuntimeAmneziaWG, model.RuntimeMieru, model.RuntimeNaiveProxy:
+	default:
+		return nil
+	}
+	var count int64
+	q := tx.Model(&model.ManagedEndpoint{}).
+		Where("runtime_kind = ? AND status <> ?", endpoint.RuntimeKind, model.EndpointDeleted)
+	if endpoint.NodeID == nil {
+		q = q.Where("node_id IS NULL")
+	} else {
+		q = q.Where("node_id = ?", *endpoint.NodeID)
+	}
+	if endpoint.Id > 0 {
+		q = q.Where("id <> ?", endpoint.Id)
+	}
+	if err := q.Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return fmt.Errorf("managed runtime %s already has an active endpoint on this node", endpoint.RuntimeKind)
+	}
+	return nil
 }
 
 func (s ManagedEndpointMutationService) buildDesiredAndSecrets(endpoint model.ManagedEndpoint, awgReq *ManagedAWGConfig, mieruReq *ManagedMieruConfig, naiveReq *ManagedNaiveProxyConfig) (string, []model.ManagedSecret, error) {
@@ -1367,14 +1548,64 @@ func (s ManagedEndpointMutationService) decryptSecret(row model.ManagedSecret) (
 
 func upsertManagedSecrets(tx *gorm.DB, secrets []model.ManagedSecret) error {
 	for _, secret := range secrets {
-		if err := tx.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "owner_type"}, {Name: "owner_id"}, {Name: "secret_kind"}},
-			DoUpdates: clause.AssignmentColumns([]string{"envelope_version", "key_id", "nonce", "ciphertext", "fingerprint", "updated_at"}),
-		}).Create(&secret).Error; err != nil {
+		var generation int
+		if err := tx.Model(&model.ManagedSecret{}).
+			Where("owner_type = ? AND owner_id = ? AND secret_kind = ?", secret.OwnerType, secret.OwnerId, secret.SecretKind).
+			Select("COALESCE(MAX(generation), 0)").
+			Scan(&generation).Error; err != nil {
 			return err
+		}
+		secret.Generation = generation + 1
+		if err := tx.Create(&secret).Error; err != nil {
+			if !isManagedSecretLegacyUniqueError(err) {
+				return err
+			}
+			if err := tx.Model(&model.ManagedSecret{}).
+				Where("owner_type = ? AND owner_id = ? AND secret_kind = ?", secret.OwnerType, secret.OwnerId, secret.SecretKind).
+				Updates(map[string]any{
+					"generation":       secret.Generation,
+					"envelope_version": secret.EnvelopeVersion,
+					"key_id":           secret.KeyID,
+					"nonce":            secret.Nonce,
+					"ciphertext":       secret.Ciphertext,
+					"fingerprint":      secret.Fingerprint,
+					"updated_at":       secret.UpdatedAt,
+				}).Error; err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+func isManagedSecretLegacyUniqueError(err error) bool {
+	text := strings.ToLower(err.Error())
+	return strings.Contains(text, "unique") && strings.Contains(text, "managed_secrets")
+}
+
+func newestManagedSecrets(tx *gorm.DB, ownerType string, ownerID int, kinds ...string) (map[string]model.ManagedSecret, error) {
+	var rows []model.ManagedSecret
+	q := tx.Where("owner_type = ? AND owner_id = ?", ownerType, ownerID)
+	if len(kinds) > 0 {
+		q = q.Where("secret_kind IN ?", kinds)
+	}
+	if err := q.Order("secret_kind ASC, generation DESC, created_at DESC, id DESC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make(map[string]model.ManagedSecret, len(kinds))
+	for _, row := range rows {
+		if _, seen := out[row.SecretKind]; seen {
+			continue
+		}
+		out[row.SecretKind] = row
+	}
+	for _, kind := range kinds {
+		row, ok := out[kind]
+		if !ok || len(row.Ciphertext) == 0 {
+			return nil, fmt.Errorf("managed secret %s missing for %s/%d", kind, ownerType, ownerID)
+		}
+	}
+	return out, nil
 }
 
 func findApplyLog(tx *gorm.DB, key, requestHash string) (model.ManagedEndpointApplyLog, bool, error) {
@@ -1492,11 +1723,11 @@ func (s ManagedEndpointMutationService) inboundFromDurable(endpoint model.Manage
 		if err := json.Unmarshal([]byte(endpoint.DesiredConfig), &cfg); err != nil {
 			return nil, err
 		}
-		var row model.ManagedSecret
-		if err := database.GetDB().First(&row, "owner_type = ? AND owner_id = ? AND secret_kind = ?", "managed_endpoint", endpoint.Id, "server.privateKey").Error; err != nil {
+		secrets, err := newestManagedSecrets(database.GetDB(), "managed_endpoint", endpoint.Id, "server.privateKey")
+		if err != nil {
 			return nil, err
 		}
-		plaintext, err := s.decryptSecret(row)
+		plaintext, err := s.decryptSecret(secrets["server.privateKey"])
 		if err != nil {
 			return nil, err
 		}
@@ -1559,11 +1790,11 @@ func (s ManagedEndpointMutationService) inboundFromDurable(endpoint model.Manage
 }
 
 func (s ManagedEndpointMutationService) clientPassword(clientID int) (string, error) {
-	var row model.ManagedSecret
-	if err := database.GetDB().First(&row, "owner_type = ? AND owner_id = ? AND secret_kind = ?", "managed_endpoint_client", clientID, "password").Error; err != nil {
+	rows, err := newestManagedSecrets(database.GetDB(), "managed_endpoint_client", clientID, "password")
+	if err != nil {
 		return "", err
 	}
-	plaintext, err := s.decryptSecret(row)
+	plaintext, err := s.decryptSecret(rows["password"])
 	if err != nil {
 		return "", err
 	}
@@ -1672,15 +1903,18 @@ func (s ManagedEndpointMutationService) awgClientsFromDB(tx *gorm.DB, endpointID
 	}
 	clients := make([]awg.Client, 0, len(rows))
 	for _, row := range rows {
-		secrets := map[string]string{}
-		var secretRows []model.ManagedSecret
-		if err := tx.Where("owner_type = ? AND owner_id = ?", "managed_endpoint_client", row.Id).Find(&secretRows).Error; err != nil {
+		secretRows, err := newestManagedSecrets(tx, "managed_endpoint_client", row.Id, "privateKey", "publicKey", "presharedKey")
+		if err != nil {
 			return nil, err
 		}
+		secrets := map[string]string{}
 		for _, secretRow := range secretRows {
 			plaintext, err := s.decryptSecret(secretRow)
 			if err != nil {
 				return nil, err
+			}
+			if len(plaintext) == 0 {
+				return nil, fmt.Errorf("managed secret %s is empty", secretRow.SecretKind)
 			}
 			secrets[secretRow.SecretKind] = string(plaintext)
 		}
