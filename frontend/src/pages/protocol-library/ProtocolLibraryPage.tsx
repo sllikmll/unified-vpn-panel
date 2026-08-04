@@ -4,8 +4,10 @@ import {
   Button,
   Card,
   Col,
+  ConfigProvider,
   Empty,
   Input,
+  Layout,
   Modal,
   Row,
   Segmented,
@@ -37,6 +39,7 @@ import {
   type ProtocolConnectionView,
 } from '@/api/queries/useProtocolConnections';
 import AppSidebar from '@/layouts/AppSidebar';
+import { useTheme } from '@/hooks/useTheme';
 import { setMessageInstance } from '@/utils/messageBus';
 import './ProtocolLibraryPage.css';
 
@@ -64,6 +67,7 @@ async function copyText(text: string) {
 
 export default function ProtocolLibraryPage() {
   const { t } = useTranslation();
+  const { isDark, isUltra, antdThemeConfig } = useTheme();
   const [messageApi, contextHolder] = message.useMessage();
   setMessageInstance(messageApi);
 
@@ -187,11 +191,21 @@ export default function ProtocolLibraryPage() {
     },
   ];
 
+  const pageClass = useMemo(() => {
+    const classes = ['protocol-library-layout'];
+    if (isDark) classes.push('is-dark');
+    if (isUltra) classes.push('is-ultra');
+    return classes.join(' ');
+  }, [isDark, isUltra]);
+
   return (
-    <>
+    <ConfigProvider theme={antdThemeConfig}>
       {contextHolder}
-      <AppSidebar />
-      <main className="page-shell protocol-library-page">
+      <Layout className={pageClass}>
+        <AppSidebar />
+        <Layout className="content-shell">
+          <Layout.Content id="content-layout" className="content-area">
+            <main className="page-shell protocol-library-page">
         <div className="page-header-row">
           <div>
             <h1>{t('pages.protocolLibrary.title')}</h1>
@@ -278,7 +292,10 @@ export default function ProtocolLibraryPage() {
             placeholder={t('pages.protocolLibrary.previewPlaceholder')}
           />
         </Card>
-      </main>
-    </>
+            </main>
+          </Layout.Content>
+        </Layout>
+      </Layout>
+    </ConfigProvider>
   );
 }
