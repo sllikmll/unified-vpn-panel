@@ -180,9 +180,11 @@ export function isManagedNativeProtocol(value: string): value is ManagedNativePr
 
 export function parseNodeManagedProtocols(node: NodeRecord | undefined): string[] {
   if (!node) return [];
-  const raw = (node as unknown as { managedProtocols?: unknown; capabilities?: unknown }).managedProtocols;
+  const record = node as unknown as { runtimeCapabilities?: unknown; managedProtocols?: unknown; capabilities?: unknown };
+  if (Array.isArray(record.runtimeCapabilities)) return record.runtimeCapabilities.map(String);
+  const raw = record.managedProtocols;
   if (Array.isArray(raw)) return raw.map(String);
-  const caps = (node as unknown as { capabilities?: unknown }).capabilities;
+  const caps = record.capabilities;
   if (typeof caps === 'string' && caps.trim()) {
     try {
       const parsed = JSON.parse(caps) as { managedProtocols?: unknown; protocols?: unknown };
