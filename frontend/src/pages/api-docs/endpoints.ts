@@ -1599,6 +1599,35 @@ export const sections: readonly Section[] = [
   },
 
   {
+    id: 'managed-endpoints',
+    title: 'Managed Endpoints',
+    description:
+      'Read-only Phase 0 unified endpoint projection. Existing inbounds are projected alongside native managed endpoint rows, with desired/observed config and secrets redacted. Native lifecycle, mutation, detection, and export endpoints are intentionally unavailable until drivers land.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/panel/api/managed-endpoints/list',
+        summary: 'List projected Xray/MTProto inbounds and native managed endpoint rows for the authenticated user. This endpoint has no runtime side effects and never returns internal desired state, observed state, or secret material.',
+        responseSchema: 'ManagedEndpointView',
+        responseSchemaArray: true,
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/managed-endpoints/:id',
+        summary: 'Fetch one projected managed endpoint by its stable read-model ID. The response is redacted like the list endpoint.',
+        params: [{ name: 'id', in: 'path', type: 'string', desc: 'Read-model ID such as legacy-xray-1, legacy-mtproto-2, or managed-3.' }],
+        responseSchema: 'ManagedEndpointView',
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/managed-endpoints/capabilities',
+        summary: 'Return static Phase 0 runtime capability metadata. Native lifecycle, client CRUD, traffic collection, detection, firewall policy, subscription, and export are marked unavailable until drivers are implemented.',
+        responseSchema: 'ManagedEndpointCapabilities',
+      },
+    ],
+  },
+
+  {
     id: 'protocol-connections',
     title: 'Protocol Library',
     description:

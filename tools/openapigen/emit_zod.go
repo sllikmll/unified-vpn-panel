@@ -33,7 +33,11 @@ func emitZod(w io.Writer, schemas []Schema, aliases []Alias) error {
 				return err
 			}
 		}
-		if _, err := fmt.Fprintln(w, "});"); err != nil {
+		closing := "});"
+		if strictSchemaNames[s.Name] {
+			closing = "}).strict();"
+		}
+		if _, err := fmt.Fprintln(w, closing); err != nil {
 			return err
 		}
 		if _, err := fmt.Fprintf(w, "export type %s = z.infer<typeof %sSchema>;\n\n", s.Name, s.Name); err != nil {

@@ -2293,6 +2293,227 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "ManagedEndpointCapabilities": {
+    "additionalProperties": false,
+    "properties": {
+      "runtimeKinds": {
+        "items": {
+          "$ref": "#/components/schemas/ManagedEndpointCapability"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "runtimeKinds"
+    ],
+    "type": "object"
+  },
+  "ManagedEndpointCapability": {
+    "additionalProperties": false,
+    "properties": {
+      "clientCrud": {
+        "type": "boolean"
+      },
+      "detect": {
+        "type": "boolean"
+      },
+      "firewallPolicy": {
+        "type": "boolean"
+      },
+      "nativeExport": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "protocols": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "runtimeKind": {
+        "example": "wireguard",
+        "type": "string"
+      },
+      "serverLifecycle": {
+        "type": "boolean"
+      },
+      "subscription": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "traffic": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "clientCrud",
+      "detect",
+      "firewallPolicy",
+      "nativeExport",
+      "protocols",
+      "runtimeKind",
+      "serverLifecycle",
+      "subscription",
+      "traffic"
+    ],
+    "type": "object"
+  },
+  "ManagedEndpointView": {
+    "additionalProperties": false,
+    "properties": {
+      "clientCount": {
+        "example": 2,
+        "type": "integer"
+      },
+      "enable": {
+        "example": true,
+        "type": "boolean"
+      },
+      "health": {
+        "$ref": "#/components/schemas/ManagedHealthView"
+      },
+      "id": {
+        "example": "legacy-xray-1",
+        "type": "string"
+      },
+      "inboundId": {
+        "example": 1,
+        "nullable": true,
+        "type": "integer"
+      },
+      "listen": {
+        "type": "string"
+      },
+      "nativeId": {
+        "example": 1,
+        "type": "integer"
+      },
+      "nodeId": {
+        "example": 2,
+        "nullable": true,
+        "type": "integer"
+      },
+      "nodeName": {
+        "type": "string"
+      },
+      "port": {
+        "example": 443,
+        "type": "integer"
+      },
+      "protocol": {
+        "example": "vless",
+        "type": "string"
+      },
+      "remark": {
+        "example": "VLESS-443",
+        "type": "string"
+      },
+      "runtimeKind": {
+        "example": "xray",
+        "type": "string"
+      },
+      "secretSummary": {
+        "$ref": "#/components/schemas/ManagedSecretSummary"
+      },
+      "source": {
+        "example": "legacy-inbound",
+        "type": "string"
+      },
+      "status": {
+        "example": "active",
+        "type": "string"
+      },
+      "tag": {
+        "example": "in-443-tcp",
+        "type": "string"
+      },
+      "traffic": {
+        "$ref": "#/components/schemas/ManagedTrafficView"
+      }
+    },
+    "required": [
+      "clientCount",
+      "enable",
+      "health",
+      "id",
+      "listen",
+      "port",
+      "protocol",
+      "remark",
+      "runtimeKind",
+      "secretSummary",
+      "source",
+      "status",
+      "tag",
+      "traffic"
+    ],
+    "type": "object"
+  },
+  "ManagedHealthView": {
+    "additionalProperties": false,
+    "properties": {
+      "checkedAt": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "message": {
+        "type": "string"
+      },
+      "status": {
+        "example": "active",
+        "type": "string"
+      }
+    },
+    "required": [
+      "checkedAt",
+      "message",
+      "status"
+    ],
+    "type": "object"
+  },
+  "ManagedSecretSummary": {
+    "additionalProperties": false,
+    "properties": {
+      "fields": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "hasSecrets": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "fields",
+      "hasSecrets"
+    ],
+    "type": "object"
+  },
+  "ManagedTrafficView": {
+    "additionalProperties": false,
+    "properties": {
+      "down": {
+        "example": 2048,
+        "format": "int64",
+        "type": "integer"
+      },
+      "up": {
+        "example": 1024,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "down",
+      "up"
+    ],
+    "type": "object"
+  },
   "Msg": {
     "properties": {
       "msg": {

@@ -84,6 +84,9 @@ func (a *APIController) initRouter(g *gin.RouterGroup) {
 	inbounds := api.Group("/inbounds")
 	a.inboundController = NewInboundController(inbounds)
 
+	managedEndpoints := api.Group("/managed-endpoints")
+	NewManagedEndpointController(managedEndpoints)
+
 	clients := api.Group("/clients")
 	NewClientController(clients)
 	NewGroupController(clients)

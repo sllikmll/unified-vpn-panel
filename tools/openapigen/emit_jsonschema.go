@@ -61,7 +61,19 @@ func (g *schemaGen) objectSchema(s Schema) map[string]any {
 	if s.Doc != "" {
 		obj["description"] = s.Doc
 	}
+	if strictSchemaNames[s.Name] {
+		obj["additionalProperties"] = false
+	}
 	return obj
+}
+
+var strictSchemaNames = map[string]bool{
+	"ManagedEndpointCapabilities": true,
+	"ManagedEndpointCapability":   true,
+	"ManagedEndpointView":         true,
+	"ManagedHealthView":           true,
+	"ManagedSecretSummary":        true,
+	"ManagedTrafficView":          true,
 }
 
 func (g *schemaGen) fieldSchema(f Field) map[string]any {

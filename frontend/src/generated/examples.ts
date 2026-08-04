@@ -554,6 +554,91 @@ export const EXAMPLES: Record<string, unknown> = {
     "wgMtu": 0,
     "wgPublicKey": ""
   },
+  "ManagedEndpointCapabilities": {
+    "runtimeKinds": [
+      {
+        "clientCrud": false,
+        "detect": false,
+        "firewallPolicy": false,
+        "nativeExport": [
+          ""
+        ],
+        "protocols": [
+          ""
+        ],
+        "runtimeKind": "wireguard",
+        "serverLifecycle": false,
+        "subscription": [
+          ""
+        ],
+        "traffic": false
+      }
+    ]
+  },
+  "ManagedEndpointCapability": {
+    "clientCrud": false,
+    "detect": false,
+    "firewallPolicy": false,
+    "nativeExport": [
+      ""
+    ],
+    "protocols": [
+      ""
+    ],
+    "runtimeKind": "wireguard",
+    "serverLifecycle": false,
+    "subscription": [
+      ""
+    ],
+    "traffic": false
+  },
+  "ManagedEndpointView": {
+    "clientCount": 2,
+    "enable": true,
+    "health": {
+      "checkedAt": 0,
+      "message": "",
+      "status": "active"
+    },
+    "id": "legacy-xray-1",
+    "inboundId": 1,
+    "listen": "",
+    "nativeId": 1,
+    "nodeId": 2,
+    "nodeName": "",
+    "port": 443,
+    "protocol": "vless",
+    "remark": "VLESS-443",
+    "runtimeKind": "xray",
+    "secretSummary": {
+      "fields": [
+        ""
+      ],
+      "hasSecrets": false
+    },
+    "source": "legacy-inbound",
+    "status": "active",
+    "tag": "in-443-tcp",
+    "traffic": {
+      "down": 2048,
+      "up": 1024
+    }
+  },
+  "ManagedHealthView": {
+    "checkedAt": 0,
+    "message": "",
+    "status": "active"
+  },
+  "ManagedSecretSummary": {
+    "fields": [
+      ""
+    ],
+    "hasSecrets": false
+  },
+  "ManagedTrafficView": {
+    "down": 2048,
+    "up": 1024
+  },
   "Msg": {
     "msg": "",
     "obj": null,
