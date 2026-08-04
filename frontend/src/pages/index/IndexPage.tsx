@@ -1,6 +1,6 @@
 import { lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, ConfigProvider, Layout, Modal, Result, Spin, message } from 'antd';
+import { Alert, Button, ConfigProvider, Layout, Modal, Result, Select, Spin, message } from 'antd';
 import {
   CopyOutlined,
   CloudDownloadOutlined,
@@ -11,9 +11,10 @@ import {
 } from '@ant-design/icons';
 
 import { HttpUtil, CPUFormatter, SizeFormatter, ClipboardManager, FileManager } from '@/utils';
-import { USAGE_CRIT_COLOR, USAGE_CRIT_PERCENT, USAGE_WARN_COLOR, USAGE_WARN_PERCENT } from '@/models/status';
+import { Status, USAGE_CRIT_COLOR, USAGE_CRIT_PERCENT, USAGE_WARN_COLOR, USAGE_WARN_PERCENT } from '@/models/status';
 import { useTheme } from '@/hooks/useTheme';
 import { useStatusQuery } from '@/api/queries/useStatusQuery';
+import { useNodesQuery } from '@/api/queries/useNodesQuery';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import AppSidebar from '@/layouts/AppSidebar';
 import { LazyMount } from '@/components/utility';
@@ -24,6 +25,11 @@ import ThroughputCard from './ThroughputCard';
 import ConnectionsCard from './ConnectionsCard';
 import SystemStrip from './SystemStrip';
 import { mean, peak, useOverviewHistory } from './useOverviewHistory';
+import {
+  LOCAL_DASHBOARD_TARGET,
+  dashboardTargets,
+  remoteSnapshotState,
+} from './remoteDashboard';
 import type { PanelUpdateInfo } from './PanelUpdateModal';
 const JsonEditor = lazy(() => import('@/components/form/JsonEditor'));
 const PanelUpdateModal = lazy(() => import('./PanelUpdateModal'));
@@ -39,6 +45,7 @@ export default function IndexPage() {
   const { t } = useTranslation();
   const { isDark, isUltra, antdThemeConfig } = useTheme();
   const { status, fetched, fetchError, refresh } = useStatusQuery();
+  const { nodes } = useNodesQuery({ refetchInterval: 5000 });
   const { isMobile } = useMediaQuery();
   const [messageApi, messageContextHolder] = message.useMessage();
   useEffect(() => { setMessageInstance(messageApi); }, [messageApi]);
@@ -65,8 +72,41 @@ export default function IndexPage() {
   const [configText, setConfigText] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingTip, setLoadingTip] = useState(t('loading'));
+  const [targetKey, setTargetKey] = useState(LOCAL_DASHBOARD_TARGET);
 
-  const history = useOverviewHistory(status, fetched && !fetchError);
+  const targets = useMemo(() => dashboardTargets(nodes, t('pages.index.localServer')), [nodes, t]);
+  const selectedTarget = useMemo(
+    () => targets.find((target) => target.key === targetKey) ?? targets[0],
+    [targets, targetKey],
+  );
+  const isLocalTarget = selectedTarget?.key === LOCAL_DASHBOARD_TARGET;
+  const remoteState = useMemo(
+    () => (isLocalTarget ? null : remoteSnapshotState(selectedTarget?.node, Date.now())),
+    [isLocalTarget, selectedTarget],
+  );
+  const displayStatus = useMemo(
+    () => (remoteState?.available ? remoteState.status : (isLocalTarget ? status : new Status())),
+    [remoteState, isLocalTarget, status],
+  );
+  const hasDisplayData = isLocalTarget
+    ? fetched && !fetchError
+    : !!remoteState?.available;
+  const history = useOverviewHistory(displayStatus, hasDisplayData, {
+    targetKey: selectedTarget?.key ?? LOCAL_DASHBOARD_TARGET,
+    seedLocal: isLocalTarget,
+  });
+
+  useEffect(() => {
+    if (isLocalTarget) return;
+    setLogsOpen(false);
+    setBackupOpen(false);
+    setPanelUpdateOpen(false);
+    setSysHistoryOpen(false);
+    setXrayMetricsOpen(false);
+    setXrayLogsOpen(false);
+    setVersionOpen(false);
+    setConfigTextOpen(false);
+  }, [isLocalTarget]);
 
   useEffect(() => {
     HttpUtil.post<{ accessLogEnable?: boolean; devChannelEnable?: boolean }>(
@@ -135,15 +175,15 @@ export default function IndexPage() {
   }
 
   const pageClass = `index-page ${isDark ? 'is-dark' : ''} ${isUltra ? 'is-ultra' : ''}`.trim();
-  const totalDisk = status.disk.total;
-  const freeDisk = Math.max(0, totalDisk - status.disk.current);
+  const totalDisk = displayStatus.disk.total;
+  const freeDisk = Math.max(0, totalDisk - displayStatus.disk.current);
 
   const health = useMemo(() => {
     const items = [
-      { name: t('pages.index.cpu'), value: status.cpu.percent },
-      { name: t('pages.index.memory'), value: status.mem.percent },
-      { name: t('pages.index.swap'), value: status.swap.percent },
-      { name: t('pages.index.storage'), value: status.disk.percent },
+      { name: t('pages.index.cpu'), value: displayStatus.cpu.percent },
+      { name: t('pages.index.memory'), value: displayStatus.mem.percent },
+      { name: t('pages.index.swap'), value: displayStatus.swap.percent },
+      { name: t('pages.index.storage'), value: displayStatus.disk.percent },
     ];
     const list = (xs: typeof items) => xs.map((i) => `${i.name} ${i.value.toFixed(0)}%`).join(', ');
     const crit = items.filter((i) => i.value >= USAGE_CRIT_PERCENT);
@@ -151,7 +191,7 @@ export default function IndexPage() {
     const warm = items.filter((i) => i.value >= USAGE_WARN_PERCENT);
     if (warm.length) return { text: t('pages.index.healthWarm', { list: list(warm) }), color: USAGE_WARN_COLOR };
     return null;
-  }, [status, t]);
+  }, [displayStatus, t]);
 
   return (
     <ConfigProvider theme={antdThemeConfig}>
@@ -178,110 +218,161 @@ export default function IndexPage() {
                 />
               ) : (
                 <div className="ov-page">
-                  <OverviewActionBar
-                    status={status}
-                    isMobile={isMobile}
-                    accessLogEnable={accessLogEnable}
-                    panelVersion={displayVersion}
-                    latestVersion={panelUpdateInfo.latestVersion}
-                    updateAvailable={panelUpdateInfo.updateAvailable}
-                    onStopXray={stopXray}
-                    onRestartXray={restartXray}
-                    onOpenLogs={() => setLogsOpen(true)}
-                    onOpenXrayLogs={() => setXrayLogsOpen(true)}
-                    onOpenConfig={openConfig}
-                    onOpenBackup={() => setBackupOpen(true)}
-                    onOpenSystemHistory={() => setSysHistoryOpen(true)}
-                    onOpenXrayMetrics={() => setXrayMetricsOpen(true)}
-                    onOpenPanelUpdate={() => setPanelUpdateOpen(true)}
-                    onOpenVersionSwitch={() => setVersionOpen(true)}
-                  />
+                  <div className="ov-target-row">
+                    <Select
+                      className="ov-target-select"
+                      aria-label={t('pages.index.dashboardTarget')}
+                      value={selectedTarget?.key ?? LOCAL_DASHBOARD_TARGET}
+                      options={targets.map((target) => ({ value: target.key, label: target.label }))}
+                      onChange={setTargetKey}
+                    />
+                    {!isLocalTarget && (
+                      <Alert
+                        type={remoteState?.available ? 'info' : 'warning'}
+                        showIcon
+                        className="ov-target-alert"
+                        message={remoteState?.available
+                          ? t('pages.index.remoteReadOnly')
+                          : t(`pages.index.remoteUnavailable.${remoteState?.reason || 'unavailable'}`)}
+                      />
+                    )}
+                  </div>
 
-                  {health && (
-                    <div className="ov-health" style={{ color: health.color }}>
-                      <span className="ov-health-mark" />
-                      {health.text}
-                    </div>
+                  {isLocalTarget ? (
+                    <OverviewActionBar
+                      status={displayStatus}
+                      isMobile={isMobile}
+                      accessLogEnable={accessLogEnable}
+                      panelVersion={displayVersion}
+                      latestVersion={panelUpdateInfo.latestVersion}
+                      updateAvailable={panelUpdateInfo.updateAvailable}
+                      onStopXray={stopXray}
+                      onRestartXray={restartXray}
+                      onOpenLogs={() => setLogsOpen(true)}
+                      onOpenXrayLogs={() => setXrayLogsOpen(true)}
+                      onOpenConfig={openConfig}
+                      onOpenBackup={() => setBackupOpen(true)}
+                      onOpenSystemHistory={() => setSysHistoryOpen(true)}
+                      onOpenXrayMetrics={() => setXrayMetricsOpen(true)}
+                      onOpenPanelUpdate={() => setPanelUpdateOpen(true)}
+                      onOpenVersionSwitch={() => setVersionOpen(true)}
+                    />
+                  ) : remoteState?.available ? (
+                    <OverviewActionBar
+                      status={displayStatus}
+                      isMobile={isMobile}
+                      accessLogEnable={false}
+                      panelVersion={selectedTarget?.node?.panelVersion || ''}
+                      latestVersion=""
+                      updateAvailable={false}
+                      readOnly
+                      onStopXray={() => undefined}
+                      onRestartXray={() => undefined}
+                      onOpenLogs={() => undefined}
+                      onOpenXrayLogs={() => undefined}
+                      onOpenConfig={() => undefined}
+                      onOpenBackup={() => undefined}
+                      onOpenSystemHistory={() => undefined}
+                      onOpenXrayMetrics={() => undefined}
+                      onOpenPanelUpdate={() => undefined}
+                      onOpenVersionSwitch={() => undefined}
+                    />
+                  ) : null}
+
+                  {!hasDisplayData ? (
+                    <Result
+                      status="warning"
+                      title={t(`pages.index.remoteUnavailable.${remoteState?.reason || 'unavailable'}`)}
+                    />
+                  ) : (
+                    <>
+                      {health && (
+                        <div className="ov-health" style={{ color: health.color }}>
+                          <span className="ov-health-mark" />
+                          {health.text}
+                        </div>
+                      )}
+
+                      <hr className="ov-rule" />
+
+                      <div className="ov-vitals">
+                        <VitalTile
+                          icon={<DashboardOutlined />}
+                          label={t('pages.index.cpu')}
+                          percent={displayStatus.cpu.percent}
+                          statusColor={displayStatus.cpu.color}
+                          detail={`${CPUFormatter.cpuCoreFormat(displayStatus.cpuCores)} / ${displayStatus.logicalPro}T · ${CPUFormatter.cpuSpeedFormat(displayStatus.cpuSpeedMhz)}`}
+                          footLeft={`${t('pages.index.avg')} ${mean(history.series.cpu).toFixed(0)}%`}
+                          footRight={`${t('pages.index.peak')} ${peak(history.series.cpu).toFixed(0)}%`}
+                          data={history.series.cpu}
+                          isMobile={isMobile}
+                        />
+                        <VitalTile
+                          icon={<DatabaseOutlined />}
+                          label={t('pages.index.memory')}
+                          percent={displayStatus.mem.percent}
+                          statusColor={displayStatus.mem.color}
+                          detail={`${SizeFormatter.sizeFormat(displayStatus.mem.current)} / ${SizeFormatter.sizeFormat(displayStatus.mem.total)}`}
+                          footLeft={`${t('pages.index.avg')} ${mean(history.series.mem).toFixed(0)}%`}
+                          footRight={`${t('pages.index.peak')} ${peak(history.series.mem).toFixed(0)}%`}
+                          data={history.series.mem}
+                          isMobile={isMobile}
+                        />
+                        <VitalTile
+                          icon={<SwapOutlined />}
+                          label={t('pages.index.swap')}
+                          percent={displayStatus.swap.percent}
+                          statusColor={displayStatus.swap.color}
+                          detail={`${SizeFormatter.sizeFormat(displayStatus.swap.current)} / ${SizeFormatter.sizeFormat(displayStatus.swap.total)}`}
+                          footLeft={`${t('pages.index.avg')} ${mean(history.series.swap).toFixed(1)}%`}
+                          footRight={`${t('pages.index.peak')} ${peak(history.series.swap).toFixed(0)}%`}
+                          data={history.series.swap}
+                          isMobile={isMobile}
+                        />
+                        <VitalTile
+                          icon={<HddOutlined />}
+                          label={t('pages.index.storage')}
+                          percent={displayStatus.disk.percent}
+                          statusColor={displayStatus.disk.color}
+                          detail={`${SizeFormatter.sizeFormat(displayStatus.disk.current)} / ${SizeFormatter.sizeFormat(totalDisk)}`}
+                          footLeft={`${t('pages.index.free')} ${SizeFormatter.sizeFormat(freeDisk)}`}
+                          footRight={`${t('pages.index.avg')} ${mean(history.series.diskUsage).toFixed(1)}%`}
+                          data={history.series.diskUsage}
+                          isMobile={isMobile}
+                        />
+                      </div>
+
+                      <div className="ov-mid">
+                        <ThroughputCard
+                          status={displayStatus}
+                          up={history.series.netUp}
+                          down={history.series.netDown}
+                          labels={history.labels}
+                          isMobile={isMobile}
+                        />
+                        <ConnectionsCard
+                          status={displayStatus}
+                          tcp={history.series.tcpCount}
+                          udp={history.series.udpCount}
+                          labels={history.labels}
+                          isMobile={isMobile}
+                        />
+                      </div>
+
+                      <SystemStrip
+                        status={displayStatus}
+                        showIp={showIp}
+                        onToggleIp={() => setShowIp((v) => !v)}
+                      />
+                    </>
                   )}
-
-                  <hr className="ov-rule" />
-
-                  <div className="ov-vitals">
-                    <VitalTile
-                      icon={<DashboardOutlined />}
-                      label={t('pages.index.cpu')}
-                      percent={status.cpu.percent}
-                      statusColor={status.cpu.color}
-                      detail={`${CPUFormatter.cpuCoreFormat(status.cpuCores)} / ${status.logicalPro}T · ${CPUFormatter.cpuSpeedFormat(status.cpuSpeedMhz)}`}
-                      footLeft={`${t('pages.index.avg')} ${mean(history.series.cpu).toFixed(0)}%`}
-                      footRight={`${t('pages.index.peak')} ${peak(history.series.cpu).toFixed(0)}%`}
-                      data={history.series.cpu}
-                      isMobile={isMobile}
-                    />
-                    <VitalTile
-                      icon={<DatabaseOutlined />}
-                      label={t('pages.index.memory')}
-                      percent={status.mem.percent}
-                      statusColor={status.mem.color}
-                      detail={`${SizeFormatter.sizeFormat(status.mem.current)} / ${SizeFormatter.sizeFormat(status.mem.total)}`}
-                      footLeft={`${t('pages.index.avg')} ${mean(history.series.mem).toFixed(0)}%`}
-                      footRight={`${t('pages.index.peak')} ${peak(history.series.mem).toFixed(0)}%`}
-                      data={history.series.mem}
-                      isMobile={isMobile}
-                    />
-                    <VitalTile
-                      icon={<SwapOutlined />}
-                      label={t('pages.index.swap')}
-                      percent={status.swap.percent}
-                      statusColor={status.swap.color}
-                      detail={`${SizeFormatter.sizeFormat(status.swap.current)} / ${SizeFormatter.sizeFormat(status.swap.total)}`}
-                      footLeft={`${t('pages.index.avg')} ${mean(history.series.swap).toFixed(1)}%`}
-                      footRight={`${t('pages.index.peak')} ${peak(history.series.swap).toFixed(0)}%`}
-                      data={history.series.swap}
-                      isMobile={isMobile}
-                    />
-                    <VitalTile
-                      icon={<HddOutlined />}
-                      label={t('pages.index.storage')}
-                      percent={status.disk.percent}
-                      statusColor={status.disk.color}
-                      detail={`${SizeFormatter.sizeFormat(status.disk.current)} / ${SizeFormatter.sizeFormat(totalDisk)}`}
-                      footLeft={`${t('pages.index.free')} ${SizeFormatter.sizeFormat(freeDisk)}`}
-                      footRight={`${t('pages.index.avg')} ${mean(history.series.diskUsage).toFixed(1)}%`}
-                      data={history.series.diskUsage}
-                      isMobile={isMobile}
-                    />
-                  </div>
-
-                  <div className="ov-mid">
-                    <ThroughputCard
-                      status={status}
-                      up={history.series.netUp}
-                      down={history.series.netDown}
-                      labels={history.labels}
-                      isMobile={isMobile}
-                    />
-                    <ConnectionsCard
-                      status={status}
-                      tcp={history.series.tcpCount}
-                      udp={history.series.udpCount}
-                      labels={history.labels}
-                      isMobile={isMobile}
-                    />
-                  </div>
-
-                  <SystemStrip
-                    status={status}
-                    showIp={showIp}
-                    onToggleIp={() => setShowIp((v) => !v)}
-                  />
                 </div>
               )}
             </Spin>
           </Layout.Content>
         </Layout>
 
-        <LazyMount when={panelUpdateOpen}>
+        <LazyMount when={isLocalTarget && panelUpdateOpen}>
           <PanelUpdateModal
             open={panelUpdateOpen}
             info={panelUpdateInfo}
@@ -291,10 +382,10 @@ export default function IndexPage() {
             onBusy={setBusy}
           />
         </LazyMount>
-        <LazyMount when={logsOpen}>
+        <LazyMount when={isLocalTarget && logsOpen}>
           <LogModal open={logsOpen} onClose={() => setLogsOpen(false)} />
         </LazyMount>
-        <LazyMount when={backupOpen}>
+        <LazyMount when={isLocalTarget && backupOpen}>
           <BackupModal
             open={backupOpen}
             basePath={basePath}
@@ -302,20 +393,20 @@ export default function IndexPage() {
             onBusy={setBusy}
           />
         </LazyMount>
-        <LazyMount when={sysHistoryOpen}>
+        <LazyMount when={isLocalTarget && sysHistoryOpen}>
           <SystemHistoryModal
             open={sysHistoryOpen}
             status={status}
             onClose={() => setSysHistoryOpen(false)}
           />
         </LazyMount>
-        <LazyMount when={xrayMetricsOpen}>
+        <LazyMount when={isLocalTarget && xrayMetricsOpen}>
           <XrayMetricsModal open={xrayMetricsOpen} onClose={() => setXrayMetricsOpen(false)} />
         </LazyMount>
-        <LazyMount when={xrayLogsOpen}>
+        <LazyMount when={isLocalTarget && xrayLogsOpen}>
           <XrayLogModal open={xrayLogsOpen} onClose={() => setXrayLogsOpen(false)} />
         </LazyMount>
-        <LazyMount when={versionOpen}>
+        <LazyMount when={isLocalTarget && versionOpen}>
           <VersionModal
             open={versionOpen}
             status={status}
@@ -324,7 +415,7 @@ export default function IndexPage() {
           />
         </LazyMount>
 
-        <LazyMount when={configTextOpen}>
+        <LazyMount when={isLocalTarget && configTextOpen}>
           <Modal
             open={configTextOpen}
             title={t('pages.index.config')}

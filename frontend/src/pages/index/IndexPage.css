@@ -31,6 +31,22 @@
 
 /* — action bar — */
 
+.ov-target-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ov-target-select {
+  min-width: 220px;
+}
+
+.ov-target-alert {
+  flex: 1 1 280px;
+  padding-block: 6px;
+}
+
 .ov-bar {
   display: flex;
   align-items: center;
@@ -103,6 +119,10 @@
 
 .ov-update-tag {
   cursor: pointer;
+  margin-inline-end: 0;
+}
+
+.ov-readonly-tag {
   margin-inline-end: 0;
 }
 

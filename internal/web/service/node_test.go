@@ -52,24 +52,60 @@ func TestNodeMetricKey(t *testing.T) {
 
 func TestHeartbeatPatch_ToUI_OnlineCopiesFields(t *testing.T) {
 	p := HeartbeatPatch{
-		Status:       "ignored-source",
-		LatencyMs:    42,
-		XrayVersion:  "1.8.4",
-		PanelVersion: "3.0.0",
-		CpuPct:       12.5,
-		MemPct:       33.3,
-		UptimeSecs:   12345,
-		LastError:    "",
+		Status:          "ignored-source",
+		LatencyMs:       42,
+		XrayVersion:     "1.8.4",
+		PanelVersion:    "3.0.0",
+		Guid:            "node-guid",
+		CpuPct:          12.5,
+		CpuCores:        4,
+		LogicalPro:      8,
+		CpuSpeedMhz:     2400,
+		MemCurrent:      100,
+		MemTotal:        200,
+		MemPct:          33.3,
+		SwapCurrent:     10,
+		SwapTotal:       20,
+		DiskCurrent:     300,
+		DiskTotal:       400,
+		UptimeSecs:      12345,
+		NetUp:           1000,
+		NetDown:         2000,
+		NetTrafficSent:  3000,
+		NetTrafficRecv:  4000,
+		TcpCount:        7,
+		UdpCount:        8,
+		AppStatsMem:     500,
+		AppStatsThreads: 6,
+		AppStatsUptime:  900,
+		PublicIPV4:      "203.0.113.1",
+		PublicIPV6:      "2001:db8::1",
+		LastError:       "",
 	}
 	ui := p.ToUI(true)
 	if ui.Status != "online" {
 		t.Fatalf("Status = %q, want online", ui.Status)
 	}
-	if ui.LatencyMs != 42 || ui.XrayVersion != "1.8.4" || ui.PanelVersion != "3.0.0" {
+	if ui.LatencyMs != 42 || ui.XrayVersion != "1.8.4" || ui.PanelVersion != "3.0.0" || ui.Guid != "node-guid" {
 		t.Fatalf("scalar copy mismatch: %+v", ui)
 	}
 	if ui.CpuPct != 12.5 || ui.MemPct != 33.3 || ui.UptimeSecs != 12345 {
 		t.Fatalf("metric copy mismatch: %+v", ui)
+	}
+	if ui.CpuCores != 4 || ui.LogicalPro != 8 || ui.CpuSpeedMhz != 2400 {
+		t.Fatalf("cpu detail mismatch: %+v", ui)
+	}
+	if ui.MemCurrent != 100 || ui.MemTotal != 200 || ui.SwapCurrent != 10 || ui.SwapTotal != 20 || ui.DiskCurrent != 300 || ui.DiskTotal != 400 {
+		t.Fatalf("resource detail mismatch: %+v", ui)
+	}
+	if ui.NetUp != 1000 || ui.NetDown != 2000 || ui.NetTrafficSent != 3000 || ui.NetTrafficRecv != 4000 {
+		t.Fatalf("network detail mismatch: %+v", ui)
+	}
+	if ui.TcpCount != 7 || ui.UdpCount != 8 || ui.AppStatsMem != 500 || ui.AppStatsThreads != 6 || ui.AppStatsUptime != 900 {
+		t.Fatalf("app/connection detail mismatch: %+v", ui)
+	}
+	if ui.PublicIPV4 != "203.0.113.1" || ui.PublicIPV6 != "2001:db8::1" {
+		t.Fatalf("public IP mismatch: %+v", ui)
 	}
 	if ui.Error != "" {
 		t.Fatalf("Error = %q, want empty", ui.Error)

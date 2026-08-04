@@ -2571,6 +2571,20 @@
           "allowPrivateAddress": {
             "type": "boolean"
           },
+          "appStatsMem": {
+            "example": 67108864,
+            "format": "int64",
+            "type": "integer"
+          },
+          "appStatsThreads": {
+            "example": 12,
+            "type": "integer"
+          },
+          "appStatsUptime": {
+            "example": 3600,
+            "format": "int64",
+            "type": "integer"
+          },
           "basePath": {
             "example": "/",
             "type": "string"
@@ -2586,9 +2600,17 @@
             "format": "int64",
             "type": "integer"
           },
+          "cpuCores": {
+            "example": 4,
+            "type": "integer"
+          },
           "cpuPct": {
             "example": 23.5,
             "type": "number"
+          },
+          "cpuSpeedMhz": {
+            "example": 2400,
+            "type": "integer"
           },
           "createdAt": {
             "example": 1700000000,
@@ -2601,6 +2623,16 @@
           },
           "disabledCount": {
             "example": 3,
+            "type": "integer"
+          },
+          "diskCurrent": {
+            "example": 10737418240,
+            "format": "int64",
+            "type": "integer"
+          },
+          "diskTotal": {
+            "example": 21474836480,
+            "format": "int64",
             "type": "integer"
           },
           "enable": {
@@ -2645,9 +2677,23 @@
             "example": 42,
             "type": "integer"
           },
+          "logicalPro": {
+            "example": 8,
+            "type": "integer"
+          },
+          "memCurrent": {
+            "example": 1073741824,
+            "format": "int64",
+            "type": "integer"
+          },
           "memPct": {
             "example": 45.1,
             "type": "number"
+          },
+          "memTotal": {
+            "example": 2147483648,
+            "format": "int64",
+            "type": "integer"
           },
           "name": {
             "example": "de-fra-1",
@@ -2655,6 +2701,16 @@
           },
           "netDown": {
             "example": 2097152,
+            "format": "int64",
+            "type": "integer"
+          },
+          "netTrafficRecv": {
+            "example": 209715200,
+            "format": "int64",
+            "type": "integer"
+          },
+          "netTrafficSent": {
+            "example": 104857600,
             "format": "int64",
             "type": "integer"
           },
@@ -2671,7 +2727,7 @@
             "type": "string"
           },
           "panelVersion": {
-            "example": "v3.x.x",
+            "example": "v0.0.1",
             "type": "string"
           },
           "parentGuid": {
@@ -2686,6 +2742,14 @@
             "maximum": 65535,
             "minimum": 1,
             "type": "integer"
+          },
+          "publicIpV4": {
+            "example": "203.0.113.10",
+            "type": "string"
+          },
+          "publicIpV6": {
+            "example": "2001:db8::10",
+            "type": "string"
           },
           "remark": {
             "type": "string"
@@ -2703,6 +2767,20 @@
             "example": "online",
             "type": "string"
           },
+          "swapCurrent": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "swapTotal": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "tcpCount": {
+            "example": 128,
+            "type": "integer"
+          },
           "tlsVerifyMode": {
             "enum": [
               "verify",
@@ -2714,6 +2792,10 @@
           },
           "transitive": {
             "type": "boolean"
+          },
+          "udpCount": {
+            "example": 16,
+            "type": "integer"
           },
           "updatedAt": {
             "example": 1700000000,
@@ -2741,14 +2823,21 @@
           "activeCount",
           "address",
           "allowPrivateAddress",
+          "appStatsMem",
+          "appStatsThreads",
+          "appStatsUptime",
           "basePath",
           "clientCount",
           "configDirty",
           "configDirtyAt",
+          "cpuCores",
           "cpuPct",
+          "cpuSpeedMhz",
           "createdAt",
           "depletedCount",
           "disabledCount",
+          "diskCurrent",
+          "diskTotal",
           "enable",
           "guid",
           "id",
@@ -2758,19 +2847,30 @@
           "lastError",
           "lastHeartbeat",
           "latencyMs",
+          "logicalPro",
+          "memCurrent",
           "memPct",
+          "memTotal",
           "name",
           "netDown",
+          "netTrafficRecv",
+          "netTrafficSent",
           "netUp",
           "onlineCount",
           "outboundTag",
           "panelVersion",
           "pinnedCertSha256",
           "port",
+          "publicIpV4",
+          "publicIpV6",
           "remark",
           "scheme",
           "status",
+          "swapCurrent",
+          "swapTotal",
+          "tcpCount",
           "tlsVerifyMode",
+          "udpCount",
           "updatedAt",
           "uptimeSecs",
           "xrayError",
@@ -3067,6 +3167,20 @@
             "example": false,
             "type": "boolean"
           },
+          "appStatsMem": {
+            "example": 67108864,
+            "format": "int64",
+            "type": "integer"
+          },
+          "appStatsThreads": {
+            "example": 12,
+            "type": "integer"
+          },
+          "appStatsUptime": {
+            "example": 3600,
+            "format": "int64",
+            "type": "integer"
+          },
           "basePath": {
             "example": "/",
             "type": "string"
@@ -3084,9 +3198,17 @@
             "format": "int64",
             "type": "integer"
           },
+          "cpuCores": {
+            "example": 4,
+            "type": "integer"
+          },
           "cpuPct": {
             "example": 12.5,
             "type": "number"
+          },
+          "cpuSpeedMhz": {
+            "example": 2400,
+            "type": "integer"
           },
           "createdAt": {
             "example": 1700000000,
@@ -3099,6 +3221,16 @@
           },
           "disabledCount": {
             "example": 2,
+            "type": "integer"
+          },
+          "diskCurrent": {
+            "example": 10737418240,
+            "format": "int64",
+            "type": "integer"
+          },
+          "diskTotal": {
+            "example": 21474836480,
+            "format": "int64",
             "type": "integer"
           },
           "enable": {
@@ -3146,9 +3278,23 @@
             "example": 42,
             "type": "integer"
           },
+          "logicalPro": {
+            "example": 8,
+            "type": "integer"
+          },
+          "memCurrent": {
+            "example": 1073741824,
+            "format": "int64",
+            "type": "integer"
+          },
           "memPct": {
             "example": 45.2,
             "type": "number"
+          },
+          "memTotal": {
+            "example": 2147483648,
+            "format": "int64",
+            "type": "integer"
           },
           "name": {
             "example": "edge-1",
@@ -3156,6 +3302,16 @@
           },
           "netDown": {
             "example": 1048576,
+            "format": "int64",
+            "type": "integer"
+          },
+          "netTrafficRecv": {
+            "example": 209715200,
+            "format": "int64",
+            "type": "integer"
+          },
+          "netTrafficSent": {
+            "example": 104857600,
             "format": "int64",
             "type": "integer"
           },
@@ -3173,7 +3329,7 @@
             "type": "string"
           },
           "panelVersion": {
-            "example": "v3.x.x",
+            "example": "v0.0.1",
             "type": "string"
           },
           "parentGuid": {
@@ -3185,6 +3341,14 @@
           "port": {
             "example": 2053,
             "type": "integer"
+          },
+          "publicIpV4": {
+            "example": "203.0.113.10",
+            "type": "string"
+          },
+          "publicIpV6": {
+            "example": "2001:db8::10",
+            "type": "string"
           },
           "remark": {
             "example": "Primary edge",
@@ -3198,6 +3362,20 @@
             "example": "online",
             "type": "string"
           },
+          "swapCurrent": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "swapTotal": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "tcpCount": {
+            "example": 128,
+            "type": "integer"
+          },
           "tlsVerifyMode": {
             "example": "verify",
             "type": "string"
@@ -3205,6 +3383,10 @@
           "transitive": {
             "example": false,
             "type": "boolean"
+          },
+          "udpCount": {
+            "example": 16,
+            "type": "integer"
           },
           "updatedAt": {
             "example": 1700003600,
@@ -3232,14 +3414,21 @@
           "activeCount",
           "address",
           "allowPrivateAddress",
+          "appStatsMem",
+          "appStatsThreads",
+          "appStatsUptime",
           "basePath",
           "clientCount",
           "configDirty",
           "configDirtyAt",
+          "cpuCores",
           "cpuPct",
+          "cpuSpeedMhz",
           "createdAt",
           "depletedCount",
           "disabledCount",
+          "diskCurrent",
+          "diskTotal",
           "enable",
           "guid",
           "hasApiToken",
@@ -3250,19 +3439,30 @@
           "lastError",
           "lastHeartbeat",
           "latencyMs",
+          "logicalPro",
+          "memCurrent",
           "memPct",
+          "memTotal",
           "name",
           "netDown",
+          "netTrafficRecv",
+          "netTrafficSent",
           "netUp",
           "onlineCount",
           "outboundTag",
           "panelVersion",
           "pinnedCertSha256",
           "port",
+          "publicIpV4",
+          "publicIpV6",
           "remark",
           "scheme",
           "status",
+          "swapCurrent",
+          "swapTotal",
+          "tcpCount",
           "tlsVerifyMode",
+          "udpCount",
           "updatedAt",
           "uptimeSecs",
           "xrayError",
@@ -3333,28 +3533,124 @@
       },
       "ProbeResultUI": {
         "properties": {
+          "appStatsMem": {
+            "example": 67108864,
+            "format": "int64",
+            "type": "integer"
+          },
+          "appStatsThreads": {
+            "example": 12,
+            "type": "integer"
+          },
+          "appStatsUptime": {
+            "example": 3600,
+            "format": "int64",
+            "type": "integer"
+          },
+          "cpuCores": {
+            "example": 4,
+            "type": "integer"
+          },
           "cpuPct": {
             "example": 12.5,
             "type": "number"
           },
+          "cpuSpeedMhz": {
+            "example": 2400,
+            "type": "integer"
+          },
+          "diskCurrent": {
+            "example": 10737418240,
+            "format": "int64",
+            "type": "integer"
+          },
+          "diskTotal": {
+            "example": 21474836480,
+            "format": "int64",
+            "type": "integer"
+          },
           "error": {
+            "type": "string"
+          },
+          "guid": {
+            "example": "node-guid",
             "type": "string"
           },
           "latencyMs": {
             "example": 42,
             "type": "integer"
           },
+          "logicalPro": {
+            "example": 8,
+            "type": "integer"
+          },
+          "memCurrent": {
+            "example": 1073741824,
+            "format": "int64",
+            "type": "integer"
+          },
           "memPct": {
             "example": 45.2,
             "type": "number"
           },
+          "memTotal": {
+            "example": 2147483648,
+            "format": "int64",
+            "type": "integer"
+          },
+          "netDown": {
+            "example": 1048576,
+            "format": "int64",
+            "type": "integer"
+          },
+          "netTrafficRecv": {
+            "example": 209715200,
+            "format": "int64",
+            "type": "integer"
+          },
+          "netTrafficSent": {
+            "example": 104857600,
+            "format": "int64",
+            "type": "integer"
+          },
+          "netUp": {
+            "example": 2097152,
+            "format": "int64",
+            "type": "integer"
+          },
           "panelVersion": {
-            "example": "v3.x.x",
+            "example": "v0.0.1",
+            "type": "string"
+          },
+          "publicIpV4": {
+            "example": "203.0.113.10",
+            "type": "string"
+          },
+          "publicIpV6": {
+            "example": "2001:db8::10",
             "type": "string"
           },
           "status": {
             "example": "online",
             "type": "string"
+          },
+          "swapCurrent": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "swapTotal": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "tcpCount": {
+            "example": 128,
+            "type": "integer"
+          },
+          "udpCount": {
+            "example": 16,
+            "type": "integer"
           },
           "uptimeSecs": {
             "example": 86400,
@@ -3374,12 +3670,33 @@
           }
         },
         "required": [
+          "appStatsMem",
+          "appStatsThreads",
+          "appStatsUptime",
+          "cpuCores",
           "cpuPct",
+          "cpuSpeedMhz",
+          "diskCurrent",
+          "diskTotal",
           "error",
+          "guid",
           "latencyMs",
+          "logicalPro",
+          "memCurrent",
           "memPct",
+          "memTotal",
+          "netDown",
+          "netTrafficRecv",
+          "netTrafficSent",
+          "netUp",
           "panelVersion",
+          "publicIpV4",
+          "publicIpV6",
           "status",
+          "swapCurrent",
+          "swapTotal",
+          "tcpCount",
+          "udpCount",
           "uptimeSecs",
           "xrayError",
           "xrayState",
@@ -8804,14 +9121,21 @@
                       "activeCount": 20,
                       "address": "node.example.com",
                       "allowPrivateAddress": false,
+                      "appStatsMem": 67108864,
+                      "appStatsThreads": 12,
+                      "appStatsUptime": 3600,
                       "basePath": "/",
                       "clientCount": 25,
                       "configDirty": false,
                       "configDirtyAt": 0,
+                      "cpuCores": 4,
                       "cpuPct": 12.5,
+                      "cpuSpeedMhz": 2400,
                       "createdAt": 1700000000,
                       "depletedCount": 1,
                       "disabledCount": 2,
+                      "diskCurrent": 10737418240,
+                      "diskTotal": 21474836480,
                       "enable": true,
                       "guid": "node-guid",
                       "hasApiToken": true,
@@ -8824,21 +9148,32 @@
                       "lastError": "",
                       "lastHeartbeat": 1700000000,
                       "latencyMs": 42,
+                      "logicalPro": 8,
+                      "memCurrent": 1073741824,
                       "memPct": 45.2,
+                      "memTotal": 2147483648,
                       "name": "edge-1",
                       "netDown": 1048576,
+                      "netTrafficRecv": 209715200,
+                      "netTrafficSent": 104857600,
                       "netUp": 2097152,
                       "onlineCount": 5,
                       "outboundTag": "direct",
-                      "panelVersion": "v3.x.x",
+                      "panelVersion": "v0.0.1",
                       "parentGuid": "",
                       "pinnedCertSha256": "",
                       "port": 2053,
+                      "publicIpV4": "203.0.113.10",
+                      "publicIpV6": "2001:db8::10",
                       "remark": "Primary edge",
                       "scheme": "https",
                       "status": "online",
+                      "swapCurrent": 0,
+                      "swapTotal": 0,
+                      "tcpCount": 128,
                       "tlsVerifyMode": "verify",
                       "transitive": false,
+                      "udpCount": 16,
                       "updatedAt": 1700003600,
                       "uptimeSecs": 86400,
                       "xrayError": "",
@@ -8975,14 +9310,21 @@
                     "activeCount": 20,
                     "address": "node.example.com",
                     "allowPrivateAddress": false,
+                    "appStatsMem": 67108864,
+                    "appStatsThreads": 12,
+                    "appStatsUptime": 3600,
                     "basePath": "/",
                     "clientCount": 25,
                     "configDirty": false,
                     "configDirtyAt": 0,
+                    "cpuCores": 4,
                     "cpuPct": 12.5,
+                    "cpuSpeedMhz": 2400,
                     "createdAt": 1700000000,
                     "depletedCount": 1,
                     "disabledCount": 2,
+                    "diskCurrent": 10737418240,
+                    "diskTotal": 21474836480,
                     "enable": true,
                     "guid": "node-guid",
                     "hasApiToken": true,
@@ -8995,21 +9337,32 @@
                     "lastError": "",
                     "lastHeartbeat": 1700000000,
                     "latencyMs": 42,
+                    "logicalPro": 8,
+                    "memCurrent": 1073741824,
                     "memPct": 45.2,
+                    "memTotal": 2147483648,
                     "name": "edge-1",
                     "netDown": 1048576,
+                    "netTrafficRecv": 209715200,
+                    "netTrafficSent": 104857600,
                     "netUp": 2097152,
                     "onlineCount": 5,
                     "outboundTag": "direct",
-                    "panelVersion": "v3.x.x",
+                    "panelVersion": "v0.0.1",
                     "parentGuid": "",
                     "pinnedCertSha256": "",
                     "port": 2053,
+                    "publicIpV4": "203.0.113.10",
+                    "publicIpV6": "2001:db8::10",
                     "remark": "Primary edge",
                     "scheme": "https",
                     "status": "online",
+                    "swapCurrent": 0,
+                    "swapTotal": 0,
+                    "tcpCount": 128,
                     "tlsVerifyMode": "verify",
                     "transitive": false,
+                    "udpCount": 16,
                     "updatedAt": 1700003600,
                     "uptimeSecs": 86400,
                     "xrayError": "",
@@ -9125,14 +9478,21 @@
                     "activeCount": 20,
                     "address": "node.example.com",
                     "allowPrivateAddress": false,
+                    "appStatsMem": 67108864,
+                    "appStatsThreads": 12,
+                    "appStatsUptime": 3600,
                     "basePath": "/",
                     "clientCount": 25,
                     "configDirty": false,
                     "configDirtyAt": 0,
+                    "cpuCores": 4,
                     "cpuPct": 12.5,
+                    "cpuSpeedMhz": 2400,
                     "createdAt": 1700000000,
                     "depletedCount": 1,
                     "disabledCount": 2,
+                    "diskCurrent": 10737418240,
+                    "diskTotal": 21474836480,
                     "enable": true,
                     "guid": "node-guid",
                     "hasApiToken": true,
@@ -9145,21 +9505,32 @@
                     "lastError": "",
                     "lastHeartbeat": 1700000000,
                     "latencyMs": 42,
+                    "logicalPro": 8,
+                    "memCurrent": 1073741824,
                     "memPct": 45.2,
+                    "memTotal": 2147483648,
                     "name": "edge-1",
                     "netDown": 1048576,
+                    "netTrafficRecv": 209715200,
+                    "netTrafficSent": 104857600,
                     "netUp": 2097152,
                     "onlineCount": 5,
                     "outboundTag": "direct",
-                    "panelVersion": "v3.x.x",
+                    "panelVersion": "v0.0.1",
                     "parentGuid": "",
                     "pinnedCertSha256": "",
                     "port": 2053,
+                    "publicIpV4": "203.0.113.10",
+                    "publicIpV6": "2001:db8::10",
                     "remark": "Primary edge",
                     "scheme": "https",
                     "status": "online",
+                    "swapCurrent": 0,
+                    "swapTotal": 0,
+                    "tcpCount": 128,
                     "tlsVerifyMode": "verify",
                     "transitive": false,
+                    "udpCount": 16,
                     "updatedAt": 1700003600,
                     "uptimeSecs": 86400,
                     "xrayError": "",
@@ -9377,12 +9748,33 @@
                 "example": {
                   "success": true,
                   "obj": {
+                    "appStatsMem": 67108864,
+                    "appStatsThreads": 12,
+                    "appStatsUptime": 3600,
+                    "cpuCores": 4,
                     "cpuPct": 12.5,
+                    "cpuSpeedMhz": 2400,
+                    "diskCurrent": 10737418240,
+                    "diskTotal": 21474836480,
                     "error": "",
+                    "guid": "node-guid",
                     "latencyMs": 42,
+                    "logicalPro": 8,
+                    "memCurrent": 1073741824,
                     "memPct": 45.2,
-                    "panelVersion": "v3.x.x",
+                    "memTotal": 2147483648,
+                    "netDown": 1048576,
+                    "netTrafficRecv": 209715200,
+                    "netTrafficSent": 104857600,
+                    "netUp": 2097152,
+                    "panelVersion": "v0.0.1",
+                    "publicIpV4": "203.0.113.10",
+                    "publicIpV6": "2001:db8::10",
                     "status": "online",
+                    "swapCurrent": 0,
+                    "swapTotal": 0,
+                    "tcpCount": 128,
+                    "udpCount": 16,
                     "uptimeSecs": 86400,
                     "xrayError": "",
                     "xrayState": "",

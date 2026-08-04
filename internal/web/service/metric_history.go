@@ -288,7 +288,7 @@ var SystemMetricKeys = []string{
 }
 
 // NodeMetricKeys lists the per-node metric names NodeHeartbeatJob writes.
-var NodeMetricKeys = []string{"cpu", "mem", "netUp", "netDown"}
+var NodeMetricKeys = []string{"cpu", "mem", "swap", "diskUsage", "netUp", "netDown", "tcpCount", "udpCount"}
 
 // XrayMetricKeys lists series sourced from xray's /debug/vars expvar endpoint.
 var XrayMetricKeys = []string{

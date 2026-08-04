@@ -65,3 +65,14 @@ test('returns to the compact rail after unpinning', () => {
   expect(sidebarRoot?.getAttribute('style')).toContain('--sider-rail: 72px');
   expect(localStorage.getItem('sidebar-pinned')).toBe('false');
 });
+
+test('removes external documentation and donate header buttons but keeps API Docs menu item', () => {
+  const view = renderSidebar();
+  const sidebarRoot = view.container.querySelector('.ant-sidebar');
+
+  fireEvent.mouseEnter(sidebarRoot!);
+
+  expect(screen.queryByRole('link', { name: 'Documentation' })).toBeNull();
+  expect(screen.queryByRole('link', { name: 'Donate' })).toBeNull();
+  expect(screen.getByText('API Docs')).toBeTruthy();
+});

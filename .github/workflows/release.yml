@@ -124,7 +124,7 @@ jobs:
           cd x-ui/bin
 
           # Download dependencies
-          Xray_URL="https://github.com/XTLS/Xray-core/releases/download/v26.7.28/"
+          Xray_URL="https://github.com/XTLS/Xray-core/releases/download/v26.6.27/"
           if [ "${{ matrix.platform }}" == "amd64" ]; then
             fetch ${Xray_URL}Xray-linux-64.zip
             unzip Xray-linux-64.zip
@@ -200,7 +200,7 @@ jobs:
           file: x-ui-linux-${{ matrix.platform }}.tar.gz
           asset_name: x-ui-linux-${{ matrix.platform }}.tar.gz
           overwrite: true
-          prerelease: true
+          prerelease: false
 
   # =================================
   #  Windows Build
@@ -282,7 +282,7 @@ jobs:
           cd x-ui\bin
 
           # Download Xray for Windows
-          $Xray_URL = "https://github.com/XTLS/Xray-core/releases/download/v26.7.28/"
+          $Xray_URL = "https://github.com/XTLS/Xray-core/releases/download/v26.6.27/"
           Invoke-WebRequest @retry -Uri "${Xray_URL}Xray-windows-64.zip" -OutFile "Xray-windows-64.zip"
           Expand-Archive -Path "Xray-windows-64.zip" -DestinationPath .
           Remove-Item "Xray-windows-64.zip"
@@ -331,7 +331,7 @@ jobs:
           file: x-ui-windows-amd64.zip
           asset_name: x-ui-windows-amd64.zip
           overwrite: true
-          prerelease: true
+          prerelease: false
 
   # =================================
   #  Rolling dev channel (per-commit)

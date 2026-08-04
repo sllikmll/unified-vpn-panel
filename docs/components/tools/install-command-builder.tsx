@@ -44,7 +44,7 @@ export function InstallCommandBuilder() {
           value={version}
           onChange={setVersion}
           placeholder="latest"
-          hint="blank = latest stable · a tag like v3.4.0 · or dev-latest for the rolling dev build"
+          hint="blank = latest stable · a tag like v0.0.1 · or dev-latest for the rolling dev build"
         />
         {method === 'docker' ? (
           <>

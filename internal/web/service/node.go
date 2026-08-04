@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -37,13 +38,31 @@ type HeartbeatPatch struct {
 	PanelVersion  string
 	Guid          string
 	CpuPct        float64
+	CpuCores      int
+	LogicalPro    int
+	CpuSpeedMhz   int
+	MemCurrent    uint64
+	MemTotal      uint64
 	MemPct        float64
+	SwapCurrent   uint64
+	SwapTotal     uint64
+	DiskCurrent   uint64
+	DiskTotal     uint64
 	UptimeSecs    uint64
 	// NetUp/NetDown are the node's current interface throughput (bytes/sec),
 	// summed over non-virtual interfaces, read from its status response.
-	NetUp     uint64
-	NetDown   uint64
-	LastError string
+	NetUp           uint64
+	NetDown         uint64
+	NetTrafficSent  uint64
+	NetTrafficRecv  uint64
+	TcpCount        int
+	UdpCount        int
+	AppStatsMem     uint64
+	AppStatsThreads int
+	AppStatsUptime  uint64
+	PublicIPV4      string
+	PublicIPV6      string
+	LastError       string
 	// XrayState and XrayError come from the remote /panel/api/server/status when the
 	// panel API is reachable. They allow distinguishing panel connectivity from
 	// Xray core health on the node.
@@ -843,16 +862,36 @@ func (s *NodeService) UpdateHeartbeat(id int, p HeartbeatPatch) error {
 		"status":         p.Status,
 		"last_heartbeat": p.LastHeartbeat,
 		"latency_ms":     p.LatencyMs,
-		"xray_version":   p.XrayVersion,
-		"panel_version":  p.PanelVersion,
-		"cpu_pct":        p.CpuPct,
-		"mem_pct":        p.MemPct,
-		"uptime_secs":    p.UptimeSecs,
-		"net_up":         p.NetUp,
-		"net_down":       p.NetDown,
 		"last_error":     p.LastError,
-		"xray_state":     p.XrayState,
-		"xray_error":     p.XrayError,
+	}
+	if p.Status == "online" {
+		updates["xray_version"] = p.XrayVersion
+		updates["panel_version"] = p.PanelVersion
+		updates["cpu_pct"] = p.CpuPct
+		updates["cpu_cores"] = p.CpuCores
+		updates["logical_pro"] = p.LogicalPro
+		updates["cpu_speed_mhz"] = p.CpuSpeedMhz
+		updates["mem_current"] = p.MemCurrent
+		updates["mem_total"] = p.MemTotal
+		updates["mem_pct"] = p.MemPct
+		updates["swap_current"] = p.SwapCurrent
+		updates["swap_total"] = p.SwapTotal
+		updates["disk_current"] = p.DiskCurrent
+		updates["disk_total"] = p.DiskTotal
+		updates["uptime_secs"] = p.UptimeSecs
+		updates["net_up"] = p.NetUp
+		updates["net_down"] = p.NetDown
+		updates["net_traffic_sent"] = p.NetTrafficSent
+		updates["net_traffic_recv"] = p.NetTrafficRecv
+		updates["tcp_count"] = p.TcpCount
+		updates["udp_count"] = p.UdpCount
+		updates["app_stats_mem"] = p.AppStatsMem
+		updates["app_stats_threads"] = p.AppStatsThreads
+		updates["app_stats_uptime"] = p.AppStatsUptime
+		updates["public_ip_v4"] = p.PublicIPV4
+		updates["public_ip_v6"] = p.PublicIPV6
+		updates["xray_state"] = p.XrayState
+		updates["xray_error"] = p.XrayError
 	}
 	// Only learn the GUID; never clear a known one if an old-build node (or a
 	// failed probe) reports none, so the stable identity survives blips.
@@ -867,8 +906,16 @@ func (s *NodeService) UpdateHeartbeat(id int, p HeartbeatPatch) error {
 		now := time.Unix(p.LastHeartbeat, 0)
 		nodeMetrics.append(nodeMetricKey(id, "cpu"), now, p.CpuPct)
 		nodeMetrics.append(nodeMetricKey(id, "mem"), now, p.MemPct)
+		if p.SwapTotal > 0 {
+			nodeMetrics.append(nodeMetricKey(id, "swap"), now, float64(p.SwapCurrent)*100.0/float64(p.SwapTotal))
+		}
+		if p.DiskTotal > 0 {
+			nodeMetrics.append(nodeMetricKey(id, "diskUsage"), now, float64(p.DiskCurrent)*100.0/float64(p.DiskTotal))
+		}
 		nodeMetrics.append(nodeMetricKey(id, "netUp"), now, float64(p.NetUp))
 		nodeMetrics.append(nodeMetricKey(id, "netDown"), now, float64(p.NetDown))
+		nodeMetrics.append(nodeMetricKey(id, "tcpCount"), now, float64(p.TcpCount))
+		nodeMetrics.append(nodeMetricKey(id, "udpCount"), now, float64(p.UdpCount))
 	}
 	return nil
 }
@@ -1151,15 +1198,38 @@ func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string)
 		return patch, errors.New(patch.LastError)
 	}
 
+	decoded, err := decodeHeartbeatStatus(resp.Body)
+	if err != nil {
+		patch.LastError = err.Error()
+		return patch, err
+	}
+	decoded.LastHeartbeat = patch.LastHeartbeat
+	decoded.LatencyMs = patch.LatencyMs
+	return decoded, nil
+}
+
+func decodeHeartbeatStatus(r io.Reader) (HeartbeatPatch, error) {
+	var patch HeartbeatPatch
 	var envelope struct {
 		Success bool   `json:"success"`
 		Msg     string `json:"msg"`
 		Obj     *struct {
-			CpuPct float64 `json:"cpu"`
-			Mem    struct {
+			CpuPct      float64 `json:"cpu"`
+			CpuCores    int     `json:"cpuCores"`
+			LogicalPro  int     `json:"logicalPro"`
+			CpuSpeedMhz int     `json:"cpuSpeedMhz"`
+			Mem         struct {
 				Current uint64 `json:"current"`
 				Total   uint64 `json:"total"`
 			} `json:"mem"`
+			Swap struct {
+				Current uint64 `json:"current"`
+				Total   uint64 `json:"total"`
+			} `json:"swap"`
+			Disk struct {
+				Current uint64 `json:"current"`
+				Total   uint64 `json:"total"`
+			} `json:"disk"`
 			Xray struct {
 				Version  string `json:"version"`
 				State    string `json:"state"`
@@ -1172,9 +1242,24 @@ func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string)
 				Up   uint64 `json:"up"`
 				Down uint64 `json:"down"`
 			} `json:"netIO"`
+			NetTraffic struct {
+				Sent uint64 `json:"sent"`
+				Recv uint64 `json:"recv"`
+			} `json:"netTraffic"`
+			TcpCount int `json:"tcpCount"`
+			UdpCount int `json:"udpCount"`
+			AppStats struct {
+				Mem     uint64 `json:"mem"`
+				Threads int    `json:"threads"`
+				Uptime  uint64 `json:"uptime"`
+			} `json:"appStats"`
+			PublicIP struct {
+				IPV4 any `json:"ipv4"`
+				IPV6 any `json:"ipv6"`
+			} `json:"publicIP"`
 		} `json:"obj"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+	if err := json.NewDecoder(r).Decode(&envelope); err != nil {
 		patch.LastError = "decode response: " + err.Error()
 		return patch, err
 	}
@@ -1184,9 +1269,18 @@ func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string)
 	}
 	o := envelope.Obj
 	patch.CpuPct = o.CpuPct
+	patch.CpuCores = o.CpuCores
+	patch.LogicalPro = o.LogicalPro
+	patch.CpuSpeedMhz = o.CpuSpeedMhz
+	patch.MemCurrent = o.Mem.Current
+	patch.MemTotal = o.Mem.Total
 	if o.Mem.Total > 0 {
 		patch.MemPct = float64(o.Mem.Current) * 100.0 / float64(o.Mem.Total)
 	}
+	patch.SwapCurrent = o.Swap.Current
+	patch.SwapTotal = o.Swap.Total
+	patch.DiskCurrent = o.Disk.Current
+	patch.DiskTotal = o.Disk.Total
 	patch.XrayVersion = o.Xray.Version
 	patch.XrayState = o.Xray.State
 	patch.XrayError = o.Xray.ErrorMsg
@@ -1195,18 +1289,63 @@ func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string)
 	patch.UptimeSecs = o.Uptime
 	patch.NetUp = o.NetIO.Up
 	patch.NetDown = o.NetIO.Down
+	patch.NetTrafficSent = o.NetTraffic.Sent
+	patch.NetTrafficRecv = o.NetTraffic.Recv
+	patch.TcpCount = o.TcpCount
+	patch.UdpCount = o.UdpCount
+	patch.AppStatsMem = o.AppStats.Mem
+	patch.AppStatsThreads = o.AppStats.Threads
+	patch.AppStatsUptime = o.AppStats.Uptime
+	patch.PublicIPV4 = statusValueString(o.PublicIP.IPV4)
+	patch.PublicIPV6 = statusValueString(o.PublicIP.IPV6)
 	return patch, nil
 }
 
+func statusValueString(v any) string {
+	if v == nil {
+		return ""
+	}
+	switch x := v.(type) {
+	case string:
+		return x
+	case float64:
+		if x == 0 {
+			return ""
+		}
+	}
+	return fmt.Sprint(v)
+}
+
 type ProbeResultUI struct {
-	Status       string  `json:"status" example:"online"`
-	LatencyMs    int     `json:"latencyMs" example:"42"`
-	XrayVersion  string  `json:"xrayVersion" example:"25.10.31"`
-	PanelVersion string  `json:"panelVersion" example:"v3.x.x"`
-	CpuPct       float64 `json:"cpuPct" example:"12.5"`
-	MemPct       float64 `json:"memPct" example:"45.2"`
-	UptimeSecs   uint64  `json:"uptimeSecs" example:"86400"`
-	Error        string  `json:"error"`
+	Status          string  `json:"status" example:"online"`
+	LatencyMs       int     `json:"latencyMs" example:"42"`
+	XrayVersion     string  `json:"xrayVersion" example:"25.10.31"`
+	PanelVersion    string  `json:"panelVersion" example:"v0.0.1"`
+	Guid            string  `json:"guid" example:"node-guid"`
+	CpuPct          float64 `json:"cpuPct" example:"12.5"`
+	CpuCores        int     `json:"cpuCores" example:"4"`
+	LogicalPro      int     `json:"logicalPro" example:"8"`
+	CpuSpeedMhz     int     `json:"cpuSpeedMhz" example:"2400"`
+	MemCurrent      uint64  `json:"memCurrent" example:"1073741824"`
+	MemTotal        uint64  `json:"memTotal" example:"2147483648"`
+	MemPct          float64 `json:"memPct" example:"45.2"`
+	SwapCurrent     uint64  `json:"swapCurrent" example:"0"`
+	SwapTotal       uint64  `json:"swapTotal" example:"0"`
+	DiskCurrent     uint64  `json:"diskCurrent" example:"10737418240"`
+	DiskTotal       uint64  `json:"diskTotal" example:"21474836480"`
+	UptimeSecs      uint64  `json:"uptimeSecs" example:"86400"`
+	NetUp           uint64  `json:"netUp" example:"2097152"`
+	NetDown         uint64  `json:"netDown" example:"1048576"`
+	NetTrafficSent  uint64  `json:"netTrafficSent" example:"104857600"`
+	NetTrafficRecv  uint64  `json:"netTrafficRecv" example:"209715200"`
+	TcpCount        int     `json:"tcpCount" example:"128"`
+	UdpCount        int     `json:"udpCount" example:"16"`
+	AppStatsMem     uint64  `json:"appStatsMem" example:"67108864"`
+	AppStatsThreads int     `json:"appStatsThreads" example:"12"`
+	AppStatsUptime  uint64  `json:"appStatsUptime" example:"3600"`
+	PublicIPV4      string  `json:"publicIpV4" example:"203.0.113.10"`
+	PublicIPV6      string  `json:"publicIpV6" example:"2001:db8::10"`
+	Error           string  `json:"error"`
 	// XrayState/XrayError are populated on successful probes even when the node's
 	// Xray core is not healthy. The UI uses them for a distinct "panel ok, xray failed" indicator.
 	XrayState string `json:"xrayState"`
@@ -1215,15 +1354,36 @@ type ProbeResultUI struct {
 
 func (p HeartbeatPatch) ToUI(ok bool) ProbeResultUI {
 	r := ProbeResultUI{
-		LatencyMs:    p.LatencyMs,
-		XrayVersion:  p.XrayVersion,
-		PanelVersion: p.PanelVersion,
-		CpuPct:       p.CpuPct,
-		MemPct:       p.MemPct,
-		UptimeSecs:   p.UptimeSecs,
-		Error:        FriendlyProbeError(p.LastError),
-		XrayState:    p.XrayState,
-		XrayError:    p.XrayError,
+		LatencyMs:       p.LatencyMs,
+		XrayVersion:     p.XrayVersion,
+		PanelVersion:    p.PanelVersion,
+		Guid:            p.Guid,
+		CpuPct:          p.CpuPct,
+		CpuCores:        p.CpuCores,
+		LogicalPro:      p.LogicalPro,
+		CpuSpeedMhz:     p.CpuSpeedMhz,
+		MemCurrent:      p.MemCurrent,
+		MemTotal:        p.MemTotal,
+		MemPct:          p.MemPct,
+		SwapCurrent:     p.SwapCurrent,
+		SwapTotal:       p.SwapTotal,
+		DiskCurrent:     p.DiskCurrent,
+		DiskTotal:       p.DiskTotal,
+		UptimeSecs:      p.UptimeSecs,
+		NetUp:           p.NetUp,
+		NetDown:         p.NetDown,
+		NetTrafficSent:  p.NetTrafficSent,
+		NetTrafficRecv:  p.NetTrafficRecv,
+		TcpCount:        p.TcpCount,
+		UdpCount:        p.UdpCount,
+		AppStatsMem:     p.AppStatsMem,
+		AppStatsThreads: p.AppStatsThreads,
+		AppStatsUptime:  p.AppStatsUptime,
+		PublicIPV4:      p.PublicIPV4,
+		PublicIPV6:      p.PublicIPV6,
+		Error:           FriendlyProbeError(p.LastError),
+		XrayState:       p.XrayState,
+		XrayError:       p.XrayError,
 	}
 	if ok {
 		r.Status = "online"

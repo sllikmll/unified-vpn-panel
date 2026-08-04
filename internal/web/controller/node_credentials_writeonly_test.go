@@ -77,7 +77,7 @@ func TestNodeControllerAddAcceptsTokenButReturnsView(t *testing.T) {
 			t.Fatalf("Authorization = %q", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"success":true,"obj":{"cpu":1,"mem":{"current":1,"total":2},"xray":{"version":"1","state":"running"},"panelVersion":"v3.4.1","panelGuid":"guid","uptime":7,"netIO":{"up":3,"down":4}}}`))
+		_, _ = w.Write([]byte(`{"success":true,"obj":{"cpu":1,"mem":{"current":1,"total":2},"xray":{"version":"1","state":"running"},"panelVersion":"v0.0.1","panelGuid":"guid","uptime":7,"netIO":{"up":3,"down":4}}}`))
 	}))
 	defer remote.Close()
 	host, portString, err := net.SplitHostPort(strings.TrimPrefix(remote.URL, "http://"))
@@ -162,7 +162,7 @@ func TestNodeControllerUpdateBlankApiTokenKeepsStoredToken(t *testing.T) {
 			t.Fatalf("Authorization = %q", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"success":true,"obj":{"cpu":1,"mem":{"current":1,"total":2},"xray":{"version":"1","state":"running"},"panelVersion":"v3.4.1","panelGuid":"guid","uptime":7,"netIO":{"up":3,"down":4}}}`))
+		_, _ = w.Write([]byte(`{"success":true,"obj":{"cpu":1,"mem":{"current":1,"total":2},"xray":{"version":"1","state":"running"},"panelVersion":"v0.0.1","panelGuid":"guid","uptime":7,"netIO":{"up":3,"down":4}}}`))
 	}))
 	defer remote.Close()
 	host, portString, err := net.SplitHostPort(strings.TrimPrefix(remote.URL, "http://"))

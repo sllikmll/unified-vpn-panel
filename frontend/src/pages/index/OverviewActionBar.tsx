@@ -34,6 +34,7 @@ interface OverviewActionBarProps {
   onOpenXrayMetrics: () => void;
   onOpenPanelUpdate: () => void;
   onOpenVersionSwitch: () => void;
+  readOnly?: boolean;
 }
 
 interface BarAction {
@@ -67,6 +68,7 @@ export default function OverviewActionBar({
   onOpenXrayMetrics,
   onOpenPanelUpdate,
   onOpenVersionSwitch,
+  readOnly = false,
 }: OverviewActionBarProps) {
   const { t } = useTranslation();
   const stateText = t(XRAY_STATE_KEYS[status.xray.state] ?? 'pages.index.xrayStatusUnknown');
@@ -96,7 +98,7 @@ export default function OverviewActionBar({
     <span className="ov-state" data-state={status.xray.state}>
       <span className="ov-state-dot" style={{ color: status.xray.color }} />
       <span>{`${t('pages.index.xrayStatus')} · ${stateText}`}</span>
-      {hasVersion && (
+      {hasVersion && !readOnly && (
         <Tooltip title={t('pages.index.xraySwitch')}>
           <button
             type="button"
@@ -107,6 +109,7 @@ export default function OverviewActionBar({
           </button>
         </Tooltip>
       )}
+      {hasVersion && readOnly && <span className="ov-state-version">{`v${status.xray.version}`}</span>}
     </span>
   );
 
@@ -120,7 +123,7 @@ export default function OverviewActionBar({
         statePill
       )}
 
-      {updateAvailable ? (
+      {!readOnly && updateAvailable ? (
         <Tag
           className="ov-update-tag"
           color="warning"
@@ -129,15 +132,21 @@ export default function OverviewActionBar({
         >
           {`${t('update')} ${formatPanelVersion(latestVersion)}`}
         </Tag>
-      ) : (
+      ) : !readOnly ? (
         <Tooltip title={t('pages.index.updatePanel')}>
           <button type="button" className="ov-panel-version ov-mono" onClick={onOpenPanelUpdate}>
             {formatPanelVersion(panelVersion)}
           </button>
         </Tooltip>
+      ) : panelVersion ? (
+        <span className="ov-panel-version ov-mono">{formatPanelVersion(panelVersion)}</span>
+      ) : null}
+
+      {readOnly && (
+        <Tag className="ov-readonly-tag">{t('pages.index.readOnlyTarget')}</Tag>
       )}
 
-      <div className="ov-bar-actions">
+      {!readOnly && <div className="ov-bar-actions">
         {actionGroups.map((group, groupIndex) => (
           <Fragment key={group[0].key}>
             {groupIndex > 0 && <span className="ov-bar-sep" />}
@@ -157,7 +166,7 @@ export default function OverviewActionBar({
             ))}
           </Fragment>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }

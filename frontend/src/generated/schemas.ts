@@ -2545,6 +2545,20 @@ export const SCHEMAS: Record<string, unknown> = {
       "allowPrivateAddress": {
         "type": "boolean"
       },
+      "appStatsMem": {
+        "example": 67108864,
+        "format": "int64",
+        "type": "integer"
+      },
+      "appStatsThreads": {
+        "example": 12,
+        "type": "integer"
+      },
+      "appStatsUptime": {
+        "example": 3600,
+        "format": "int64",
+        "type": "integer"
+      },
       "basePath": {
         "example": "/",
         "type": "string"
@@ -2560,9 +2574,17 @@ export const SCHEMAS: Record<string, unknown> = {
         "format": "int64",
         "type": "integer"
       },
+      "cpuCores": {
+        "example": 4,
+        "type": "integer"
+      },
       "cpuPct": {
         "example": 23.5,
         "type": "number"
+      },
+      "cpuSpeedMhz": {
+        "example": 2400,
+        "type": "integer"
       },
       "createdAt": {
         "example": 1700000000,
@@ -2575,6 +2597,16 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "disabledCount": {
         "example": 3,
+        "type": "integer"
+      },
+      "diskCurrent": {
+        "example": 10737418240,
+        "format": "int64",
+        "type": "integer"
+      },
+      "diskTotal": {
+        "example": 21474836480,
+        "format": "int64",
         "type": "integer"
       },
       "enable": {
@@ -2619,9 +2651,23 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": 42,
         "type": "integer"
       },
+      "logicalPro": {
+        "example": 8,
+        "type": "integer"
+      },
+      "memCurrent": {
+        "example": 1073741824,
+        "format": "int64",
+        "type": "integer"
+      },
       "memPct": {
         "example": 45.1,
         "type": "number"
+      },
+      "memTotal": {
+        "example": 2147483648,
+        "format": "int64",
+        "type": "integer"
       },
       "name": {
         "example": "de-fra-1",
@@ -2629,6 +2675,16 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "netDown": {
         "example": 2097152,
+        "format": "int64",
+        "type": "integer"
+      },
+      "netTrafficRecv": {
+        "example": 209715200,
+        "format": "int64",
+        "type": "integer"
+      },
+      "netTrafficSent": {
+        "example": 104857600,
         "format": "int64",
         "type": "integer"
       },
@@ -2645,7 +2701,7 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "string"
       },
       "panelVersion": {
-        "example": "v3.x.x",
+        "example": "v0.0.1",
         "type": "string"
       },
       "parentGuid": {
@@ -2660,6 +2716,14 @@ export const SCHEMAS: Record<string, unknown> = {
         "maximum": 65535,
         "minimum": 1,
         "type": "integer"
+      },
+      "publicIpV4": {
+        "example": "203.0.113.10",
+        "type": "string"
+      },
+      "publicIpV6": {
+        "example": "2001:db8::10",
+        "type": "string"
       },
       "remark": {
         "type": "string"
@@ -2677,6 +2741,20 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "online",
         "type": "string"
       },
+      "swapCurrent": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "swapTotal": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "tcpCount": {
+        "example": 128,
+        "type": "integer"
+      },
       "tlsVerifyMode": {
         "enum": [
           "verify",
@@ -2688,6 +2766,10 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "transitive": {
         "type": "boolean"
+      },
+      "udpCount": {
+        "example": 16,
+        "type": "integer"
       },
       "updatedAt": {
         "example": 1700000000,
@@ -2715,14 +2797,21 @@ export const SCHEMAS: Record<string, unknown> = {
       "activeCount",
       "address",
       "allowPrivateAddress",
+      "appStatsMem",
+      "appStatsThreads",
+      "appStatsUptime",
       "basePath",
       "clientCount",
       "configDirty",
       "configDirtyAt",
+      "cpuCores",
       "cpuPct",
+      "cpuSpeedMhz",
       "createdAt",
       "depletedCount",
       "disabledCount",
+      "diskCurrent",
+      "diskTotal",
       "enable",
       "guid",
       "id",
@@ -2732,19 +2821,30 @@ export const SCHEMAS: Record<string, unknown> = {
       "lastError",
       "lastHeartbeat",
       "latencyMs",
+      "logicalPro",
+      "memCurrent",
       "memPct",
+      "memTotal",
       "name",
       "netDown",
+      "netTrafficRecv",
+      "netTrafficSent",
       "netUp",
       "onlineCount",
       "outboundTag",
       "panelVersion",
       "pinnedCertSha256",
       "port",
+      "publicIpV4",
+      "publicIpV6",
       "remark",
       "scheme",
       "status",
+      "swapCurrent",
+      "swapTotal",
+      "tcpCount",
       "tlsVerifyMode",
+      "udpCount",
       "updatedAt",
       "uptimeSecs",
       "xrayError",
@@ -3041,6 +3141,20 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": false,
         "type": "boolean"
       },
+      "appStatsMem": {
+        "example": 67108864,
+        "format": "int64",
+        "type": "integer"
+      },
+      "appStatsThreads": {
+        "example": 12,
+        "type": "integer"
+      },
+      "appStatsUptime": {
+        "example": 3600,
+        "format": "int64",
+        "type": "integer"
+      },
       "basePath": {
         "example": "/",
         "type": "string"
@@ -3058,9 +3172,17 @@ export const SCHEMAS: Record<string, unknown> = {
         "format": "int64",
         "type": "integer"
       },
+      "cpuCores": {
+        "example": 4,
+        "type": "integer"
+      },
       "cpuPct": {
         "example": 12.5,
         "type": "number"
+      },
+      "cpuSpeedMhz": {
+        "example": 2400,
+        "type": "integer"
       },
       "createdAt": {
         "example": 1700000000,
@@ -3073,6 +3195,16 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "disabledCount": {
         "example": 2,
+        "type": "integer"
+      },
+      "diskCurrent": {
+        "example": 10737418240,
+        "format": "int64",
+        "type": "integer"
+      },
+      "diskTotal": {
+        "example": 21474836480,
+        "format": "int64",
         "type": "integer"
       },
       "enable": {
@@ -3120,9 +3252,23 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": 42,
         "type": "integer"
       },
+      "logicalPro": {
+        "example": 8,
+        "type": "integer"
+      },
+      "memCurrent": {
+        "example": 1073741824,
+        "format": "int64",
+        "type": "integer"
+      },
       "memPct": {
         "example": 45.2,
         "type": "number"
+      },
+      "memTotal": {
+        "example": 2147483648,
+        "format": "int64",
+        "type": "integer"
       },
       "name": {
         "example": "edge-1",
@@ -3130,6 +3276,16 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "netDown": {
         "example": 1048576,
+        "format": "int64",
+        "type": "integer"
+      },
+      "netTrafficRecv": {
+        "example": 209715200,
+        "format": "int64",
+        "type": "integer"
+      },
+      "netTrafficSent": {
+        "example": 104857600,
         "format": "int64",
         "type": "integer"
       },
@@ -3147,7 +3303,7 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "string"
       },
       "panelVersion": {
-        "example": "v3.x.x",
+        "example": "v0.0.1",
         "type": "string"
       },
       "parentGuid": {
@@ -3159,6 +3315,14 @@ export const SCHEMAS: Record<string, unknown> = {
       "port": {
         "example": 2053,
         "type": "integer"
+      },
+      "publicIpV4": {
+        "example": "203.0.113.10",
+        "type": "string"
+      },
+      "publicIpV6": {
+        "example": "2001:db8::10",
+        "type": "string"
       },
       "remark": {
         "example": "Primary edge",
@@ -3172,6 +3336,20 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "online",
         "type": "string"
       },
+      "swapCurrent": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "swapTotal": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "tcpCount": {
+        "example": 128,
+        "type": "integer"
+      },
       "tlsVerifyMode": {
         "example": "verify",
         "type": "string"
@@ -3179,6 +3357,10 @@ export const SCHEMAS: Record<string, unknown> = {
       "transitive": {
         "example": false,
         "type": "boolean"
+      },
+      "udpCount": {
+        "example": 16,
+        "type": "integer"
       },
       "updatedAt": {
         "example": 1700003600,
@@ -3206,14 +3388,21 @@ export const SCHEMAS: Record<string, unknown> = {
       "activeCount",
       "address",
       "allowPrivateAddress",
+      "appStatsMem",
+      "appStatsThreads",
+      "appStatsUptime",
       "basePath",
       "clientCount",
       "configDirty",
       "configDirtyAt",
+      "cpuCores",
       "cpuPct",
+      "cpuSpeedMhz",
       "createdAt",
       "depletedCount",
       "disabledCount",
+      "diskCurrent",
+      "diskTotal",
       "enable",
       "guid",
       "hasApiToken",
@@ -3224,19 +3413,30 @@ export const SCHEMAS: Record<string, unknown> = {
       "lastError",
       "lastHeartbeat",
       "latencyMs",
+      "logicalPro",
+      "memCurrent",
       "memPct",
+      "memTotal",
       "name",
       "netDown",
+      "netTrafficRecv",
+      "netTrafficSent",
       "netUp",
       "onlineCount",
       "outboundTag",
       "panelVersion",
       "pinnedCertSha256",
       "port",
+      "publicIpV4",
+      "publicIpV6",
       "remark",
       "scheme",
       "status",
+      "swapCurrent",
+      "swapTotal",
+      "tcpCount",
       "tlsVerifyMode",
+      "udpCount",
       "updatedAt",
       "uptimeSecs",
       "xrayError",
@@ -3307,28 +3507,124 @@ export const SCHEMAS: Record<string, unknown> = {
   },
   "ProbeResultUI": {
     "properties": {
+      "appStatsMem": {
+        "example": 67108864,
+        "format": "int64",
+        "type": "integer"
+      },
+      "appStatsThreads": {
+        "example": 12,
+        "type": "integer"
+      },
+      "appStatsUptime": {
+        "example": 3600,
+        "format": "int64",
+        "type": "integer"
+      },
+      "cpuCores": {
+        "example": 4,
+        "type": "integer"
+      },
       "cpuPct": {
         "example": 12.5,
         "type": "number"
       },
+      "cpuSpeedMhz": {
+        "example": 2400,
+        "type": "integer"
+      },
+      "diskCurrent": {
+        "example": 10737418240,
+        "format": "int64",
+        "type": "integer"
+      },
+      "diskTotal": {
+        "example": 21474836480,
+        "format": "int64",
+        "type": "integer"
+      },
       "error": {
+        "type": "string"
+      },
+      "guid": {
+        "example": "node-guid",
         "type": "string"
       },
       "latencyMs": {
         "example": 42,
         "type": "integer"
       },
+      "logicalPro": {
+        "example": 8,
+        "type": "integer"
+      },
+      "memCurrent": {
+        "example": 1073741824,
+        "format": "int64",
+        "type": "integer"
+      },
       "memPct": {
         "example": 45.2,
         "type": "number"
       },
+      "memTotal": {
+        "example": 2147483648,
+        "format": "int64",
+        "type": "integer"
+      },
+      "netDown": {
+        "example": 1048576,
+        "format": "int64",
+        "type": "integer"
+      },
+      "netTrafficRecv": {
+        "example": 209715200,
+        "format": "int64",
+        "type": "integer"
+      },
+      "netTrafficSent": {
+        "example": 104857600,
+        "format": "int64",
+        "type": "integer"
+      },
+      "netUp": {
+        "example": 2097152,
+        "format": "int64",
+        "type": "integer"
+      },
       "panelVersion": {
-        "example": "v3.x.x",
+        "example": "v0.0.1",
+        "type": "string"
+      },
+      "publicIpV4": {
+        "example": "203.0.113.10",
+        "type": "string"
+      },
+      "publicIpV6": {
+        "example": "2001:db8::10",
         "type": "string"
       },
       "status": {
         "example": "online",
         "type": "string"
+      },
+      "swapCurrent": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "swapTotal": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "tcpCount": {
+        "example": 128,
+        "type": "integer"
+      },
+      "udpCount": {
+        "example": 16,
+        "type": "integer"
       },
       "uptimeSecs": {
         "example": 86400,
@@ -3348,12 +3644,33 @@ export const SCHEMAS: Record<string, unknown> = {
       }
     },
     "required": [
+      "appStatsMem",
+      "appStatsThreads",
+      "appStatsUptime",
+      "cpuCores",
       "cpuPct",
+      "cpuSpeedMhz",
+      "diskCurrent",
+      "diskTotal",
       "error",
+      "guid",
       "latencyMs",
+      "logicalPro",
+      "memCurrent",
       "memPct",
+      "memTotal",
+      "netDown",
+      "netTrafficRecv",
+      "netTrafficSent",
+      "netUp",
       "panelVersion",
+      "publicIpV4",
+      "publicIpV6",
       "status",
+      "swapCurrent",
+      "swapTotal",
+      "tcpCount",
+      "udpCount",
       "uptimeSecs",
       "xrayError",
       "xrayState",

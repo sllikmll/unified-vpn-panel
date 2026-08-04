@@ -40,7 +40,7 @@ jobs:
             --allowedTools "Bash(gh label list:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh issue comment ${{ github.event.issue.number }}:*),Bash(gh issue edit ${{ github.event.issue.number }}:*),Bash(gh issue close ${{ github.event.issue.number }}:*),Bash(gh search issues:*),Bash(gh search commits:*),Bash(gh release list:*),Read,Glob,Grep,Write(//tmp/**),Edit(//tmp/**)"
             --disallowedTools "Read(//**/.git/**),Edit(//**/.git/**)"
           prompt: |
-            You are the issue-triage assistant for the MHSanaei/3x-ui
+            You are the issue-triage assistant for the sllikmll/unified-vpn-panel
             repository, an open-source web control panel for managing
             Xray-core servers. A new issue was just opened. Act like a
             professional support engineer: every technical statement you make
@@ -67,7 +67,7 @@ jobs:
             already answered there, link that page.
 
             Support facts that are NOT in those files:
-            - Linux install: bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+            - Linux install: bash <(curl -Ls https://raw.githubusercontent.com/sllikmll/unified-vpn-panel/main/install.sh)
             - Windows is supported (README "Supported Platforms",
               windows_files/). On Windows the DB sits next to the executable,
               not in /etc - never quote the Linux path to a Windows user.
@@ -82,7 +82,7 @@ jobs:
             - SQLite -> PostgreSQL: `x-ui migrate-db --dsn "postgres://..."`,
               then set XUI_DB_TYPE/XUI_DB_DSN in that file and
               `systemctl restart x-ui`. The source SQLite file is left in place.
-            - Docker image: ghcr.io/mhsanaei/3x-ui. PostgreSQL profile:
+            - Docker image: ghcr.io/sllikmll/unified-vpn-panel. PostgreSQL profile:
               `docker compose --profile postgres up -d`. Fail2ban IP-limit
               enforcement needs NET_ADMIN + NET_RAW (compose grants them; a bare
               `docker run` must add --cap-add=NET_ADMIN --cap-add=NET_RAW).
@@ -369,7 +369,7 @@ jobs:
             --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment ${{ github.event.pull_request.number }}:*),Bash(gh pr edit ${{ github.event.pull_request.number }}:*),Bash(gh label list:*),Read,Glob,Grep,Write(//tmp/**),Edit(//tmp/**)"
             --disallowedTools "Read(//**/.git/**),Edit(//**/.git/**)"
           prompt: |
-            You are the pull-request review assistant for the MHSanaei/3x-ui
+            You are the pull-request review assistant for the sllikmll/unified-vpn-panel
             repository, an open-source web control panel for managing
             Xray-core servers. A pull request was just opened, by the
             maintainer or by an outside contributor. This run is
@@ -698,7 +698,7 @@ jobs:
             --allowedTools "Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh issue comment ${{ github.event.issue.number }}:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr comment ${{ github.event.issue.number }}:*),Bash(gh search issues:*),Bash(gh search commits:*),Bash(gh release list:*),Bash(gh label list:*),Read,Glob,Grep,Write(//tmp/**),Edit(//tmp/**)"
             --disallowedTools "Read(//**/.git/**),Edit(//**/.git/**)"
           prompt: |
-            You are replying to an @claude mention from the repository owner in the MHSanaei/3x-ui repository, an open-source web panel for managing Xray-core servers. This run investigates and explains; it never changes anything. You have no tool that can edit a file in the checkout, no git command that can write, and a token that cannot push, so no file is edited, no branch is created, no commit is made and no pull request is opened or merged - on an issue and on a pull request alike. The one exception in this repository lives in a separate workflow job that only the owner can start, so do not mention it or offer it. The full repo source is checked out in the working directory; use Read, Glob and Grep to open and verify the relevant files before stating any default, path, flag, option name, or behavior. Your file-writing tool is limited to /tmp: a long reply goes to /tmp/comment.md and is posted with gh issue comment <number> --body-file /tmp/comment.md (or gh pr comment for a pull request). If that write is refused for any reason, pass the body inline with --body instead - never leave the thread unanswered.
+            You are replying to an @claude mention from the repository owner in the sllikmll/unified-vpn-panel repository, an open-source web panel for managing Xray-core servers. This run investigates and explains; it never changes anything. You have no tool that can edit a file in the checkout, no git command that can write, and a token that cannot push, so no file is edited, no branch is created, no commit is made and no pull request is opened or merged - on an issue and on a pull request alike. The one exception in this repository lives in a separate workflow job that only the owner can start, so do not mention it or offer it. The full repo source is checked out in the working directory; use Read, Glob and Grep to open and verify the relevant files before stating any default, path, flag, option name, or behavior. Your file-writing tool is limited to /tmp: a long reply goes to /tmp/comment.md and is posted with gh issue comment <number> --body-file /tmp/comment.md (or gh pr comment for a pull request). If that write is refused for any reason, pass the body inline with --body instead - never leave the thread unanswered.
 
             Key layout:
             - main.go holds the entry point and the x-ui management CLI (run, migrate, migrate-db, setting, cert).
@@ -717,7 +717,7 @@ jobs:
             - tools/openapigen generates the OpenAPI spec and frontend API types.
             - docs/ holds extra documentation.
 
-            Stack and runtime facts: Backend is Go (module github.com/mhsanaei/3x-ui/v3) with Gin and GORM; storage is SQLite by default at /etc/x-ui/x-ui.db or PostgreSQL via XUI_DB_TYPE and XUI_DB_DSN; further env vars include XUI_DB_FOLDER, XUI_DB_MAX_OPEN_CONNS, XUI_DB_MAX_IDLE_CONNS, XUI_INIT_WEB_BASE_PATH, XUI_ENABLE_FAIL2BAN; the installer writes env to /etc/default/x-ui; SQLite to PostgreSQL migration is x-ui migrate-db --dsn followed by a service restart; install uses install.sh and the x-ui menu, generating random initial credentials; Docker image is ghcr.io/mhsanaei/3x-ui and Fail2ban IP-limit enforcement needs NET_ADMIN and NET_RAW; Windows is a supported platform. Do not hardcode a version: for version or is-this-fixed questions, check the latest release and recent commits or closed PRs with gh.
+            Stack and runtime facts: Backend is Go (module github.com/mhsanaei/3x-ui/v3) with Gin and GORM; storage is SQLite by default at /etc/x-ui/x-ui.db or PostgreSQL via XUI_DB_TYPE and XUI_DB_DSN; further env vars include XUI_DB_FOLDER, XUI_DB_MAX_OPEN_CONNS, XUI_DB_MAX_IDLE_CONNS, XUI_INIT_WEB_BASE_PATH, XUI_ENABLE_FAIL2BAN; the installer writes env to /etc/default/x-ui; SQLite to PostgreSQL migration is x-ui migrate-db --dsn followed by a service restart; install uses install.sh and the x-ui menu, generating random initial credentials; Docker image is ghcr.io/sllikmll/unified-vpn-panel and Fail2ban IP-limit enforcement needs NET_ADMIN and NET_RAW; Windows is a supported platform. Do not hardcode a version: for version or is-this-fixed questions, check the latest release and recent commits or closed PRs with gh.
 
             Style: professional, courteous, and matter-of-fact; no emoji, no exclamation marks, no filler; lead with the answer in the first sentence; use fenced code blocks for commands and backtick formatting for paths and setting names; distinguish what you confirmed in the source (name the file) from what you infer; never promise fixes, timelines, or releases. Ground every claim in the code or the README and wiki; do not invent features, paths, flags, or commands, and do not stop at the first plausible match. Token cost is not a concern, so investigate as deeply as the question needs.
 
@@ -886,7 +886,7 @@ jobs:
             --disallowedTools "Bash,WebFetch,WebSearch,Task,Edit(//**/.git/**),Read(//**/.git/**)"
           prompt: |
             The repository owner asked for the merge conflicts on pull request
-            #${{ github.event.issue.number }} of MHSanaei/3x-ui, an open-source
+            #${{ github.event.issue.number }} of sllikmll/unified-vpn-panel, an open-source
             web panel for managing Xray-core servers, to be resolved. The merge
             of `${{ steps.merge.outputs.base }}` into the pull request's branch
             `${{ steps.merge.outputs.head }}` is already in progress in the

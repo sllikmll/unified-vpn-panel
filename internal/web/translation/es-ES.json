@@ -106,9 +106,7 @@
     "routing": "Enrutamiento",
     "outbounds": "Salidas",
     "apiDocs": "Documentación de la API",
-    "donate": "Donar",
     "hosts": "Hosts",
-    "docs": "Documentación",
     "openMenu": "Abrir menú",
     "pinSidebar": "Fijar barra lateral",
     "unpinSidebar": "Desfijar barra lateral",
@@ -258,7 +256,17 @@
       "healthCritical": "{list} — crítico",
       "panel": "Panel",
       "threads": "Hilos",
-      "uptime": "Tiempo activo"
+      "uptime": "Tiempo activo",
+      "dashboardTarget": "Dashboard target",
+      "localServer": "Local server",
+      "remoteReadOnly": "Remote node telemetry is read-only. Local server actions are disabled for this target.",
+      "readOnlyTarget": "Read-only target",
+      "remoteUnavailable": {
+        "disabled": "This node is disabled.",
+        "offline": "This node is offline.",
+        "stale": "The latest heartbeat snapshot is stale.",
+        "unavailable": "Telemetry is unavailable for this node."
+      }
     },
     "inbounds": {
       "totalDownUp": "Subidas/Descargas Totales",

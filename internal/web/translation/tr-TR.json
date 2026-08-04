@@ -106,9 +106,7 @@
     "routing": "Yönlendirme",
     "outbounds": "Giden Bağlantılar",
     "apiDocs": "API Belgeleri",
-    "donate": "Bağış Yap",
     "hosts": "Host'lar",
-    "docs": "Belgeler",
     "openMenu": "Menüyü aç",
     "pinSidebar": "Kenar çubuğunu sabitle",
     "unpinSidebar": "Kenar çubuğu sabitlemesini kaldır",
@@ -258,7 +256,17 @@
       "healthCritical": "{list} — kritik",
       "panel": "Panel",
       "threads": "İş parçacıkları",
-      "uptime": "Çalışma süresi"
+      "uptime": "Çalışma süresi",
+      "dashboardTarget": "Dashboard target",
+      "localServer": "Local server",
+      "remoteReadOnly": "Remote node telemetry is read-only. Local server actions are disabled for this target.",
+      "readOnlyTarget": "Read-only target",
+      "remoteUnavailable": {
+        "disabled": "This node is disabled.",
+        "offline": "This node is offline.",
+        "stale": "The latest heartbeat snapshot is stale.",
+        "unavailable": "Telemetry is unavailable for this node."
+      }
     },
     "inbounds": {
       "totalDownUp": "Toplam Gönderilen/Alınan",
