@@ -40,7 +40,13 @@ export const Collapsed: Story = {
     await expect(canvas.queryByText(/vless:\/\/11112222/)).not.toBeInTheDocument();
     await userEvent.click(canvas.getByText('vless'));
     const configText = await canvas.findByText(/vless:\/\/11112222/);
-    await waitFor(() => expect(configText).toBeVisible());
+    await waitFor(() => {
+      expect(configText).toBeVisible();
+      const panel = configText.closest<HTMLElement>('.ant-collapse-panel');
+      expect(panel).not.toBeNull();
+      expect(panel?.style.height).toBe('');
+      expect(panel?.style.opacity).toBe('');
+    });
     await expect(canvas.getByRole('button', { name: 'Copy' })).toBeVisible();
     await expect(canvas.getByRole('button', { name: 'Download' })).toBeVisible();
     await expect(canvas.getByRole('button', { name: 'QR Code' })).toBeVisible();
