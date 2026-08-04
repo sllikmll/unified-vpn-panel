@@ -63,6 +63,16 @@ func (d *Driver) Disable(ctx context.Context, inbound *model.Inbound) (driver.En
 	return result(inbound, model.EndpointDisabled), nil
 }
 
+func (d *Driver) Stop(ctx context.Context, inbound *model.Inbound) error {
+	if err := require(inbound); err != nil {
+		return err
+	}
+	if d.rt == nil {
+		return driver.ErrNilRuntime
+	}
+	return d.rt.Stop(ctx)
+}
+
 func (d *Driver) Restart(ctx context.Context) error {
 	if d.rt == nil {
 		return driver.ErrNilRuntime
@@ -146,18 +156,23 @@ type unsupported struct{}
 func (unsupported) Create(context.Context, *model.Inbound, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (unsupported) Update(context.Context, *model.Inbound, string, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (unsupported) Delete(context.Context, *model.Inbound, string) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (unsupported) Enable(context.Context, *model.Inbound, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (unsupported) Disable(context.Context, *model.Inbound, string) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (unsupported) Status(context.Context, *model.Inbound, string) (driver.ClientStatusResult, error) {
 	return driver.ClientStatusResult{}, driver.ErrUnsupportedOperation
 }

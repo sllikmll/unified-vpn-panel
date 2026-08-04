@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 )
@@ -210,13 +209,7 @@ func validateManagedSecretKeyFileInfo(st os.FileInfo) error {
 	if st.Mode()&os.ModeSymlink != 0 || !st.Mode().IsRegular() {
 		return ErrManagedSecretUnavailable
 	}
-	if st.Mode().Perm()&^0o600 != 0 {
-		return ErrManagedSecretUnavailable
-	}
-	if sys, ok := st.Sys().(*syscall.Stat_t); ok && sys.Uid != uint32(os.Getuid()) {
-		return ErrManagedSecretUnavailable
-	}
-	return nil
+	return validateManagedSecretKeyFileSecurity(st)
 }
 
 func DefaultManagedSecretMasterKeyPath() string {

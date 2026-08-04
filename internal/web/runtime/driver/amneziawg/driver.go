@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	awg "github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -62,10 +61,21 @@ func (d *Driver) Disable(ctx context.Context, inbound *model.Inbound) (driver.En
 	if err != nil {
 		return driver.EndpointResult{}, err
 	}
-	if err := d.rt.Delete(ctx, cfg.Server.InterfaceName); err != nil {
+	if err := d.rt.Stop(ctx, cfg.Server.InterfaceName); err != nil {
 		return driver.EndpointResult{}, err
 	}
 	return endpointResult(inbound, model.EndpointDisabled), nil
+}
+
+func (d *Driver) Stop(ctx context.Context, inbound *model.Inbound) error {
+	cfg, err := configFromInbound(inbound)
+	if err != nil {
+		return err
+	}
+	if err := d.rt.Stop(ctx, cfg.Server.InterfaceName); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (d *Driver) Restart(context.Context) error { return driver.ErrUnsupportedOperation }
@@ -145,13 +155,6 @@ func (c clientDriver) Export(ctx context.Context, clientID string) (string, erro
 	return "", awg.ErrPeerOperationsUnsupported
 }
 
-func (c clientDriver) upsert(ctx context.Context, _ *model.Inbound, email string, client awg.Client) (driver.ClientResult, error) {
-	if err := c.d.rt.UpsertPeer(ctx, client); err != nil {
-		return driver.ClientResult{}, err
-	}
-	return driver.ClientResult{RuntimeKind: model.RuntimeAmneziaWG, Email: email, Enabled: client.Enable}, nil
-}
-
 func configFromInbound(inbound *model.Inbound) (awg.DesiredConfig, error) {
 	if inbound == nil {
 		return awg.DesiredConfig{}, driver.ErrNilInbound
@@ -170,25 +173,6 @@ func configFromInbound(inbound *model.Inbound) (awg.DesiredConfig, error) {
 		cfg.Server.ListenPort = inbound.Port
 	}
 	return cfg, nil
-}
-
-func modelClientToAWG(c model.Client) awg.Client {
-	id := c.Email
-	if c.ID != "" {
-		id = c.ID
-	}
-	allowed := first(c.AllowedIPs)
-	return awg.Client{ID: id, Email: c.Email, PrivateKey: c.PrivateKey, PublicKey: c.PublicKey, PresharedKey: c.PreSharedKey, IPv4Address: allowed, AllowedIPs: allowed, ClientAllowedIPs: "0.0.0.0/0", PersistentKeepalive: c.KeepAlive, Enable: c.Enable}
-}
-
-func first(v []string) string {
-	if len(v) == 0 {
-		return ""
-	}
-	if parts := strings.Split(v[0], ","); len(parts) > 0 {
-		return strings.TrimSpace(parts[0])
-	}
-	return strings.TrimSpace(v[0])
 }
 
 func endpointResult(inbound *model.Inbound, status model.EndpointStatus) driver.EndpointResult {

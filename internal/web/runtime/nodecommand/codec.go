@@ -16,7 +16,7 @@ var allowedJSONFields = map[string]struct{}{
 	"version": {}, "supportedVersions": {}, "commandId": {}, "idempotencyKey": {},
 	"nodeId": {}, "targetGuid": {}, "endpointId": {}, "runtimeKind": {}, "operation": {},
 	"desiredGeneration": {}, "issuedAt": {}, "expiresAt": {}, "payload": {}, "sealedPayload": {},
-	"tag": {}, "enable": {}, "clientId": {}, "email": {},
+	"tag": {}, "enable": {}, "clientId": {}, "email": {}, "artifactRef": {},
 }
 
 type DecodeOptions struct {
@@ -98,6 +98,13 @@ func DecodeRequest(r io.Reader, opts DecodeOptions) (Request, error) {
 }
 
 func decodePayload(operation Operation, raw json.RawMessage) (Payload, error) {
+	if strings.HasPrefix(string(operation), "runtime.") {
+		var payload RuntimePayload
+		if err := decodeStrict(raw, &payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
+	}
 	if strings.HasPrefix(string(operation), "client.") {
 		var payload ClientPayload
 		if err := decodeStrict(raw, &payload); err != nil {

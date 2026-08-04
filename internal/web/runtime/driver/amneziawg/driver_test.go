@@ -48,7 +48,7 @@ func TestDriverCapabilities(t *testing.T) {
 	if !caps.EndpointLifecycle || caps.ClientCRUD || !caps.Detect || !caps.Status {
 		t.Fatalf("capabilities = %+v", caps)
 	}
-	if err := d.Restart(context.Background()); err != driver.ErrUnsupportedOperation {
+	if err := d.Restart(context.Background()); !errors.Is(err, driver.ErrUnsupportedOperation) {
 		t.Fatalf("Restart err = %v, want unsupported", err)
 	}
 }

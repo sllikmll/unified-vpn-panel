@@ -99,8 +99,6 @@ type Remote struct {
 	egressResolver NodeEgressResolver
 }
 
-func (r *Remote) nodeCommandTransport() {}
-
 func (r *Remote) Send(ctx context.Context, session nodecommand.AuthenticatedSession, req nodecommand.Request) (nodecommand.Response, error) {
 	if r.node.ApiToken == "" {
 		return nodecommand.Response{}, errors.New("node command requires bearer token for sealed payloads")

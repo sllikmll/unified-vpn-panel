@@ -115,19 +115,24 @@ func (d *captureDriver) Kind() model.RuntimeKind { return d.kind }
 func (d *captureDriver) Capabilities() driver.Capabilities {
 	return driver.Capabilities{EndpointLifecycle: true}
 }
+
 func (d *captureDriver) Create(_ context.Context, inbound *model.Inbound) (driver.EndpointResult, error) {
 	d.settings = inbound.Settings
 	return driver.EndpointResult{RuntimeKind: d.kind, InboundId: inbound.Id, Tag: inbound.Tag, Status: model.EndpointActive}, nil
 }
+
 func (d *captureDriver) Update(context.Context, *model.Inbound, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{}, nil
 }
+
 func (d *captureDriver) Delete(context.Context, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{}, nil
 }
+
 func (d *captureDriver) Enable(context.Context, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{}, nil
 }
+
 func (d *captureDriver) Disable(context.Context, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{}, nil
 }
@@ -135,9 +140,11 @@ func (d *captureDriver) Restart(context.Context) error { return nil }
 func (d *captureDriver) Status(context.Context, *model.Inbound) (driver.StatusResult, error) {
 	return driver.StatusResult{}, nil
 }
+
 func (d *captureDriver) Detect(context.Context) (driver.DetectResult, error) {
 	return driver.DetectResult{}, nil
 }
+
 func (d *captureDriver) Health(context.Context, *model.Inbound) (driver.HealthResult, error) {
 	return driver.HealthResult{}, nil
 }
@@ -148,18 +155,23 @@ type managedNoopClient struct{}
 func (managedNoopClient) Create(context.Context, *model.Inbound, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (managedNoopClient) Update(context.Context, *model.Inbound, string, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (managedNoopClient) Delete(context.Context, *model.Inbound, string) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (managedNoopClient) Enable(context.Context, *model.Inbound, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (managedNoopClient) Disable(context.Context, *model.Inbound, string) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (managedNoopClient) Status(context.Context, *model.Inbound, string) (driver.ClientStatusResult, error) {
 	return driver.ClientStatusResult{}, driver.ErrUnsupportedOperation
 }

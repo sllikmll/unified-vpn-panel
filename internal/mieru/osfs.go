@@ -33,7 +33,7 @@ func (OSFileSystem) ReadFile(path string) ([]byte, error) {
 }
 
 func (OSFileSystem) WriteFile(path string, data []byte, perm uint32) error {
-	if os.FileMode(perm) != 0600 {
+	if os.FileMode(perm) != 0o600 {
 		return fmt.Errorf("mieru config file mode must be 0600")
 	}
 	dir := filepath.Dir(path)
@@ -43,7 +43,7 @@ func (OSFileSystem) WriteFile(path string, data []byte, perm uint32) error {
 	}
 	tmpName := tmp.Name()
 	defer func() { _ = os.Remove(tmpName) }()
-	if err := tmp.Chmod(0600); err != nil {
+	if err := tmp.Chmod(0o600); err != nil {
 		_ = tmp.Close()
 		return err
 	}

@@ -2754,6 +2754,10 @@
           "remark": {
             "type": "string"
           },
+          "runtimeCapabilities": {
+            "description": "RuntimeCapabilities is a JSON array of managed runtime kinds the node\nexplicitly advertised. Empty means the node has not advertised managed\nendpoint support and must not receive managed runtime commands.",
+            "type": "string"
+          },
           "scheme": {
             "enum": [
               "http",
@@ -2864,6 +2868,7 @@
           "publicIpV4",
           "publicIpV6",
           "remark",
+          "runtimeCapabilities",
           "scheme",
           "status",
           "swapCurrent",
@@ -3959,8 +3964,12 @@
       "description": "A separate HTTP/HTTPS server that serves proxy subscription links (standard, JSON, and Clash) to clients. The server listens on its own port (default 10882) and is configured in Settings → Subscription. Paths are configurable; defaults are shown below. All subscription endpoints set response headers for client apps to read traffic/expiry info."
     },
     {
+      "name": "Node Command Transport",
+      "description": "Internal authenticated transport for sealed, typed managed-runtime commands. Arbitrary shell commands are not accepted."
+    },
+    {
       "name": "Managed Endpoints",
-      "description": "Read-only Phase 0 unified endpoint projection. Existing inbounds are projected alongside native managed endpoint rows, with desired/observed config and secrets redacted. Native lifecycle, mutation, detection, and export endpoints are intentionally unavailable until drivers land."
+      "description": "Unified read model and native lifecycle API for AWG2, Mieru, and NaiveProxy endpoints. Desired/observed configuration, credentials, encrypted envelopes, and runtime errors are write-only and never returned."
     },
     {
       "name": "Protocol Library",
@@ -13011,12 +13020,42 @@
         }
       }
     },
+    "/panel/api/node-command/v1": {
+      "post": {
+        "tags": [
+          "Node Command Transport"
+        ],
+        "summary": "Execute one authenticated, sealed and allowlisted managed-runtime command addressed to this node GUID.",
+        "operationId": "post_panel_api_node_command_v1",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/panel/api/managed-endpoints/list": {
       "get": {
         "tags": [
           "Managed Endpoints"
         ],
-        "summary": "List projected Xray/MTProto inbounds and native managed endpoint rows for the authenticated user. This endpoint has no runtime side effects and never returns internal desired state, observed state, or secret material.",
+        "summary": "List projected legacy inbounds and native managed endpoints.",
         "operationId": "get_panel_api_managed_endpoints_list",
         "responses": {
           "200": {
@@ -13083,19 +13122,236 @@
         }
       }
     },
+    "/panel/api/managed-endpoints/capabilities": {
+      "get": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Return runtime and lifecycle capabilities.",
+        "operationId": "get_panel_api_managed_endpoints_capabilities",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/ManagedEndpointCapabilities"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "runtimeKinds": [
+                      {
+                        "clientCrud": false,
+                        "detect": false,
+                        "firewallPolicy": false,
+                        "nativeExport": [
+                          ""
+                        ],
+                        "protocols": [
+                          ""
+                        ],
+                        "runtimeKind": "wireguard",
+                        "serverLifecycle": false,
+                        "subscription": [
+                          ""
+                        ],
+                        "traffic": false
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/managed-endpoints/install-plan": {
+      "get": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Return fail-closed immutable runtime installation plans for AWG2, Mieru, and NaiveProxy.",
+        "operationId": "get_panel_api_managed_endpoints_install_plan",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/managed-endpoints/install-plan/{runtimeKind}": {
+      "get": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Return the fail-closed immutable runtime installation plan.",
+        "operationId": "get_panel_api_managed_endpoints_install_plan_runtimeKind",
+        "parameters": [
+          {
+            "name": "runtimeKind",
+            "in": "path",
+            "required": true,
+            "description": "amneziawg, mieru, or naiveproxy.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/managed-endpoints": {
+      "post": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Create and apply a native managed endpoint.",
+        "operationId": "post_panel_api_managed_endpoints",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/managed-endpoints/": {
+      "post": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Create and apply a native managed endpoint (trailing-slash route).",
+        "operationId": "post_panel_api_managed_endpoints",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/managed-endpoints/create": {
+      "post": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Create and apply a native managed endpoint (compatibility route).",
+        "operationId": "post_panel_api_managed_endpoints_create",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/panel/api/managed-endpoints/{id}": {
       "get": {
         "tags": [
           "Managed Endpoints"
         ],
-        "summary": "Fetch one projected managed endpoint by its stable read-model ID. The response is redacted like the list endpoint.",
+        "summary": "Fetch a redacted managed endpoint view.",
         "operationId": "get_panel_api_managed_endpoints_id",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Read-model ID such as legacy-xray-1, legacy-mtproto-2, or managed-3.",
+            "description": "Stable ID such as managed-3 or legacy-xray-1.",
             "schema": {
               "type": "string"
             }
@@ -13159,15 +13415,24 @@
             }
           }
         }
-      }
-    },
-    "/panel/api/managed-endpoints/capabilities": {
-      "get": {
+      },
+      "put": {
         "tags": [
           "Managed Endpoints"
         ],
-        "summary": "Return static Phase 0 runtime capability metadata. Native lifecycle, client CRUD, traffic collection, detection, firewall policy, subscription, and export are marked unavailable until drivers are implemented.",
-        "operationId": "get_panel_api_managed_endpoints_capabilities",
+        "summary": "Replace and apply a managed endpoint configuration.",
+        "operationId": "put_panel_api_managed_endpoints_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Managed endpoint ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -13182,33 +13447,470 @@
                     "msg": {
                       "type": "string"
                     },
-                    "obj": {
-                      "$ref": "#/components/schemas/ManagedEndpointCapabilities"
-                    }
+                    "obj": {}
                   }
-                },
-                "example": {
-                  "success": true,
-                  "obj": {
-                    "runtimeKinds": [
-                      {
-                        "clientCrud": false,
-                        "detect": false,
-                        "firewallPolicy": false,
-                        "nativeExport": [
-                          ""
-                        ],
-                        "protocols": [
-                          ""
-                        ],
-                        "runtimeKind": "wireguard",
-                        "serverLifecycle": false,
-                        "subscription": [
-                          ""
-                        ],
-                        "traffic": false
-                      }
-                    ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Update and apply a managed endpoint configuration.",
+        "operationId": "patch_panel_api_managed_endpoints_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Managed endpoint ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Delete a managed endpoint record. Runtime uninstall is a separate action.",
+        "operationId": "delete_panel_api_managed_endpoints_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Managed endpoint ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/managed-endpoints/{id}/actions/{action}": {
+      "post": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Run start, stop, restart, status, detect, install, update, or uninstall.",
+        "operationId": "post_panel_api_managed_endpoints_id_actions_action",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Managed endpoint ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "description": "Typed lifecycle action.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/managed-endpoints/{id}/clients": {
+      "get": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "List redacted clients bound to normalized subscription records.",
+        "operationId": "get_panel_api_managed_endpoints_id_clients",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Managed endpoint ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Create and apply a managed client bound by subscription ID.",
+        "operationId": "post_panel_api_managed_endpoints_id_clients",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Managed endpoint ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/managed-endpoints/{id}/clients/{clientId}": {
+      "put": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Replace and apply a managed client.",
+        "operationId": "put_panel_api_managed_endpoints_id_clients_clientId",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Managed endpoint ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "description": "Managed client ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Update and apply a managed client.",
+        "operationId": "patch_panel_api_managed_endpoints_id_clients_clientId",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Managed endpoint ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "description": "Managed client ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Remove a managed client and reapply desired runtime state.",
+        "operationId": "delete_panel_api_managed_endpoints_id_clients_clientId",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Managed endpoint ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "description": "Managed client ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/managed-endpoints/{id}/clients/{clientId}/actions/{action}": {
+      "post": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Enable, disable, export, or read managed client status.",
+        "operationId": "post_panel_api_managed_endpoints_id_clients_clientId_actions_action",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Managed endpoint ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "description": "Managed client ID.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "description": "Typed client action.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/managed-endpoints/{id}/clients/{clientId}/export": {
+      "get": {
+        "tags": [
+          "Managed Endpoints"
+        ],
+        "summary": "Export a generated client profile and enabled subscription URLs.",
+        "operationId": "get_panel_api_managed_endpoints_id_clients_clientId_export",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Managed endpoint ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "description": "Managed client ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
                   }
                 }
               }

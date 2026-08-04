@@ -41,6 +41,7 @@ func (fs *fakeFS) WriteFile(path string, data []byte, _ uint32) error {
 	fs.files[path] = append([]byte(nil), data...)
 	return nil
 }
+
 func (fs *fakeFS) Rename(oldPath, newPath string) error {
 	if fs.files == nil {
 		fs.files = map[string][]byte{}

@@ -15,10 +15,12 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/provisioner"
 )
 
 type managedTestProvider struct {
 	driver driver.Driver
+	prov   provisioner.Provisioner
 	err    error
 }
 
@@ -29,37 +31,99 @@ func (p managedTestProvider) DriverForEndpoint(model.ManagedEndpoint) (driver.Dr
 	return p.driver, nil
 }
 
+func (p managedTestProvider) ProvisionerForEndpoint(model.ManagedEndpoint) (provisioner.Provisioner, error) {
+	if p.prov != nil {
+		return p.prov, p.err
+	}
+	return managedTestProvisioner{}, p.err
+}
+
+type managedTestProvisioner struct{}
+
+func (managedTestProvisioner) Plan(kind model.RuntimeKind) provisioner.Plan {
+	return provisioner.Plan{RuntimeKind: kind, Supported: true, Version: "test", ArtifactRef: "test-ref"}
+}
+
+func (managedTestProvisioner) Install(context.Context, model.RuntimeKind) (provisioner.Result, error) {
+	return provisioner.Result{State: "running"}, nil
+}
+
+func (managedTestProvisioner) Update(context.Context, model.RuntimeKind) (provisioner.Result, error) {
+	return provisioner.Result{State: "running"}, nil
+}
+
+func (managedTestProvisioner) Uninstall(context.Context, model.RuntimeKind) (provisioner.Result, error) {
+	return provisioner.Result{State: "removed"}, nil
+}
+
+type managedBlockingProvisioner struct{}
+
+func (managedBlockingProvisioner) Plan(kind model.RuntimeKind) provisioner.Plan {
+	return provisioner.Plan{RuntimeKind: kind, Blocked: true, Reason: "missing immutable GHCR image digest"}
+}
+
+func (managedBlockingProvisioner) Install(context.Context, model.RuntimeKind) (provisioner.Result, error) {
+	return provisioner.Result{State: "blocked"}, provisioner.ErrArtifactBlocked
+}
+
+func (managedBlockingProvisioner) Update(context.Context, model.RuntimeKind) (provisioner.Result, error) {
+	return provisioner.Result{State: "blocked"}, provisioner.ErrArtifactBlocked
+}
+
+func (managedBlockingProvisioner) Uninstall(context.Context, model.RuntimeKind) (provisioner.Result, error) {
+	return provisioner.Result{State: "removed"}, nil
+}
+
 type managedTestDriver struct {
-	kind model.RuntimeKind
-	fail error
+	kind        model.RuntimeKind
+	fail        error
+	stopCalls   *int
+	deleteCalls *int
 }
 
 func (d managedTestDriver) Kind() model.RuntimeKind { return d.kind }
 func (d managedTestDriver) Capabilities() driver.Capabilities {
 	return driver.Capabilities{EndpointLifecycle: true, ClientCRUD: true, Detect: true, Status: true, Health: true}
 }
+
 func (d managedTestDriver) Create(context.Context, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{RuntimeKind: d.kind, Status: model.EndpointActive}, d.fail
 }
+
 func (d managedTestDriver) Update(context.Context, *model.Inbound, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{RuntimeKind: d.kind, Status: model.EndpointActive}, d.fail
 }
+
 func (d managedTestDriver) Delete(context.Context, *model.Inbound) (driver.EndpointResult, error) {
+	if d.deleteCalls != nil {
+		(*d.deleteCalls)++
+	}
 	return driver.EndpointResult{RuntimeKind: d.kind, Status: model.EndpointDeleted}, d.fail
 }
+
 func (d managedTestDriver) Enable(context.Context, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{RuntimeKind: d.kind, Status: model.EndpointActive}, d.fail
 }
+
 func (d managedTestDriver) Disable(context.Context, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{RuntimeKind: d.kind, Status: model.EndpointDisabled}, d.fail
+}
+
+func (d managedTestDriver) Stop(context.Context, *model.Inbound) error {
+	if d.stopCalls != nil {
+		(*d.stopCalls)++
+	}
+	return d.fail
 }
 func (d managedTestDriver) Restart(context.Context) error { return d.fail }
 func (d managedTestDriver) Status(context.Context, *model.Inbound) (driver.StatusResult, error) {
 	return driver.StatusResult{RuntimeKind: d.kind, Status: model.EndpointActive}, d.fail
 }
+
 func (d managedTestDriver) Detect(context.Context) (driver.DetectResult, error) {
 	return driver.DetectResult{RuntimeKind: d.kind, Available: d.fail == nil}, d.fail
 }
+
 func (d managedTestDriver) Health(context.Context, *model.Inbound) (driver.HealthResult, error) {
 	return driver.HealthResult{RuntimeKind: d.kind, Status: model.EndpointActive}, d.fail
 }
@@ -70,18 +134,23 @@ type managedTestClientDriver struct{}
 func (managedTestClientDriver) Create(context.Context, *model.Inbound, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, nil
 }
+
 func (managedTestClientDriver) Update(context.Context, *model.Inbound, string, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, nil
 }
+
 func (managedTestClientDriver) Delete(context.Context, *model.Inbound, string) (driver.ClientResult, error) {
 	return driver.ClientResult{}, nil
 }
+
 func (managedTestClientDriver) Enable(context.Context, *model.Inbound, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, nil
 }
+
 func (managedTestClientDriver) Disable(context.Context, *model.Inbound, string) (driver.ClientResult, error) {
 	return driver.ClientResult{}, nil
 }
+
 func (managedTestClientDriver) Status(context.Context, *model.Inbound, string) (driver.ClientStatusResult, error) {
 	return driver.ClientStatusResult{}, nil
 }
@@ -189,8 +258,12 @@ func TestManagedEndpointSecretGenerationUsesNewestForRestartReconstruction(t *te
 		kind  string
 		value string
 	}{
-		{"privateKey", "OLD_PRIVATE"}, {"publicKey", "OLD_PUBLIC"}, {"presharedKey", "OLD_PSK"},
-		{"privateKey", "NEW_PRIVATE"}, {"publicKey", "NEW_PUBLIC"}, {"presharedKey", "NEW_PSK"},
+		{"privateKey", "OLD_PRIVATE"},
+		{"publicKey", "OLD_PUBLIC"},
+		{"presharedKey", "OLD_PSK"},
+		{"privateKey", "NEW_PRIVATE"},
+		{"publicKey", "NEW_PUBLIC"},
+		{"presharedKey", "NEW_PSK"},
 	} {
 		secret, err := mutations.encryptSecret("managed_endpoint_client", client.Id, gen.kind, []byte(gen.value))
 		if err != nil {
@@ -479,6 +552,158 @@ func TestManagedEndpointCreateIdempotencyHashConflict(t *testing.T) {
 	}
 }
 
+func TestManagedEndpointInstallPlansReturnsManagedKinds(t *testing.T) {
+	plans := ManagedEndpointService{}.InstallPlans()
+	if len(plans) != 3 {
+		t.Fatalf("plans len = %d, want 3", len(plans))
+	}
+	seen := map[model.RuntimeKind]bool{}
+	for _, plan := range plans {
+		seen[plan.RuntimeKind] = true
+	}
+	for _, kind := range []model.RuntimeKind{model.RuntimeAmneziaWG, model.RuntimeMieru, model.RuntimeNaiveProxy} {
+		if !seen[kind] {
+			t.Fatalf("missing install plan for %s in %+v", kind, plans)
+		}
+	}
+}
+
+func TestManagedEndpointInstallActionBlockedByImmutableArtifact(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	endpoint := model.ManagedEndpoint{UserId: 1, RuntimeKind: model.RuntimeAmneziaWG, Protocol: "amneziawg", Tag: "awg", Port: 51820, Enable: true, Status: model.EndpointActive, DesiredConfig: `{"server":{"interfaceName":"awg0","listenPort":51820,"enable":true}}`}
+	if err := database.GetDB().Create(&endpoint).Error; err != nil {
+		t.Fatal(err)
+	}
+	mutations := ManagedEndpointMutationService{Drivers: managedTestProvider{driver: managedTestDriver{kind: model.RuntimeAmneziaWG}, prov: managedBlockingProvisioner{}}}
+	_, _, err := mutations.EndpointAction(context.Background(), 1, fmt.Sprintf("managed-%d", endpoint.Id), "install", "install-blocked")
+	if !errors.Is(err, ErrManagedRuntimeArtifactBlocked) {
+		t.Fatalf("install err = %v, want artifact blocked", err)
+	}
+}
+
+func TestManagedEndpointInstallActionAppliesDesiredAfterProvision(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	desired := `{"portBindings":[{"port":2999,"protocol":"TCP"}],"users":[{"name":"u","password":"p"}]}`
+	endpoint := model.ManagedEndpoint{UserId: 1, RuntimeKind: model.RuntimeMieru, Protocol: "mieru", Tag: "mieru", Port: 2999, Enable: true, Status: model.EndpointActive, DesiredConfig: desired}
+	if err := database.GetDB().Create(&endpoint).Error; err != nil {
+		t.Fatal(err)
+	}
+	mutations := ManagedEndpointMutationService{Drivers: managedTestProvider{driver: managedTestDriver{kind: model.RuntimeMieru}, prov: managedTestProvisioner{}}}
+	view, _, err := mutations.EndpointAction(context.Background(), 1, fmt.Sprintf("managed-%d", endpoint.Id), "install", "install-ok")
+	if err != nil {
+		t.Fatalf("install action: %v", err)
+	}
+	if view == nil || view.Status != model.EndpointActive {
+		t.Fatalf("view = %+v, want active", view)
+	}
+}
+
+type managedTxProvisioner struct {
+	tx *managedTx
+}
+
+func (p managedTxProvisioner) Plan(kind model.RuntimeKind) provisioner.Plan {
+	return provisioner.Plan{RuntimeKind: kind, Supported: true, Version: "test", ArtifactRef: "test-ref"}
+}
+
+func (p managedTxProvisioner) Install(context.Context, model.RuntimeKind) (provisioner.Result, error) {
+	return provisioner.Result{State: "running"}, nil
+}
+
+func (p managedTxProvisioner) Update(context.Context, model.RuntimeKind) (provisioner.Result, error) {
+	return provisioner.Result{State: "running"}, nil
+}
+
+func (p managedTxProvisioner) Uninstall(context.Context, model.RuntimeKind) (provisioner.Result, error) {
+	return provisioner.Result{State: "removed"}, nil
+}
+
+func (p managedTxProvisioner) BeginInstall(context.Context, model.RuntimeKind) (provisioner.Transaction, error) {
+	return p.tx, nil
+}
+
+func (p managedTxProvisioner) BeginUpdate(context.Context, model.RuntimeKind) (provisioner.Transaction, error) {
+	return p.tx, nil
+}
+
+type managedTx struct {
+	commits   int
+	rollbacks int
+}
+
+func (t *managedTx) Result() provisioner.Result {
+	return provisioner.Result{RuntimeKind: model.RuntimeMieru, ArtifactRef: "test-ref", Version: "test", State: "running"}
+}
+
+func (t *managedTx) Commit(context.Context) error {
+	t.commits++
+	return nil
+}
+
+func (t *managedTx) Rollback(context.Context) (provisioner.Result, error) {
+	t.rollbacks++
+	return provisioner.Result{RuntimeKind: model.RuntimeMieru, ArtifactRef: "test-ref", Version: "test", State: "rolled_back", RolledBack: true}, nil
+}
+
+func TestManagedEndpointInstallApplyFailureRollsBackProvisioner(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	desired := `{"portBindings":[{"port":2999,"protocol":"TCP"}],"users":[{"name":"u","password":"p"}]}`
+	endpoint := model.ManagedEndpoint{UserId: 1, RuntimeKind: model.RuntimeMieru, Protocol: "mieru", Tag: "mieru", Port: 2999, Enable: true, Status: model.EndpointActive, DesiredConfig: desired}
+	if err := database.GetDB().Create(&endpoint).Error; err != nil {
+		t.Fatal(err)
+	}
+	tx := &managedTx{}
+	mutations := ManagedEndpointMutationService{Drivers: managedTestProvider{driver: managedTestDriver{kind: model.RuntimeMieru, fail: errors.New("apply failed")}, prov: managedTxProvisioner{tx: tx}}}
+	_, _, err := mutations.EndpointAction(context.Background(), 1, fmt.Sprintf("managed-%d", endpoint.Id), "install", "install-rollback")
+	if err == nil {
+		t.Fatal("install action succeeded despite apply failure")
+	}
+	if tx.rollbacks != 1 || tx.commits != 0 {
+		t.Fatalf("tx commits=%d rollbacks=%d, want rollback only", tx.commits, tx.rollbacks)
+	}
+	var stored model.ManagedEndpoint
+	if err := database.GetDB().First(&stored, endpoint.Id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status != model.EndpointRolledBack {
+		t.Fatalf("status = %s, want rolled_back", stored.Status)
+	}
+}
+
+func TestManagedEndpointUpdateApplySuccessCommitsProvisioner(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	desired := `{"portBindings":[{"port":2999,"protocol":"TCP"}],"users":[{"name":"u","password":"p"}]}`
+	endpoint := model.ManagedEndpoint{UserId: 1, RuntimeKind: model.RuntimeMieru, Protocol: "mieru", Tag: "mieru", Port: 2999, Enable: true, Status: model.EndpointActive, DesiredConfig: desired}
+	if err := database.GetDB().Create(&endpoint).Error; err != nil {
+		t.Fatal(err)
+	}
+	tx := &managedTx{}
+	mutations := ManagedEndpointMutationService{Drivers: managedTestProvider{driver: managedTestDriver{kind: model.RuntimeMieru}, prov: managedTxProvisioner{tx: tx}}}
+	if _, _, err := mutations.EndpointAction(context.Background(), 1, fmt.Sprintf("managed-%d", endpoint.Id), "update", "update-commit"); err != nil {
+		t.Fatalf("update action: %v", err)
+	}
+	if tx.commits != 1 || tx.rollbacks != 0 {
+		t.Fatalf("tx commits=%d rollbacks=%d, want commit only", tx.commits, tx.rollbacks)
+	}
+}
+
+func TestManagedEndpointUninstallStopsWithoutDriverDelete(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	endpoint := model.ManagedEndpoint{UserId: 1, RuntimeKind: model.RuntimeMieru, Protocol: "mieru", Tag: "mieru", Port: 2999, Enable: true, Status: model.EndpointActive, DesiredConfig: `{"portBindings":[{"port":2999,"protocol":"TCP"}],"users":[]}`}
+	if err := database.GetDB().Create(&endpoint).Error; err != nil {
+		t.Fatal(err)
+	}
+	stopCalls := 0
+	deleteCalls := 0
+	mutations := ManagedEndpointMutationService{Drivers: managedTestProvider{driver: managedTestDriver{kind: model.RuntimeMieru, stopCalls: &stopCalls, deleteCalls: &deleteCalls}, prov: managedTestProvisioner{}}}
+	if _, _, err := mutations.EndpointAction(context.Background(), 1, fmt.Sprintf("managed-%d", endpoint.Id), "uninstall", "uninstall-stop"); err != nil {
+		t.Fatalf("uninstall action: %v", err)
+	}
+	if stopCalls != 1 || deleteCalls != 0 {
+		t.Fatalf("stopCalls=%d deleteCalls=%d, want stop only before provisioner uninstall", stopCalls, deleteCalls)
+	}
+}
+
 func TestManagedEndpointCanonicalConfigNormalizesAndRejectsPrivateFields(t *testing.T) {
 	req := ManagedEndpointCreateRequest{
 		RuntimeKind: model.RuntimeMieru,
@@ -684,23 +909,34 @@ func TestManagedEndpointCapabilitiesManagedBackendsMutable(t *testing.T) {
 	}
 }
 
-func TestManagedEndpointInstallPlanBlocksUnpinnedAWGImage(t *testing.T) {
+func TestManagedEndpointInstallPlansUseExactPinnedDockerRefs(t *testing.T) {
+	cases := []struct {
+		kind model.RuntimeKind
+		ref  string
+	}{
+		{model.RuntimeAmneziaWG, "ghcr.io/sllikmll/unified-vpn-panel-protocol-awg2@sha256:538dfb87a642932430e6c0e1ab83b53ea53bc61104ff60ba6d0310bb279e24d8"},
+		{model.RuntimeNaiveProxy, "ghcr.io/sllikmll/unified-vpn-panel-protocol-naive-caddy@sha256:eb3dc466b930f15186dad947b19ac52f4f60eac8db683ea8e8d03f2a6862ed8"},
+	}
+	for _, tc := range cases {
+		plan := ManagedEndpointService{}.InstallPlan(tc.kind)
+		if !plan.Supported || plan.Blocked || !plan.RequiresPinnedImage {
+			t.Fatalf("%s install plan = %#v, want supported unblocked pinned image", tc.kind, plan)
+		}
+		if plan.ImageRef != tc.ref || plan.ArtifactRef != tc.ref {
+			t.Fatalf("%s install ref image=%q artifact=%q, want %q", tc.kind, plan.ImageRef, plan.ArtifactRef, tc.ref)
+		}
+		if strings.Contains(plan.ImageRef, ":latest") {
+			t.Fatalf("install plan must not advertise latest image: %#v", plan)
+		}
+	}
+
 	plan := ManagedEndpointService{}.InstallPlan(model.RuntimeAmneziaWG)
-	if plan.Supported || !plan.Blocked || !plan.RequiresPinnedImage {
-		t.Fatalf("AWG install plan must be blocked until a pinned image exists: %#v", plan)
-	}
-	if strings.Contains(plan.ImageRef, ":latest") {
-		t.Fatalf("install plan must not advertise latest image: %#v", plan)
-	}
-	if !strings.Contains(plan.Reason, "pinned by digest") {
-		t.Fatalf("install plan reason must name digest blocker: %#v", plan)
-	}
 	foundDocker := false
 	for _, profile := range plan.BackendProfiles {
 		if profile.Kind == "docker-amnezia-awg2" {
-			foundDocker = profile.ContainerName == "amnezia-awg2" &&
-				profile.HostConfigDir == "/opt/amnezia/state/amnezia-awg2" &&
-				profile.ContainerConfigDir == "/opt/amnezia/awg"
+			foundDocker = profile.ContainerName == "unified-vpn-awg2-runtime" &&
+				profile.HostConfigDir == provisioner.AWG2HostConfigPath &&
+				profile.ContainerConfigDir == provisioner.AWG2GuestConfigPath
 		}
 	}
 	if !foundDocker {

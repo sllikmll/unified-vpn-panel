@@ -120,9 +120,9 @@ type PeerStatus struct {
 }
 
 const (
-	awgHMaxGenerated = 2147483647
-	awgHMaxValid     = 4294967295
-	hMinWidth        = 1000
+	awgHMaxGenerated int64  = 2147483647
+	awgHMaxValid     uint64 = 4294967295
+	hMinWidth               = 1000
 )
 
 func DefaultServer(iface string, port int) Server {
@@ -221,17 +221,17 @@ func randInt(min, max int) (int, error) {
 }
 
 func generateHRanges() ([4]string, error) {
-	const lo = 5
+	const lo int64 = 5
 	bandSize := (awgHMaxGenerated - lo + 1) / 4
 	var out [4]string
 	for i := 0; i < 4; i++ {
-		bandLo := lo + i*bandSize
+		bandLo := lo + int64(i)*bandSize
 		bandHi := bandLo + bandSize - 1
-		start, err := randInt(bandLo, bandHi-hMinWidth-1)
+		start, err := randInt(int(bandLo), int(bandHi)-hMinWidth-1)
 		if err != nil {
 			return out, err
 		}
-		end, err := randInt(start+hMinWidth, bandHi-1)
+		end, err := randInt(start+hMinWidth, int(bandHi)-1)
 		if err != nil {
 			return out, err
 		}
@@ -307,18 +307,25 @@ func validateHValue(v string) error {
 		return nil
 	}
 	if lo, hi, ok := strings.Cut(v, "-"); ok {
-		l, err1 := strconv.ParseInt(strings.TrimSpace(lo), 10, 64)
-		h, err2 := strconv.ParseInt(strings.TrimSpace(hi), 10, 64)
-		if err1 != nil || err2 != nil || l < 0 || h > awgHMaxValid || l > h {
+		l, err1 := parseAWGHValue(strings.TrimSpace(lo))
+		h, err2 := parseAWGHValue(strings.TrimSpace(hi))
+		if err1 != nil || err2 != nil || l > h {
 			return fmt.Errorf("range must satisfy 0 <= low <= high <= %d", awgHMaxValid)
 		}
 		return nil
 	}
-	n, err := strconv.ParseInt(v, 10, 64)
-	if err != nil || n < 0 || n > awgHMaxValid {
+	if _, err := parseAWGHValue(v); err != nil {
 		return fmt.Errorf("value must be integer in 0..%d", awgHMaxValid)
 	}
 	return nil
+}
+
+func parseAWGHValue(v string) (uint64, error) {
+	n, err := strconv.ParseUint(v, 10, 64)
+	if err != nil || n > awgHMaxValid {
+		return 0, fmt.Errorf("invalid H value")
+	}
+	return n, nil
 }
 
 func validateIPv4CIDR(value string) error {

@@ -180,12 +180,3 @@ func TestRuntimeDockerApplyPersistsNewConfigBeforeRestart(t *testing.T) {
 		t.Fatalf("mode = %o, want 0600", got)
 	}
 }
-
-func containsAll(s string, needles ...string) bool {
-	for _, n := range needles {
-		if !strings.Contains(s, n) {
-			return false
-		}
-	}
-	return true
-}

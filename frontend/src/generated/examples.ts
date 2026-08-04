@@ -692,6 +692,7 @@ export const EXAMPLES: Record<string, unknown> = {
     "publicIpV4": "203.0.113.10",
     "publicIpV6": "2001:db8::10",
     "remark": "",
+    "runtimeCapabilities": "",
     "scheme": "https",
     "status": "online",
     "swapCurrent": 0,

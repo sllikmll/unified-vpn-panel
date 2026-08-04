@@ -1620,6 +1620,7 @@ export const sections: readonly Section[] = [
     endpoints: [
       { method: 'GET', path: '/panel/api/managed-endpoints/list', summary: 'List projected legacy inbounds and native managed endpoints.', responseSchema: 'ManagedEndpointView', responseSchemaArray: true },
       { method: 'GET', path: '/panel/api/managed-endpoints/capabilities', summary: 'Return runtime and lifecycle capabilities.', responseSchema: 'ManagedEndpointCapabilities' },
+      { method: 'GET', path: '/panel/api/managed-endpoints/install-plan', summary: 'Return fail-closed immutable runtime installation plans for AWG2, Mieru, and NaiveProxy.' },
       { method: 'GET', path: '/panel/api/managed-endpoints/install-plan/:runtimeKind', summary: 'Return the fail-closed immutable runtime installation plan.', params: [{ name: 'runtimeKind', in: 'path', type: 'string', desc: 'amneziawg, mieru, or naiveproxy.' }] },
       { method: 'POST', path: '/panel/api/managed-endpoints', summary: 'Create and apply a native managed endpoint.' },
       { method: 'POST', path: '/panel/api/managed-endpoints/', summary: 'Create and apply a native managed endpoint (trailing-slash route).' },

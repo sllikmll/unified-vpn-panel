@@ -11,10 +11,12 @@ import (
 	"sync"
 )
 
-var ErrBackendUnavailable = errors.New("amneziawg backend unavailable")
-var ErrDockerMountMismatch = errors.New("amneziawg docker mount mismatch")
-var ErrUnsupportedInterface = errors.New("amneziawg interface unsupported by backend profile")
-var ErrPeerOperationsUnsupported = errors.New("amneziawg peer mutations require a complete desired endpoint config")
+var (
+	ErrBackendUnavailable        = errors.New("amneziawg backend unavailable")
+	ErrDockerMountMismatch       = errors.New("amneziawg docker mount mismatch")
+	ErrUnsupportedInterface      = errors.New("amneziawg interface unsupported by backend profile")
+	ErrPeerOperationsUnsupported = errors.New("amneziawg peer mutations require a complete desired endpoint config")
+)
 
 type Backend interface {
 	Detect(ctx context.Context) (SafeStatus, error)
@@ -345,6 +347,10 @@ func (r *Runtime) Start(ctx context.Context, iface string) error {
 	return r.backend.Up(ctx, iface)
 }
 
+func (r *Runtime) Stop(ctx context.Context, iface string) error {
+	return r.backend.Down(ctx, iface)
+}
+
 func (r *Runtime) Observe(ctx context.Context, iface string) (SafeStatus, error) {
 	return r.backend.Status(ctx, iface)
 }
@@ -461,6 +467,7 @@ func (b *FakeBackend) Delete(context.Context, string) error { return nil }
 func (b *FakeBackend) Status(context.Context, string) (SafeStatus, error) {
 	return b.Detect(context.Background())
 }
+
 func (b *FakeBackend) Rollback(context.Context, string, string) error {
 	b.RolledBack = true
 	return nil

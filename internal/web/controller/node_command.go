@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/nodecommand"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/provisioner"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 )
 
@@ -32,6 +34,22 @@ func (nodeCommandDriverProvider) Driver(kind model.RuntimeKind) (driver.Driver, 
 		return nil, errors.New("managed runtime unavailable")
 	}
 	return managed.Driver(kind)
+}
+
+func (nodeCommandDriverProvider) Provisioner() provisioner.Provisioner {
+	mgr := runtime.GetManager()
+	if mgr == nil {
+		return provisioner.NewLocal(provisioner.Config{})
+	}
+	rt, err := mgr.RuntimeFor(nil)
+	if err != nil {
+		return provisioner.NewLocal(provisioner.Config{})
+	}
+	managed, ok := rt.(runtime.ManagedRuntime)
+	if !ok {
+		return provisioner.NewLocal(provisioner.Config{})
+	}
+	return managed.Provisioner()
 }
 
 func handleNodeCommand(c *gin.Context) {
@@ -64,7 +82,7 @@ func handleNodeCommand(c *gin.Context) {
 		jsonObj(c, replayed, nil)
 		return
 	}
-	exec := nodecommand.AWGExecutor{Provider: nodeCommandDriverProvider{}, ResponseSealKey: []byte(token)}
+	exec := nodecommand.AWGExecutor{Provider: nodeCommandDriverProvider{}, Provisioners: nodeCommandDriverProvider{}, ResponseSealKey: []byte(token)}
 	resp, err := exec.Execute(c.Request.Context(), session, req)
 	if err != nil {
 		_ = nodeCommandReplayGuard.Abort(c.Request.Context(), req)
@@ -76,12 +94,4 @@ func handleNodeCommand(c *gin.Context) {
 		return
 	}
 	jsonObj(c, resp, nil)
-}
-
-func bearerToken(c *gin.Context) string {
-	auth := c.GetHeader("Authorization")
-	if token, ok := strings.CutPrefix(auth, "Bearer "); ok {
-		return token
-	}
-	return ""
 }

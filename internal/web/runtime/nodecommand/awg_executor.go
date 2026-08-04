@@ -10,14 +10,20 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/mieru"
 	"github.com/mhsanaei/3x-ui/v3/internal/naiveproxy"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/provisioner"
 )
 
 type DriverProvider interface {
 	Driver(kind model.RuntimeKind) (driver.Driver, error)
 }
 
+type ProvisionerProvider interface {
+	Provisioner() provisioner.Provisioner
+}
+
 type AWGExecutor struct {
 	Provider        DriverProvider
+	Provisioners    ProvisionerProvider
 	ResponseSealKey []byte
 }
 
@@ -29,6 +35,12 @@ func (e AWGExecutor) Execute(ctx context.Context, session AuthenticatedSession, 
 
 func (e AWGExecutor) execute(ctx context.Context, _ AuthenticatedSession, req Request) (Response, error) {
 	resp := baseResponse(req)
+	switch req.Operation {
+	case OperationRuntimeInstallPlan:
+		return e.runtimePlan(ctx, req)
+	case OperationRuntimeInstall, OperationRuntimeUpdate, OperationRuntimeUninstall:
+		return e.runtimeLifecycle(ctx, req)
+	}
 	if e.Provider == nil {
 		resp.Status = StatusFailed
 		resp.ErrorCode = ErrorCodeUnavailable
@@ -122,6 +134,98 @@ func (e AWGExecutor) execute(ctx context.Context, _ AuthenticatedSession, req Re
 	}
 }
 
+func (e AWGExecutor) runtimePlan(_ context.Context, req Request) (Response, error) {
+	resp := baseResponse(req)
+	p, err := e.provisioner()
+	if err != nil {
+		resp.Status = StatusFailed
+		resp.ErrorCode = ErrorCodeUnavailable
+		resp.SummaryCode = SummaryUnavailable
+		return resp, nil
+	}
+	plan := p.Plan(req.RuntimeKind)
+	resp.Result = Result{RuntimeKind: req.RuntimeKind, EndpointID: req.EndpointID, ArtifactRef: plan.ArtifactRef, ArtifactVersion: plan.Version}
+	if plan.Blocked || !plan.Supported {
+		resp.Status = StatusFailed
+		resp.ErrorCode = ErrorCodeRuntimeFailed
+		resp.SummaryCode = SummaryBlocked
+		resp.Result.State = ResultStateStopped
+		return resp, nil
+	}
+	resp.Status = StatusSucceeded
+	resp.SummaryCode = SummaryStatusAvailable
+	resp.Result.State = ResultStateHealthy
+	return resp, nil
+}
+
+func (e AWGExecutor) runtimeLifecycle(ctx context.Context, req Request) (Response, error) {
+	resp := baseResponse(req)
+	payload, ok := req.Payload.(RuntimePayload)
+	if !ok || payload.RuntimeKind != req.RuntimeKind {
+		return validationResponse(req), nil
+	}
+	p, err := e.provisioner()
+	if err != nil {
+		resp.Status = StatusFailed
+		resp.ErrorCode = ErrorCodeUnavailable
+		resp.SummaryCode = SummaryUnavailable
+		return resp, nil
+	}
+	plan := p.Plan(req.RuntimeKind)
+	if req.Operation == OperationRuntimeUninstall {
+		if payload.ArtifactRef != "" {
+			return validationResponse(req), nil
+		}
+	} else if payload.ArtifactRef != plan.ArtifactRef {
+		return validationResponse(req), nil
+	}
+	var result provisioner.Result
+	switch req.Operation {
+	case OperationRuntimeInstall:
+		result, err = p.Install(ctx, req.RuntimeKind)
+	case OperationRuntimeUpdate:
+		result, err = p.Update(ctx, req.RuntimeKind)
+	case OperationRuntimeUninstall:
+		result, err = p.Uninstall(ctx, req.RuntimeKind)
+	}
+	resp.Result = Result{RuntimeKind: req.RuntimeKind, EndpointID: req.EndpointID, ArtifactRef: result.ArtifactRef, ArtifactVersion: result.Version, State: ResultStateRunning}
+	if req.Operation == OperationRuntimeUninstall {
+		resp.Result.State = ResultStateDeleted
+	}
+	if result.State == "blocked" {
+		resp.Result.State = ResultStateStopped
+	}
+	if err != nil {
+		resp.Status = StatusFailed
+		resp.ErrorCode = ErrorCodeRuntimeFailed
+		resp.SummaryCode = SummaryRuntimeFailed
+		if errors.Is(err, provisioner.ErrArtifactBlocked) {
+			resp.SummaryCode = SummaryBlocked
+		}
+		return resp, nil
+	}
+	resp.Status = StatusSucceeded
+	switch req.Operation {
+	case OperationRuntimeInstall:
+		resp.SummaryCode = SummaryInstalled
+	case OperationRuntimeUpdate:
+		resp.SummaryCode = SummaryUpdated
+	case OperationRuntimeUninstall:
+		resp.SummaryCode = SummaryUninstalled
+	}
+	return resp, nil
+}
+
+func (e AWGExecutor) provisioner() (provisioner.Provisioner, error) {
+	if e.Provisioners != nil {
+		p := e.Provisioners.Provisioner()
+		if p != nil {
+			return p, nil
+		}
+	}
+	return provisioner.NewLocal(provisioner.Config{}), nil
+}
+
 func baseResponse(req Request) Response {
 	return Response{Version: ProtocolV1, CommandID: req.CommandID, IdempotencyKey: req.IdempotencyKey, NodeID: req.NodeID, TargetGUID: req.TargetGUID, Operation: req.Operation, DesiredGeneration: req.DesiredGeneration}
 }
@@ -132,44 +236,6 @@ func validationResponse(req Request) Response {
 	resp.ErrorCode = ErrorCodeValidationFailed
 	resp.SummaryCode = SummaryValidationFailed
 	return resp
-}
-
-func clientResult(req Request, clientID string, enabled bool) Result {
-	state := ResultStateDisabled
-	if enabled {
-		state = ResultStateEnabled
-	}
-	return Result{RuntimeKind: req.RuntimeKind, EndpointID: req.EndpointID, ClientID: clientID, Enabled: &enabled, State: state}
-}
-
-func clientFromRequest(req Request) (model.Client, error) {
-	if req.SecretInput == nil || len(req.SecretInput.Material) == 0 {
-		return model.Client{}, errors.New("missing sealed material")
-	}
-	var client awg.Client
-	if err := json.Unmarshal(req.SecretInput.Material, &client); err != nil {
-		return model.Client{}, err
-	}
-	payload, _ := req.Payload.(ClientPayload)
-	if client.ID == "" {
-		client.ID = payload.ClientID
-	}
-	if client.Email == "" {
-		client.Email = payload.Email
-	}
-	if err := awg.ValidateClient(client); err != nil {
-		return model.Client{}, err
-	}
-	return model.Client{
-		ID:           client.ID,
-		Email:        client.Email,
-		PrivateKey:   client.PrivateKey,
-		PublicKey:    client.PublicKey,
-		PreSharedKey: client.PresharedKey,
-		AllowedIPs:   []string{client.IPv4Address},
-		KeepAlive:    client.PersistentKeepalive,
-		Enable:       client.Enable,
-	}, nil
 }
 
 func inboundFromRequest(req Request) (*model.Inbound, error) {

@@ -6,11 +6,17 @@ export type EndpointClientState = z.infer<typeof EndpointClientStateSchema>;
 export const EndpointStatusSchema = z.string();
 export type EndpointStatus = z.infer<typeof EndpointStatusSchema>;
 
+export const ManagedDriverProviderSchema = z.unknown();
+export type ManagedDriverProvider = z.infer<typeof ManagedDriverProviderSchema>;
+
 export const ManagedEndpointSourceSchema = z.string();
 export type ManagedEndpointSource = z.infer<typeof ManagedEndpointSourceSchema>;
 
 export const ManagedProtocolSchema = z.string();
 export type ManagedProtocol = z.infer<typeof ManagedProtocolSchema>;
+
+export const ManagedSecretKeySourceSchema = z.unknown();
+export type ManagedSecretKeySource = z.infer<typeof ManagedSecretKeySourceSchema>;
 
 export const OnlineAPISupportSchema = z.number().int();
 export type OnlineAPISupport = z.infer<typeof OnlineAPISupportSchema>;
@@ -697,6 +703,7 @@ export const NodeSchema = z.object({
   publicIpV4: z.string(),
   publicIpV6: z.string(),
   remark: z.string(),
+  runtimeCapabilities: z.string(),
   scheme: z.enum(['http', 'https']),
   status: z.string(),
   swapCurrent: z.number().int(),

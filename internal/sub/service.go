@@ -15,8 +15,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
-	awg "github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 
+	awg "github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
@@ -528,9 +528,17 @@ func managedAWGClientConfig(server awg.Server, client model.ManagedEndpointClien
 		key string
 		val any
 	}{
-		{"Jc", server.Jc}, {"Jmin", server.Jmin}, {"Jmax", server.Jmax},
-		{"S1", server.S1}, {"S2", server.S2}, {"S3", server.S3}, {"S4", server.S4},
-		{"H1", server.H1}, {"H2", server.H2}, {"H3", server.H3}, {"H4", server.H4},
+		{"Jc", server.Jc},
+		{"Jmin", server.Jmin},
+		{"Jmax", server.Jmax},
+		{"S1", server.S1},
+		{"S2", server.S2},
+		{"S3", server.S3},
+		{"S4", server.S4},
+		{"H1", server.H1},
+		{"H2", server.H2},
+		{"H3", server.H3},
+		{"H4", server.H4},
 	} {
 		if fmt.Sprint(kv.val) != "" && fmt.Sprint(kv.val) != "0" {
 			fmt.Fprintf(&b, "%s = %v\n", kv.key, kv.val)

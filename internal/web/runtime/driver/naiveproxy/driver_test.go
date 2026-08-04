@@ -17,6 +17,7 @@ func (r *fakeRunner) Run(_ context.Context, cmd core.Command) error {
 	r.commands = append(r.commands, cmd)
 	return nil
 }
+
 func (r *fakeRunner) Observe(context.Context, string) (core.Observation, error) {
 	return core.Observation{State: core.BackendActive}, nil
 }

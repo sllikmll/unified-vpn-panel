@@ -30,6 +30,7 @@ func NewManagedEndpointController(g *gin.RouterGroup) *ManagedEndpointController
 func (a *ManagedEndpointController) initRouter(g *gin.RouterGroup) {
 	g.GET("/list", a.list)
 	g.GET("/capabilities", a.capabilities)
+	g.GET("/install-plan", a.installPlans)
 	g.GET("/install-plan/:runtimeKind", a.installPlan)
 	g.POST("", a.create)
 	g.POST("/", a.create)
@@ -85,6 +86,10 @@ func (a *ManagedEndpointController) installPlan(c *gin.Context) {
 	jsonObj(c, a.managedEndpointService.InstallPlan(model.RuntimeKind(c.Param("runtimeKind"))), nil)
 }
 
+func (a *ManagedEndpointController) installPlans(c *gin.Context) {
+	jsonObj(c, a.managedEndpointService.InstallPlans(), nil)
+}
+
 func (a *ManagedEndpointController) create(c *gin.Context) {
 	var req service.ManagedEndpointCreateRequest
 	if !bindStrictJSON(c, &req) {
@@ -115,12 +120,10 @@ func (a *ManagedEndpointController) action(c *gin.Context) {
 	user := session.GetLoginUser(c)
 	view, obj, err := managedEndpointMutations().EndpointAction(c.Request.Context(), user.Id, c.Param("id"), strings.TrimSpace(c.Param("action")), c.GetHeader("Idempotency-Key"))
 	if strings.TrimSpace(c.Param("action")) == "install" || strings.TrimSpace(c.Param("action")) == "update" || strings.TrimSpace(c.Param("action")) == "uninstall" {
-		if err != nil {
+		if errors.Is(err, service.ErrManagedRuntimeArtifactBlocked) {
 			pureJsonMsg(c, http.StatusPreconditionFailed, false, err.Error())
 			return
 		}
-		pureJsonMsg(c, http.StatusPreconditionFailed, false, "runtime_artifact_precondition_blocked")
-		return
 	}
 	if obj != nil {
 		jsonObj(c, obj, err)

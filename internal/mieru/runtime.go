@@ -267,7 +267,7 @@ func (r Runtime) atomicApply(ctx context.Context, body []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := r.FS.WriteFile(tmp, body, 0600); err != nil {
+	if err := r.FS.WriteFile(tmp, body, 0o600); err != nil {
 		_ = r.FS.Remove(tmp)
 		return err
 	}

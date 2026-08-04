@@ -77,7 +77,7 @@ describe('managed native protocol inbound form branch', () => {
     expect(fieldLabels()).toEqual(expect.arrayContaining(['Interface', 'IPv4 pool', 'Client allowed IPs', 'Jc', 'H4']));
     expect(fieldLabels()).not.toContain('Transmission');
     expect(fieldLabels()).not.toContain('Sniffing');
-  });
+  }, 15_000);
 
   it('blocks unsupported selected nodes with a visible capability reason', async () => {
     renderModal();

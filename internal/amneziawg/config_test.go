@@ -16,6 +16,7 @@ func TestValidateObfuscation20RejectsInvalidParams(t *testing.T) {
 		{"s4 high", func(s *Server) { s.S4 = 33 }},
 		{"h range reversed", func(s *Server) { s.H1 = "9-5" }},
 		{"h too high", func(s *Server) { s.H2 = "4294967296" }},
+		{"h negative", func(s *Server) { s.H3 = "-1" }},
 		{"i1 shellish", func(s *Server) { s.I1 = "$(cat /etc/shadow)" }},
 		{"ipv6 disabled", func(s *Server) { s.IPv6Enabled = true }},
 	}
@@ -27,6 +28,17 @@ func TestValidateObfuscation20RejectsInvalidParams(t *testing.T) {
 				t.Fatal("ValidateServer succeeded, want error")
 			}
 		})
+	}
+}
+
+func TestValidateObfuscation20AcceptsMaxUint32HValue(t *testing.T) {
+	s := DefaultServer("awg0", 51820)
+	s.PrivateKey = "SERVER_PRIVATE"
+	s.PublicKey = "SERVER_PUBLIC"
+	s.H1 = "4294967295"
+	s.H2 = "0-4294967295"
+	if err := ValidateServer(s); err != nil {
+		t.Fatalf("ValidateServer rejected uint32 max H value: %v", err)
 	}
 }
 

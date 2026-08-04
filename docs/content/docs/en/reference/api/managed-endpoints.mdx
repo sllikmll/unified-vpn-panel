@@ -47,18 +47,24 @@ _openapi:
       - content: Manage native endpoint clients from durable control-plane state.
         id: manage-native-endpoint-clients-from-durable-control-plane-state
     contents:
-      - Native mutation requests are strict JSON objects. Unknown fields are
+      - >-
+        Native mutation requests are strict JSON objects. Unknown fields are
         rejected. Runtime kind and protocol are allowlisted to amneziawg, mieru,
         and naiveproxy for native managed rows.
-      - Secrets are stored only as ManagedSecret AES-256-GCM envelopes. Public
+      - >-
+        Secrets are stored only as ManagedSecret AES-256-GCM envelopes. Public
         DesiredConfig rows contain redacted secret references only.
-      - install, update, and uninstall lifecycle actions currently return a
-        stable blocked/precondition result until immutable runtime artifacts and
-        digests are injected. No latest image or curl|bash install is exposed.
-      - Managed clients bind to one existing enabled subscription client by
+      - >-
+        Install and update lifecycle actions are unblocked only when the runtime
+        install plan has immutable artifact metadata. AWG2 and NaiveProxy use
+        pinned GHCR digest refs; Mieru uses the checked v3.35.0 mita manifest.
+        No latest image or curl|bash install is exposed.
+      - >-
+        Managed clients bind to one existing enabled subscription client by
         subId. Responses show binding metadata only: id, clientId, subId, email,
         enable, state/status, publicIdentity, address, and timestamps.
-      - Subscription compatibility: raw subscriptions include amneziawg, mieru,
+      - >-
+        Subscription compatibility: raw subscriptions include amneziawg, mieru,
         and naiveproxy native links. JSON/Xray configs do not carry these
         managed-native protocols. Clash/Mihomo includes AmneziaWG 2.0 as a
         WireGuard proxy with amnezia-wg-option and NaiveProxy as HTTPS HTTP
@@ -86,7 +92,7 @@ export default function Layout(props) {
   return (
     <>
       {props.children}
-      <Comp document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/managed-endpoints/list","method":"get"},{"path":"/panel/api/managed-endpoints/{id}","method":"get"},{"path":"/panel/api/managed-endpoints/capabilities","method":"get"},{"path":"/panel/api/managed-endpoints/install-plan/{runtimeKind}","method":"get"},{"path":"/panel/api/managed-endpoints/create","method":"post"},{"path":"/panel/api/managed-endpoints/{id}","method":"patch"},{"path":"/panel/api/managed-endpoints/{id}","method":"delete"},{"path":"/panel/api/managed-endpoints/{id}/actions/{action}","method":"post"},{"path":"/panel/api/managed-endpoints/{id}/clients","method":"get"},{"path":"/panel/api/managed-endpoints/{id}/clients","method":"post"},{"path":"/panel/api/managed-endpoints/{id}/clients/{clientId}","method":"patch"},{"path":"/panel/api/managed-endpoints/{id}/clients/{clientId}","method":"delete"},{"path":"/panel/api/managed-endpoints/{id}/clients/{clientId}/actions/{action}","method":"post"},{"path":"/panel/api/managed-endpoints/{id}/clients/{clientId}/export","method":"get"}]} showTitle />
+      <Comp document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/managed-endpoints/list","method":"get"},{"path":"/panel/api/managed-endpoints/{id}","method":"get"},{"path":"/panel/api/managed-endpoints/capabilities","method":"get"},{"path":"/panel/api/managed-endpoints/install-plan","method":"get"},{"path":"/panel/api/managed-endpoints/install-plan/{runtimeKind}","method":"get"},{"path":"/panel/api/managed-endpoints/create","method":"post"},{"path":"/panel/api/managed-endpoints/{id}","method":"patch"},{"path":"/panel/api/managed-endpoints/{id}","method":"delete"},{"path":"/panel/api/managed-endpoints/{id}/actions/{action}","method":"post"},{"path":"/panel/api/managed-endpoints/{id}/clients","method":"get"},{"path":"/panel/api/managed-endpoints/{id}/clients","method":"post"},{"path":"/panel/api/managed-endpoints/{id}/clients/{clientId}","method":"patch"},{"path":"/panel/api/managed-endpoints/{id}/clients/{clientId}","method":"delete"},{"path":"/panel/api/managed-endpoints/{id}/clients/{clientId}/actions/{action}","method":"post"},{"path":"/panel/api/managed-endpoints/{id}/clients/{clientId}/export","method":"get"}]} showTitle />
     </>
   );
 }

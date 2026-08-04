@@ -165,13 +165,13 @@ export default function ManagedInboundForm({
       <Alert
         type="info"
         showIcon
-        message={t('managedProtocols.branch')}
+        title={t('managedProtocols.branch')}
         description={mode === 'edit'
           ? t('managedProtocols.editDescription')
           : t('managedProtocols.description', { protocol: MANAGED_PROTOCOL_LABELS[protocol] })}
       />
-      {error && <Alert className="mt-12" type="error" showIcon message={error} />}
-      {blockReason && <Alert className="mt-12" type="warning" showIcon message={t('managedProtocols.capabilityUnavailable')} />}
+      {error && <Alert className="mt-12" type="error" showIcon title={error} />}
+      {blockReason && <Alert className="mt-12" type="warning" showIcon title={t('managedProtocols.capabilityUnavailable')} />}
 
       <Form colon={false} labelCol={{ sm: { span: 8 } }} wrapperCol={{ sm: { span: 14 } }} labelWrap className="mt-12">
         <Form.Item label={t('pages.inbounds.protocol')}>

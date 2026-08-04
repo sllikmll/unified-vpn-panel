@@ -2728,6 +2728,10 @@ export const SCHEMAS: Record<string, unknown> = {
       "remark": {
         "type": "string"
       },
+      "runtimeCapabilities": {
+        "description": "RuntimeCapabilities is a JSON array of managed runtime kinds the node\nexplicitly advertised. Empty means the node has not advertised managed\nendpoint support and must not receive managed runtime commands.",
+        "type": "string"
+      },
       "scheme": {
         "enum": [
           "http",
@@ -2838,6 +2842,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "publicIpV4",
       "publicIpV6",
       "remark",
+      "runtimeCapabilities",
       "scheme",
       "status",
       "swapCurrent",

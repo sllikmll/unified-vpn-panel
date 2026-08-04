@@ -19,8 +19,10 @@ import {
   useManagedEndpointActions,
   useManagedEndpointQuery,
   useManagedEndpointsQuery,
+  useManagedInstallPlansQuery,
   type ManagedEndpointClient,
   type ManagedExportResponse,
+  type ManagedInstallPlan,
 } from '@/api/queries/useManagedEndpointsQuery';
 import { MANAGED_PROTOCOL_LABELS, type ManagedNativeProtocol } from '@/lib/managed-protocols';
 import type { ManagedEndpoint } from '@/schemas/api/managed-endpoint';
@@ -98,6 +100,13 @@ function pickActionBlockReason(endpoint: ManagedEndpoint, action: string): strin
     const blocked = data.blocked === true || data.available === false || data.allowed === false || data.supported === false;
     if (blocked) return String(data.reason || data.blockedReason || data.message || 'unavailable');
   }
+  return '';
+}
+
+function planBlockReason(plan: ManagedInstallPlan | undefined, action: string): string {
+  if (action !== 'install' && action !== 'update') return '';
+  if (!plan) return '';
+  if (plan.blocked || !plan.supported) return plan.reason || 'unavailable';
   return '';
 }
 
@@ -220,8 +229,8 @@ function ManagedClientsModal({ endpoint, open, onClose }: ClientModalProps) {
           <Button icon={<UserAddOutlined />} onClick={() => setClientFormOpen(true)}>{t('managedProtocols.createClient')}</Button>
           <Button onClick={() => query.refetch()} loading={query.isFetching}>{t('managedProtocols.retry')}</Button>
         </Space>
-        {error && <Alert className="managed-action-error" type="error" showIcon message={error} />}
-        {query.error && <Alert type="error" showIcon message={(query.error as Error).message} />}
+        {error && <Alert className="managed-action-error" type="error" showIcon title={error} />}
+        {query.error && <Alert type="error" showIcon title={(query.error as Error).message} />}
         <Table
           rowKey="id"
           size="small"
@@ -253,7 +262,7 @@ function ManagedClientsModal({ endpoint, open, onClose }: ClientModalProps) {
         />
       </Modal>
       <Modal open={clientFormOpen} title={t('managedProtocols.createClient')} onCancel={() => setClientFormOpen(false)} onOk={createClient}>
-        <Alert type="info" showIcon message={t('managedProtocols.generatedCredentials')} />
+        <Alert type="info" showIcon title={t('managedProtocols.generatedCredentials')} />
         <Form className="mt-12" colon={false}>
           <Form.Item label={t('managedProtocols.subId')} htmlFor="managed-client-create-sub-id" required>
             <Input id="managed-client-create-sub-id" value={subId} onChange={(e) => setSubId(e.target.value)} />
@@ -264,7 +273,7 @@ function ManagedClientsModal({ endpoint, open, onClose }: ClientModalProps) {
         </Form>
       </Modal>
       <Modal open={!!editingClient} title={t('managedProtocols.editClient')} onCancel={() => setEditingClient(null)} onOk={saveClientEdit}>
-        <Alert type="info" showIcon message={t('managedProtocols.noSecretsInEdit')} />
+        <Alert type="info" showIcon title={t('managedProtocols.noSecretsInEdit')} />
         <Form className="mt-12" colon={false}>
           <Form.Item label={t('managedProtocols.subId')} htmlFor="managed-client-edit-sub-id" required>
             <Input id="managed-client-edit-sub-id" value={subId} onChange={(e) => setSubId(e.target.value)} />
@@ -306,6 +315,7 @@ function ManagedClientsModal({ endpoint, open, onClose }: ClientModalProps) {
 export default function ManagedEndpointsPanel() {
   const { t } = useTranslation();
   const query = useManagedEndpointsQuery();
+  const plansQuery = useManagedInstallPlansQuery();
   const actions = useManagedEndpointActions();
   const [selected, setSelected] = useState<ManagedEndpoint | null>(null);
   const [editing, setEditing] = useState<ManagedEndpoint | null>(null);
@@ -316,9 +326,10 @@ export default function ManagedEndpointsPanel() {
     () => (query.data ?? []).filter((row) => ['amneziawg', 'mieru', 'naiveproxy'].includes(row.protocol)),
     [query.data],
   );
+  const plansByRuntime = useMemo(() => new Map((plansQuery.data ?? []).map((plan) => [plan.runtimeKind, plan])), [plansQuery.data]);
 
   const runAction = (endpoint: ManagedEndpoint, action: string) => {
-    const blockReason = pickActionBlockReason(endpoint, action);
+    const blockReason = planBlockReason(plansByRuntime.get(endpoint.runtimeKind), action) || pickActionBlockReason(endpoint, action);
     if (blockReason && (action === 'install' || action === 'update')) {
       setError(t('managedProtocols.installBlocked', { reason: blockReason }));
       return;
@@ -373,8 +384,8 @@ export default function ManagedEndpointsPanel() {
         title={<Space><ApiOutlined /> {t('managedProtocols.title')}</Space>}
         extra={<Button onClick={() => query.refetch()} loading={query.isFetching}>{t('managedProtocols.retry')}</Button>}
       >
-        {error && <Alert className="managed-action-error" type="error" showIcon message={error} />}
-        {query.error && <Alert type="error" showIcon message={(query.error as Error).message} />}
+        {error && <Alert className="managed-action-error" type="error" showIcon title={error} />}
+        {query.error && <Alert type="error" showIcon title={(query.error as Error).message} />}
         <Table
           size="small"
           rowKey="id"
@@ -402,7 +413,7 @@ export default function ManagedEndpointsPanel() {
                       icon={actionIcon(action)}
                       danger={action === 'uninstall'}
                       loading={busy === `${row.id}:${action}`}
-                      disabled={!!pickActionBlockReason(row, action) && (action === 'install' || action === 'update')}
+                      disabled={!!(planBlockReason(plansByRuntime.get(row.runtimeKind), action) || pickActionBlockReason(row, action)) && (action === 'install' || action === 'update')}
                       onClick={() => runAction(row, action)}
                     >
                       {actionLabel(action, t)}
@@ -414,7 +425,7 @@ export default function ManagedEndpointsPanel() {
                   <Button size="small" danger loading={busy === `${row.id}:delete`} onClick={() => deleteEndpoint(row)}>
                     {t('managedProtocols.deleteAction')}
                   </Button>
-                  {pickActionBlockReason(row, 'install') && <Tag color="red">{pickActionBlockReason(row, 'install')}</Tag>}
+                  {(planBlockReason(plansByRuntime.get(row.runtimeKind), 'install') || pickActionBlockReason(row, 'install')) && <Tag color="red">{planBlockReason(plansByRuntime.get(row.runtimeKind), 'install') || pickActionBlockReason(row, 'install')}</Tag>}
                 </Space>
               ),
             },
@@ -422,8 +433,8 @@ export default function ManagedEndpointsPanel() {
         />
       </Card>
       <Modal open={!!editing} title={t('managedProtocols.editAction')} onCancel={() => setEditing(null)} footer={null} width={760}>
-        {detailQuery.error && <Alert type="error" showIcon message={(detailQuery.error as Error).message} />}
-        {detailQuery.isFetching && <Alert type="info" showIcon message={t('managedProtocols.loading')} />}
+        {detailQuery.error && <Alert type="error" showIcon title={(detailQuery.error as Error).message} />}
+        {detailQuery.isFetching && <Alert type="info" showIcon title={t('managedProtocols.loading')} />}
         {editing && (detailQuery.data || !detailQuery.isFetching) && (
           <ManagedInboundForm
             protocol={editing.protocol as ManagedNativeProtocol}

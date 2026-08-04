@@ -6,8 +6,10 @@ import {
   ManagedEndpointCapabilitiesSchema,
   ManagedEndpointListSchema,
   ManagedEndpointViewSchema,
+  ManagedInstallPlanListSchema,
   type ManagedEndpoint,
   type ManagedEndpointCapabilities,
+  type ManagedInstallPlan,
 } from '@/schemas/api/managed-endpoint';
 import { HttpUtil } from '@/utils';
 import { parseMsg } from '@/utils/zodValidate';
@@ -29,6 +31,13 @@ async function fetchManagedEndpointCapabilities(): Promise<ManagedEndpointCapabi
   const msg = await HttpUtil.get('/panel/api/managed-endpoints/capabilities', undefined, { silent: true });
   if (!msg?.success) throw new Error(msg?.msg || i18n.t('managedProtocols.fetchCapabilitiesFailed'));
   return parseMsg(msg, ManagedEndpointCapabilitiesSchema, 'managed-endpoints/capabilities').obj;
+}
+
+async function fetchManagedInstallPlans(): Promise<ManagedInstallPlan[]> {
+  const msg = await HttpUtil.get('/panel/api/managed-endpoints/install-plan', undefined, { silent: true });
+  if (!msg?.success) throw new Error(msg?.msg || i18n.t('managedProtocols.fetchCapabilitiesFailed'));
+  const validated = parseMsg(msg, ManagedInstallPlanListSchema, 'managed-endpoints/install-plan');
+  return Array.isArray(validated.obj) ? validated.obj : [];
 }
 
 export function useManagedEndpointsQuery() {
@@ -53,6 +62,16 @@ export function useManagedEndpointCapabilitiesQuery() {
     staleTime: Infinity,
   });
 }
+
+export function useManagedInstallPlansQuery() {
+  return useQuery({
+    queryKey: keys.managedEndpoints.installPlans(),
+    queryFn: fetchManagedInstallPlans,
+    staleTime: 60_000,
+  });
+}
+
+export type { ManagedInstallPlan };
 
 export interface ManagedEndpointClient {
   id: string;

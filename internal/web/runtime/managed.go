@@ -16,17 +16,23 @@ import (
 	mierudriver "github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver/mieru"
 	naivedriver "github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver/naiveproxy"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/nodecommand"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/provisioner"
 )
 
 type ManagedRuntime interface {
 	Runtime
 	Driver(kind model.RuntimeKind) (driver.Driver, error)
+	Provisioner() provisioner.Provisioner
 }
 
 func (l *Local) Driver(kind model.RuntimeKind) (driver.Driver, error) {
 	switch kind {
 	case model.RuntimeAmneziaWG:
-		return awgdriver.New(awg.NewRuntime(awg.NewCommandBackend(), nil)), nil
+		backend := awg.NewCommandBackend()
+		profile := awg.DockerBackendProfile()
+		profile.ContainerName = provisioner.AWG2ContainerName
+		backend.DockerProfile = profile
+		return awgdriver.New(awg.NewRuntime(backend, nil)), nil
 	case model.RuntimeMieru:
 		return mierudriver.New(mieru.NewRuntime(mieru.OSRunner{}, mieru.OSFileSystem{})), nil
 	case model.RuntimeNaiveProxy:
@@ -39,6 +45,10 @@ func (l *Local) Driver(kind model.RuntimeKind) (driver.Driver, error) {
 	return legacyDriverFor(kind, l)
 }
 
+func (l *Local) Provisioner() provisioner.Provisioner {
+	return provisioner.NewLocal(provisioner.Config{})
+}
+
 func (r *Remote) Driver(kind model.RuntimeKind) (driver.Driver, error) {
 	switch kind {
 	case model.RuntimeAmneziaWG, model.RuntimeMieru, model.RuntimeNaiveProxy:
@@ -48,6 +58,75 @@ func (r *Remote) Driver(kind model.RuntimeKind) (driver.Driver, error) {
 		return remoteManagedDriver{remote: r, kind: kind}, nil
 	}
 	return legacyDriverFor(kind, r)
+}
+
+func (r *Remote) Provisioner() provisioner.Provisioner {
+	return remoteProvisioner{remote: r}
+}
+
+type remoteProvisioner struct {
+	remote *Remote
+}
+
+func (p remoteProvisioner) Plan(kind model.RuntimeKind) provisioner.Plan {
+	local := provisioner.NewLocal(provisioner.Config{}).Plan(kind)
+	if p.remote == nil || p.remote.node == nil || p.remote.node.Id <= 0 || p.remote.node.Guid == "" {
+		local.Supported = false
+		local.Blocked = true
+		local.Reason = "remote node identity unavailable"
+	}
+	return local
+}
+
+func (p remoteProvisioner) Install(ctx context.Context, kind model.RuntimeKind) (provisioner.Result, error) {
+	return p.send(ctx, nodecommand.OperationRuntimeInstall, kind)
+}
+
+func (p remoteProvisioner) Update(ctx context.Context, kind model.RuntimeKind) (provisioner.Result, error) {
+	return p.send(ctx, nodecommand.OperationRuntimeUpdate, kind)
+}
+
+func (p remoteProvisioner) Uninstall(ctx context.Context, kind model.RuntimeKind) (provisioner.Result, error) {
+	return p.send(ctx, nodecommand.OperationRuntimeUninstall, kind)
+}
+
+func (p remoteProvisioner) send(ctx context.Context, op nodecommand.Operation, kind model.RuntimeKind) (provisioner.Result, error) {
+	if p.remote == nil || p.remote.node == nil {
+		return provisioner.Result{}, driver.ErrNilRuntime
+	}
+	plan := p.Plan(kind)
+	if op != nodecommand.OperationRuntimeUninstall && (plan.Blocked || !plan.Supported) {
+		return provisioner.Result{RuntimeKind: kind, ArtifactRef: plan.ArtifactRef, Version: plan.Version, State: "blocked", SummaryCode: "blocked"}, provisioner.ErrArtifactBlocked
+	}
+	node := p.remote.node
+	now := time.Now().UTC()
+	req := nodecommand.Request{
+		Version:           nodecommand.ProtocolV1,
+		SupportedVersions: []nodecommand.ProtocolVersion{nodecommand.ProtocolV1},
+		CommandID:         fmt.Sprintf("runtime-%s-%s-%d", kind, op, now.UnixNano()),
+		IdempotencyKey:    fmt.Sprintf("runtime-%s-%s-%d", kind, op, now.UnixNano()),
+		NodeID:            node.Id,
+		TargetGUID:        node.Guid,
+		EndpointID:        1,
+		RuntimeKind:       kind,
+		Operation:         op,
+		DesiredGeneration: now.UnixNano(),
+		IssuedAt:          now,
+		ExpiresAt:         now.Add(5 * time.Minute),
+		Payload:           nodecommand.RuntimePayload{RuntimeKind: kind},
+	}
+	if op != nodecommand.OperationRuntimeUninstall {
+		req.Payload = nodecommand.RuntimePayload{RuntimeKind: kind, ArtifactRef: plan.ArtifactRef}
+	}
+	session := nodecommand.NewAuthenticatedSession(node.Id, node.Guid, fmt.Sprintf("node-%d", node.Id), "node-command-v1", now.Add(-time.Second), now.Add(10*time.Minute))
+	resp, err := p.remote.Send(ctx, session, req)
+	if err != nil {
+		return provisioner.Result{}, err
+	}
+	if resp.Status != nodecommand.StatusSucceeded {
+		return provisioner.Result{RuntimeKind: kind, ArtifactRef: plan.ArtifactRef, Version: resp.Result.ArtifactVersion, State: string(resp.Result.State), SummaryCode: string(resp.SummaryCode)}, fmt.Errorf("remote runtime provision failed: %s", resp.SummaryCode)
+	}
+	return provisioner.Result{RuntimeKind: kind, ArtifactRef: resp.Result.ArtifactRef, Version: resp.Result.ArtifactVersion, State: string(resp.Result.State), SummaryCode: string(resp.SummaryCode)}, nil
 }
 
 func legacyDriverFor(kind model.RuntimeKind, rt Runtime) (driver.Driver, error) {
@@ -184,9 +263,10 @@ func (d remoteManagedDriver) send(ctx context.Context, op nodecommand.Operation,
 		IssuedAt:          now,
 		ExpiresAt:         now.Add(5 * time.Minute),
 	}
-	if op == nodecommand.OperationEndpointApply {
+	switch op {
+	case nodecommand.OperationEndpointApply:
 		req.Payload = nodecommand.EndpointPayload{Tag: tag}
-	} else if op == nodecommand.OperationEndpointEnable || op == nodecommand.OperationEndpointDisable {
+	case nodecommand.OperationEndpointEnable, nodecommand.OperationEndpointDisable:
 		req.Payload = nodecommand.EndpointPayload{Enable: &enable}
 	}
 	if len(material) > 0 {
@@ -201,18 +281,23 @@ type remoteUnsupportedClient struct{}
 func (remoteUnsupportedClient) Create(context.Context, *model.Inbound, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (remoteUnsupportedClient) Update(context.Context, *model.Inbound, string, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (remoteUnsupportedClient) Delete(context.Context, *model.Inbound, string) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (remoteUnsupportedClient) Enable(context.Context, *model.Inbound, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (remoteUnsupportedClient) Disable(context.Context, *model.Inbound, string) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (remoteUnsupportedClient) Status(context.Context, *model.Inbound, string) (driver.ClientStatusResult, error) {
 	return driver.ClientStatusResult{}, driver.ErrUnsupportedOperation
 }

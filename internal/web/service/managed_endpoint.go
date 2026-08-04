@@ -23,6 +23,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/naiveproxy"
 	webruntime "github.com/mhsanaei/3x-ui/v3/internal/web/runtime"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/provisioner"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -36,7 +37,10 @@ const (
 	ManagedEndpointSourceManaged ManagedEndpointSource = "managed-endpoint"
 )
 
-var ErrManagedIdempotencyConflict = errors.New("managed endpoint idempotency key conflict")
+var (
+	ErrManagedIdempotencyConflict    = errors.New("managed endpoint idempotency key conflict")
+	ErrManagedRuntimeArtifactBlocked = provisioner.ErrArtifactBlocked
+)
 
 type ManagedTrafficView struct {
 	Up   int64 `json:"up" example:"1024"`
@@ -116,7 +120,10 @@ type InstallPlan struct {
 	Blocked             bool                        `json:"blocked"`
 	RequiresPinnedImage bool                        `json:"requiresPinnedImage"`
 	ImageRef            string                      `json:"imageRef,omitempty"`
+	ArtifactRef         string                      `json:"artifactRef,omitempty"`
+	Version             string                      `json:"version,omitempty"`
 	Reason              string                      `json:"reason,omitempty"`
+	Capabilities        []string                    `json:"capabilities,omitempty"`
 	BackendProfiles     []InstallPlanBackendProfile `json:"backendProfiles,omitempty"`
 }
 
@@ -124,6 +131,7 @@ type ManagedEndpointService struct{}
 
 type ManagedDriverProvider interface {
 	DriverForEndpoint(endpoint model.ManagedEndpoint) (driver.Driver, error)
+	ProvisionerForEndpoint(endpoint model.ManagedEndpoint) (provisioner.Provisioner, error)
 }
 
 type ManagedEndpointMutationService struct {
@@ -136,6 +144,22 @@ type RuntimeManagerDriverProvider struct {
 }
 
 func (p RuntimeManagerDriverProvider) DriverForEndpoint(endpoint model.ManagedEndpoint) (driver.Driver, error) {
+	managed, err := p.managedRuntime(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	return managed.Driver(endpoint.RuntimeKind)
+}
+
+func (p RuntimeManagerDriverProvider) ProvisionerForEndpoint(endpoint model.ManagedEndpoint) (provisioner.Provisioner, error) {
+	managed, err := p.managedRuntime(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	return managed.Provisioner(), nil
+}
+
+func (p RuntimeManagerDriverProvider) managedRuntime(endpoint model.ManagedEndpoint) (webruntime.ManagedRuntime, error) {
 	mgr := p.Manager
 	if mgr == nil {
 		mgr = webruntime.GetManager()
@@ -156,7 +180,7 @@ func (p RuntimeManagerDriverProvider) DriverForEndpoint(endpoint model.ManagedEn
 		if !ok {
 			return nil, fmt.Errorf("%w: managed remote unavailable", driver.ErrUnsupportedRuntime)
 		}
-		return managed.Driver(endpoint.RuntimeKind)
+		return managed, nil
 	}
 	rt, err := mgr.RuntimeFor(nil)
 	if err != nil {
@@ -166,7 +190,7 @@ func (p RuntimeManagerDriverProvider) DriverForEndpoint(endpoint model.ManagedEn
 	if !ok {
 		return nil, fmt.Errorf("%w: managed runtime unavailable", driver.ErrUnsupportedRuntime)
 	}
-	return managed.Driver(endpoint.RuntimeKind)
+	return managed, nil
 }
 
 type ManagedEndpointCreateRequest struct {
@@ -554,14 +578,115 @@ func (s ManagedEndpointMutationService) EndpointAction(ctx context.Context, user
 		res, err := d.Health(ctx, inbound)
 		return nil, res, err
 	case "install-plan":
-		return nil, ManagedEndpointService{}.InstallPlan(endpoint.RuntimeKind), nil
+		p, err := s.resolveProvisioner(endpoint)
+		if err != nil {
+			return nil, nil, err
+		}
+		return nil, installPlanFromProvisioner(p.Plan(endpoint.RuntimeKind)), nil
 	case "install", "update", "uninstall":
-		return nil, nil, errors.New("runtime_artifact_precondition_blocked")
+		reqHash := managedRequestHash("runtime."+action+":"+id, nil)
+		replayed := false
+		if idempotencyKey != "" {
+			if existing, ok, err := findApplyLog(database.GetDB(), idempotencyKey, reqHash); err != nil || ok {
+				if err != nil {
+					return nil, nil, err
+				}
+				replayed = ok
+				if existing.EndpointId != endpoint.Id {
+					return nil, nil, ErrManagedIdempotencyConflict
+				}
+			}
+		}
+		if !replayed {
+			if err := createApplyLog(database.GetDB(), idempotencyKey, endpoint.Id, "runtime."+action, reqHash, model.EndpointApplying, ""); err != nil {
+				return nil, nil, err
+			}
+			p, err := s.resolveProvisioner(endpoint)
+			if err != nil {
+				return nil, nil, err
+			}
+			var res provisioner.Result
+			var tx provisioner.Transaction
+			if action == "install" || action == "update" {
+				if tp, ok := p.(provisioner.TransactionalProvisioner); ok {
+					if action == "install" {
+						tx, err = tp.BeginInstall(ctx, endpoint.RuntimeKind)
+					} else {
+						tx, err = tp.BeginUpdate(ctx, endpoint.RuntimeKind)
+					}
+					if tx != nil {
+						res = tx.Result()
+					}
+				} else if action == "install" {
+					res, err = p.Install(ctx, endpoint.RuntimeKind)
+				} else {
+					res, err = p.Update(ctx, endpoint.RuntimeKind)
+				}
+			} else {
+				if err := s.stopRuntimeBeforeUninstall(ctx, endpoint); err != nil {
+					return nil, nil, err
+				}
+				res, err = p.Uninstall(ctx, endpoint.RuntimeKind)
+			}
+			status := model.EndpointActive
+			if action == "uninstall" {
+				status = model.EndpointDisabled
+			}
+			code := ""
+			if err != nil {
+				status = model.EndpointFailed
+				code = safeManagedErrorCode(err)
+			} else if res.RolledBack {
+				status = model.EndpointRolledBack
+			}
+			if err := database.GetDB().Model(&model.ManagedEndpoint{}).Where("id = ?", endpoint.Id).Updates(map[string]any{"status": status, "last_error": code}).Error; err != nil {
+				return nil, nil, err
+			}
+			if err := database.GetDB().Model(&model.ManagedEndpointApplyLog{}).Where("endpoint_id = ? AND action = ?", endpoint.Id, "runtime."+action).Order("id desc").Limit(1).Updates(map[string]any{"status": status, "error": code}).Error; err != nil {
+				return nil, nil, err
+			}
+			if err != nil {
+				return nil, nil, err
+			}
+			if action != "uninstall" {
+				if err := s.applyEndpoint(ctx, &endpoint, action); err != nil {
+					if tx != nil {
+						res, _ = tx.Rollback(ctx)
+						code = safeManagedErrorCode(err)
+						_ = database.GetDB().Model(&model.ManagedEndpoint{}).Where("id = ?", endpoint.Id).Updates(map[string]any{"status": model.EndpointRolledBack, "last_error": code}).Error
+						_ = database.GetDB().Model(&model.ManagedEndpointApplyLog{}).Where("endpoint_id = ? AND action = ?", endpoint.Id, "runtime."+action).Order("id desc").Limit(1).Updates(map[string]any{"status": model.EndpointRolledBack, "error": code}).Error
+						_ = res
+					}
+					return nil, nil, err
+				}
+				if tx != nil {
+					if err := tx.Commit(ctx); err != nil {
+						return nil, nil, err
+					}
+				}
+			}
+		}
 	default:
 		return nil, nil, fmt.Errorf("unsupported action %q", action)
 	}
 	view, err := ManagedEndpointService{}.Get(userId, id)
 	return view, nil, err
+}
+
+func (s ManagedEndpointMutationService) stopRuntimeBeforeUninstall(ctx context.Context, endpoint model.ManagedEndpoint) error {
+	d, err := s.resolveDriver(endpoint)
+	if err != nil {
+		return err
+	}
+	stopper, ok := d.(driver.Stopper)
+	if !ok {
+		return nil
+	}
+	inbound, err := s.inboundFromDurable(endpoint)
+	if err != nil {
+		return err
+	}
+	return stopper.Stop(ctx, inbound)
 }
 
 func (s ManagedEndpointMutationService) CreateClient(ctx context.Context, userId int, endpointRef string, req ManagedEndpointClientCreateRequest) (model.ManagedEndpointClient, error) {
@@ -957,25 +1082,39 @@ func (ManagedEndpointService) Capabilities() ManagedEndpointCapabilities {
 }
 
 func (ManagedEndpointService) InstallPlan(kind model.RuntimeKind) InstallPlan {
-	if kind != model.RuntimeAmneziaWG {
-		return InstallPlan{
-			RuntimeKind: kind,
-			Supported:   false,
-			Blocked:     true,
-			Reason:      "install planning is currently defined only for amneziawg",
-		}
+	return installPlanFromProvisioner(provisioner.NewLocal(provisioner.Config{}).Plan(kind))
+}
+
+func (ManagedEndpointService) InstallPlans() []InstallPlan {
+	kinds := provisioner.Kinds()
+	out := make([]InstallPlan, 0, len(kinds))
+	for _, kind := range kinds {
+		out = append(out, ManagedEndpointService{}.InstallPlan(kind))
 	}
-	return InstallPlan{
-		RuntimeKind:         model.RuntimeAmneziaWG,
-		Supported:           false,
-		Blocked:             true,
-		RequiresPinnedImage: true,
-		Reason:              "real install is blocked until this repo builds and publishes a reproducible GHCR AWG2 runtime image pinned by digest; current fleets use local amnezia-awg2:latest images with inconsistent IDs",
-		BackendProfiles: []InstallPlanBackendProfile{
-			{Kind: "docker-amnezia-awg2", ContainerName: "amnezia-awg2", HostConfigDir: "/opt/amnezia/state/amnezia-awg2", ContainerConfigDir: "/opt/amnezia/awg"},
-			{Kind: "native-awg", HostConfigDir: "/etc/amnezia/amneziawg"},
-		},
+	return out
+}
+
+func installPlanFromProvisioner(plan provisioner.Plan) InstallPlan {
+	out := InstallPlan{
+		RuntimeKind:         plan.RuntimeKind,
+		Supported:           plan.Supported,
+		Blocked:             plan.Blocked,
+		RequiresPinnedImage: plan.RequiresPinnedImage,
+		ImageRef:            plan.ArtifactRef,
+		ArtifactRef:         plan.ArtifactRef,
+		Version:             plan.Version,
+		Reason:              plan.Reason,
+		Capabilities:        plan.Capabilities,
 	}
+	switch plan.RuntimeKind {
+	case model.RuntimeAmneziaWG:
+		out.BackendProfiles = []InstallPlanBackendProfile{{Kind: "docker-amnezia-awg2", ContainerName: provisioner.AWG2ContainerName, HostConfigDir: provisioner.AWG2HostConfigPath, ContainerConfigDir: provisioner.AWG2GuestConfigPath}}
+	case model.RuntimeNaiveProxy:
+		out.BackendProfiles = []InstallPlanBackendProfile{{Kind: "docker-naiveproxy", ContainerName: provisioner.NaiveContainerName, HostConfigDir: provisioner.NaiveHostConfigPath, ContainerConfigDir: provisioner.NaiveGuestConfig}}
+	case model.RuntimeMieru:
+		out.BackendProfiles = []InstallPlanBackendProfile{{Kind: "native-mita", HostConfigDir: "/usr/local/bin"}}
+	}
+	return out
 }
 
 func phase0Capability(kind model.RuntimeKind, protocols ...model.ManagedProtocol) ManagedEndpointCapability {
@@ -1410,6 +1549,13 @@ func (s ManagedEndpointMutationService) resolveDriver(endpoint model.ManagedEndp
 		return nil, fmt.Errorf("%w: managed runtime provider unavailable", driver.ErrUnsupportedRuntime)
 	}
 	return s.Drivers.DriverForEndpoint(endpoint)
+}
+
+func (s ManagedEndpointMutationService) resolveProvisioner(endpoint model.ManagedEndpoint) (provisioner.Provisioner, error) {
+	if s.Drivers == nil {
+		return nil, fmt.Errorf("%w: managed runtime provider unavailable", driver.ErrUnsupportedRuntime)
+	}
+	return s.Drivers.ProvisionerForEndpoint(endpoint)
 }
 
 func ensureSingletonManagedEndpoint(tx *gorm.DB, endpoint model.ManagedEndpoint) error {

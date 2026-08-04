@@ -23,6 +23,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/nodecommand"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/provisioner"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/session"
 )
@@ -201,11 +202,34 @@ func (f fakeManagedRuntime) Driver(kind model.RuntimeKind) (driver.Driver, error
 	}
 	return f.driver, nil
 }
+
+func (f fakeManagedRuntime) Provisioner() provisioner.Provisioner {
+	return fakeNodeCommandProvisioner{}
+}
+
+type fakeNodeCommandProvisioner struct{}
+
+func (fakeNodeCommandProvisioner) Plan(kind model.RuntimeKind) provisioner.Plan {
+	return provisioner.Plan{RuntimeKind: kind, Supported: true, ArtifactRef: "test-ref", Version: "test"}
+}
+
+func (fakeNodeCommandProvisioner) Install(context.Context, model.RuntimeKind) (provisioner.Result, error) {
+	return provisioner.Result{State: "running", ArtifactRef: "test-ref", Version: "test"}, nil
+}
+
+func (fakeNodeCommandProvisioner) Update(context.Context, model.RuntimeKind) (provisioner.Result, error) {
+	return provisioner.Result{State: "running", ArtifactRef: "test-ref", Version: "test"}, nil
+}
+
+func (fakeNodeCommandProvisioner) Uninstall(context.Context, model.RuntimeKind) (provisioner.Result, error) {
+	return provisioner.Result{State: "removed", ArtifactRef: "test-ref", Version: "test"}, nil
+}
 func (f fakeManagedRuntime) AddInbound(context.Context, *model.Inbound) error { return nil }
 func (f fakeManagedRuntime) DelInbound(context.Context, *model.Inbound) error { return nil }
 func (f fakeManagedRuntime) UpdateInbound(context.Context, *model.Inbound, *model.Inbound) error {
 	return nil
 }
+
 func (f fakeManagedRuntime) AddUser(context.Context, *model.Inbound, map[string]any) error {
 	return nil
 }
@@ -222,6 +246,7 @@ func (f fakeManagedRuntime) RestartXray(context.Context) error          { return
 func (f fakeManagedRuntime) ResetClientTraffic(context.Context, *model.Inbound, string) error {
 	return nil
 }
+
 func (f fakeManagedRuntime) ResetInboundTraffic(context.Context, *model.Inbound) error {
 	return nil
 }
@@ -233,18 +258,23 @@ func (fakeNodeCommandDriver) Kind() model.RuntimeKind { return model.RuntimeAmne
 func (fakeNodeCommandDriver) Capabilities() driver.Capabilities {
 	return driver.Capabilities{EndpointLifecycle: true, Detect: true, Status: true, Health: true}
 }
+
 func (fakeNodeCommandDriver) Create(context.Context, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{}, driver.ErrUnsupportedOperation
 }
+
 func (fakeNodeCommandDriver) Update(context.Context, *model.Inbound, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{}, driver.ErrUnsupportedOperation
 }
+
 func (fakeNodeCommandDriver) Delete(context.Context, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{}, driver.ErrUnsupportedOperation
 }
+
 func (fakeNodeCommandDriver) Enable(context.Context, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{}, driver.ErrUnsupportedOperation
 }
+
 func (fakeNodeCommandDriver) Disable(context.Context, *model.Inbound) (driver.EndpointResult, error) {
 	return driver.EndpointResult{}, driver.ErrUnsupportedOperation
 }
@@ -252,9 +282,11 @@ func (fakeNodeCommandDriver) Restart(context.Context) error { return driver.ErrU
 func (fakeNodeCommandDriver) Status(context.Context, *model.Inbound) (driver.StatusResult, error) {
 	return driver.StatusResult{}, driver.ErrUnsupportedOperation
 }
+
 func (fakeNodeCommandDriver) Detect(context.Context) (driver.DetectResult, error) {
 	return driver.DetectResult{RuntimeKind: model.RuntimeAmneziaWG, Available: true}, nil
 }
+
 func (fakeNodeCommandDriver) Health(context.Context, *model.Inbound) (driver.HealthResult, error) {
 	return driver.HealthResult{}, driver.ErrUnsupportedOperation
 }
@@ -265,22 +297,29 @@ type unsupportedClientDriver struct{}
 func (unsupportedClientDriver) Create(context.Context, *model.Inbound, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (unsupportedClientDriver) Update(context.Context, *model.Inbound, string, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (unsupportedClientDriver) Delete(context.Context, *model.Inbound, string) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (unsupportedClientDriver) Enable(context.Context, *model.Inbound, model.Client) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (unsupportedClientDriver) Disable(context.Context, *model.Inbound, string) (driver.ClientResult, error) {
 	return driver.ClientResult{}, driver.ErrUnsupportedOperation
 }
+
 func (unsupportedClientDriver) Status(context.Context, *model.Inbound, string) (driver.ClientStatusResult, error) {
 	return driver.ClientStatusResult{}, driver.ErrUnsupportedOperation
 }
 
-var _ runtime.ManagedRuntime = fakeManagedRuntime{}
-var _ driver.Driver = fakeNodeCommandDriver{}
-var _ driver.ClientDriver = unsupportedClientDriver{}
+var (
+	_ runtime.ManagedRuntime = fakeManagedRuntime{}
+	_ driver.Driver          = fakeNodeCommandDriver{}
+	_ driver.ClientDriver    = unsupportedClientDriver{}
+)
