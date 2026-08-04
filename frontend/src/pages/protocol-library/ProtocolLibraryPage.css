@@ -1,4 +1,6 @@
 .protocol-library-page {
+  min-width: 0;
+  padding: 24px;
   padding-bottom: 32px;
 }
 
