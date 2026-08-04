@@ -37,6 +37,26 @@ jobs:
           go list ./... | grep -v '/frontend/node_modules/' > /tmp/go-packages.txt
           go test -shuffle=on -count=1 $(cat /tmp/go-packages.txt)
 
+  pinned-runtime-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify pinned managed runtime manifests exist in GHCR
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+          import subprocess
+
+          source = pathlib.Path("internal/web/runtime/provisioner/provisioner.go").read_text()
+          refs = re.findall(r'(?:AWG2|NaiveProxy)ImageRef\s*=\s*"([^"]+)"', source)
+          if len(refs) != 2:
+              raise SystemExit(f"expected two pinned runtime refs, found {len(refs)}")
+          for ref in refs:
+              subprocess.run(["docker", "manifest", "inspect", ref], check=True, stdout=subprocess.DEVNULL)
+              print(f"verified: {ref}")
+          PY
+
   postgres-durable-first:
     runs-on: ubuntu-latest
     services:
