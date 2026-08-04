@@ -205,6 +205,63 @@ func TestParseNaiveRequiresPassword(t *testing.T) {
 	}
 }
 
+func TestPercentEncodedPlusInUserinfoIsPreserved(t *testing.T) {
+	cases := []struct {
+		name     string
+		protocol string
+		raw      string
+		want     map[string]string
+	}{
+		{
+			name:     "hysteria2 password",
+			protocol: "hysteria2",
+			raw:      "hy2://auth%2Btoken@hy.example.com:443",
+			want:     map[string]string{"password": "auth+token"},
+		},
+		{
+			name:     "hysteria2 raw plus",
+			protocol: "hysteria2",
+			raw:      "hy2://auth+token@hy.example.com:443",
+			want:     map[string]string{"password": "auth+token"},
+		},
+		{
+			name:     "vless userinfo",
+			protocol: "vless",
+			raw:      "vless://id%2Bsuffix@vless.example.com:443?security=none&type=tcp",
+			want:     map[string]string{"uuid": "id+suffix"},
+		},
+		{
+			name:     "trojan password",
+			protocol: "trojan",
+			raw:      "trojan://pass%2Bword@tr.example.com:443",
+			want:     map[string]string{"password": "pass+word"},
+		},
+		{
+			name:     "naive credentials",
+			protocol: "naiveproxy",
+			raw:      "naive+https://user%2Bname:pass%2Bword@naive.example.com:443",
+			want:     map[string]string{"username": "user+name", "password": "pass+word"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			connection, err := ParseConnection(tc.protocol, tc.raw, tc.name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var generated map[string]any
+			if err := json.Unmarshal([]byte(connection.MihomoJSON), &generated); err != nil {
+				t.Fatal(err)
+			}
+			for key, want := range tc.want {
+				if got := generated[key]; got != want {
+					t.Fatalf("%s = %q, want %q", key, got, want)
+				}
+			}
+		})
+	}
+}
+
 func TestRedactHysteriaObfsPassword(t *testing.T) {
 	redacted := Redact("- name: hy\n  password: auth-secret\n  obfs-password: obfs-secret\n")
 	if strings.Contains(redacted, "auth-secret") || strings.Contains(redacted, "obfs-secret") {

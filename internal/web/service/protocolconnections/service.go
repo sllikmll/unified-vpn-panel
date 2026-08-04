@@ -392,7 +392,7 @@ func parseVLESS(raw, customName string) (map[string]any, bool, error) {
 			p["flow"] = normalizeVLESSFlow(parts[1])
 		}
 	}
-	p["uuid"] = unescape(user)
+	p["uuid"] = user
 	if flow := normalizeVLESSFlow(q.Get("flow")); flow != "" {
 		p["flow"] = flow
 	}
@@ -416,7 +416,7 @@ func parseTrojan(raw, customName string) (map[string]any, bool, error) {
 		return nil, true, fmt.Errorf("xhttp transport is supported by Mihomo only for VLESS proxies")
 	}
 	p := baseProxy(customName, u, "trojan")
-	p["password"] = unescape(u.User.Username())
+	p["password"] = u.User.Username()
 	p["udp"] = true
 	addTLSOptions(p, q, firstNonEmpty(q.Get("security"), "tls"), false)
 	p["network"] = netw
@@ -434,9 +434,9 @@ func parseHysteria2(raw, customName string) (map[string]any, bool, error) {
 		return nil, true, fmt.Errorf("invalid hysteria2 link")
 	}
 	p := baseProxy(customName, u, "hysteria2")
-	pass := unescape(u.User.Username())
+	pass := u.User.Username()
 	if pwd, ok := u.User.Password(); ok && pwd != "" {
-		pass += ":" + unescape(pwd)
+		pass += ":" + pwd
 	}
 	if pass == "" {
 		return nil, true, fmt.Errorf("invalid hysteria2 link")
@@ -474,8 +474,8 @@ func parseNaive(raw, customName string) (map[string]any, bool, error) {
 	}
 	password, hasPassword := u.User.Password()
 	p := baseProxy(customName, u, "http")
-	p["username"] = unescape(u.User.Username())
-	p["password"] = unescape(password)
+	p["username"] = u.User.Username()
+	p["password"] = password
 	p["tls"] = true
 	p["sni"] = u.Hostname()
 	if p["username"] == "" || !hasPassword || password == "" {
