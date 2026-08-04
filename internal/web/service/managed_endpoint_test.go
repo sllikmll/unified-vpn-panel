@@ -819,6 +819,30 @@ func TestManagedEndpointCreateRejectsSecondActiveSingletonRuntime(t *testing.T) 
 	}
 }
 
+func TestManagedEndpointDeleteTombstonesNeverAppliedFailureWithoutDriver(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	endpoint := model.ManagedEndpoint{
+		UserId: 1, RuntimeKind: model.RuntimeAmneziaWG, Protocol: "amneziawg",
+		Tag: "failed-first-install", Port: 32001, Enable: false,
+		Status: model.EndpointFailed, DesiredConfig: `{}`,
+	}
+	if err := database.GetDB().Create(&endpoint).Error; err != nil {
+		t.Fatal(err)
+	}
+	deleteCalls := 0
+	mutations := ManagedEndpointMutationService{Drivers: managedTestProvider{driver: managedTestDriver{kind: model.RuntimeAmneziaWG, deleteCalls: &deleteCalls}}}
+	if err := mutations.Delete(context.Background(), 1, fmt.Sprintf("managed-%d", endpoint.Id), "delete-never-applied"); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	var got model.ManagedEndpoint
+	if err := database.GetDB().First(&got, endpoint.Id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != model.EndpointDeleted || got.LastError != "" || got.Enable || deleteCalls != 0 {
+		t.Fatalf("endpoint=%+v deleteCalls=%d, want deleted tombstone without driver call", got, deleteCalls)
+	}
+}
+
 func TestManagedEndpointServiceProjectsLegacyAndNativeRowsRedacted(t *testing.T) {
 	initManagedEndpointServiceDB(t)
 	db := database.GetDB()

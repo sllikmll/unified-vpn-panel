@@ -503,6 +503,7 @@ func (s ManagedEndpointMutationService) Delete(ctx context.Context, userId int, 
 	db := database.GetDB()
 	reqHash := managedRequestHash("delete:"+id, nil)
 	replayed := false
+	neverApplied := false
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&endpoint, "id = ? AND user_id = ?", endpointID, userId).Error; err != nil {
 			return err
@@ -514,6 +515,7 @@ func (s ManagedEndpointMutationService) Delete(ctx context.Context, userId int, 
 		if endpoint.Status == model.EndpointDeleted {
 			return nil
 		}
+		neverApplied = endpoint.Status == model.EndpointFailed && strings.TrimSpace(endpoint.LastAppliedHash) == "" && strings.TrimSpace(endpoint.LastObservedHash) == ""
 		endpoint.Status = model.EndpointDeleting
 		endpoint.Enable = false
 		if err := tx.Save(&endpoint).Error; err != nil {
@@ -526,10 +528,13 @@ func (s ManagedEndpointMutationService) Delete(ctx context.Context, userId int, 
 	if replayed {
 		return nil
 	}
-	runtimeErr := s.callDriver(ctx, endpoint.RuntimeKind, func(d driver.Driver, inbound *model.Inbound) error {
-		_, err := d.Delete(ctx, inbound)
-		return err
-	}, &endpoint)
+	var runtimeErr error
+	if !neverApplied {
+		runtimeErr = s.callDriver(ctx, endpoint.RuntimeKind, func(d driver.Driver, inbound *model.Inbound) error {
+			_, err := d.Delete(ctx, inbound)
+			return err
+		}, &endpoint)
+	}
 	status := model.EndpointDeleted
 	code := ""
 	if runtimeErr != nil {
