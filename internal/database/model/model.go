@@ -786,17 +786,35 @@ type Node struct {
 	// Heartbeat-updated fields. UpdatedAt advances on every probe even when
 	// the row is otherwise unchanged so the UI's "last seen" tooltip is
 	// truthful without us having to read LastHeartbeat separately.
-	Status        string  `json:"status" gorm:"default:unknown" example:"online"` // online|offline|unknown
-	LastHeartbeat int64   `json:"lastHeartbeat" example:"1700000000"`             // unix seconds, 0 = never
-	LatencyMs     int     `json:"latencyMs" example:"42"`
-	XrayVersion   string  `json:"xrayVersion" example:"25.10.31"`
-	PanelVersion  string  `json:"panelVersion" gorm:"column:panel_version" example:"v3.x.x"`
-	CpuPct        float64 `json:"cpuPct" example:"23.5"`
-	MemPct        float64 `json:"memPct" example:"45.1"`
-	UptimeSecs    uint64  `json:"uptimeSecs" example:"86400"`
-	NetUp         uint64  `json:"netUp" gorm:"column:net_up" example:"1048576"`
-	NetDown       uint64  `json:"netDown" gorm:"column:net_down" example:"2097152"`
-	LastError     string  `json:"lastError"`
+	Status          string  `json:"status" gorm:"default:unknown" example:"online"` // online|offline|unknown
+	LastHeartbeat   int64   `json:"lastHeartbeat" example:"1700000000"`             // unix seconds, 0 = never
+	LatencyMs       int     `json:"latencyMs" example:"42"`
+	XrayVersion     string  `json:"xrayVersion" example:"25.10.31"`
+	PanelVersion    string  `json:"panelVersion" gorm:"column:panel_version" example:"v0.0.1"`
+	CpuPct          float64 `json:"cpuPct" example:"23.5"`
+	CpuCores        int     `json:"cpuCores" gorm:"column:cpu_cores" example:"4"`
+	LogicalPro      int     `json:"logicalPro" gorm:"column:logical_pro" example:"8"`
+	CpuSpeedMhz     int     `json:"cpuSpeedMhz" gorm:"column:cpu_speed_mhz" example:"2400"`
+	MemCurrent      uint64  `json:"memCurrent" gorm:"column:mem_current" example:"1073741824"`
+	MemTotal        uint64  `json:"memTotal" gorm:"column:mem_total" example:"2147483648"`
+	MemPct          float64 `json:"memPct" example:"45.1"`
+	SwapCurrent     uint64  `json:"swapCurrent" gorm:"column:swap_current" example:"0"`
+	SwapTotal       uint64  `json:"swapTotal" gorm:"column:swap_total" example:"0"`
+	DiskCurrent     uint64  `json:"diskCurrent" gorm:"column:disk_current" example:"10737418240"`
+	DiskTotal       uint64  `json:"diskTotal" gorm:"column:disk_total" example:"21474836480"`
+	UptimeSecs      uint64  `json:"uptimeSecs" example:"86400"`
+	NetUp           uint64  `json:"netUp" gorm:"column:net_up" example:"1048576"`
+	NetDown         uint64  `json:"netDown" gorm:"column:net_down" example:"2097152"`
+	NetTrafficSent  uint64  `json:"netTrafficSent" gorm:"column:net_traffic_sent" example:"104857600"`
+	NetTrafficRecv  uint64  `json:"netTrafficRecv" gorm:"column:net_traffic_recv" example:"209715200"`
+	TcpCount        int     `json:"tcpCount" gorm:"column:tcp_count" example:"128"`
+	UdpCount        int     `json:"udpCount" gorm:"column:udp_count" example:"16"`
+	AppStatsMem     uint64  `json:"appStatsMem" gorm:"column:app_stats_mem" example:"67108864"`
+	AppStatsThreads int     `json:"appStatsThreads" gorm:"column:app_stats_threads" example:"12"`
+	AppStatsUptime  uint64  `json:"appStatsUptime" gorm:"column:app_stats_uptime" example:"3600"`
+	PublicIPV4      string  `json:"publicIpV4" gorm:"column:public_ip_v4" example:"203.0.113.10"`
+	PublicIPV6      string  `json:"publicIpV6" gorm:"column:public_ip_v6" example:"2001:db8::10"`
+	LastError       string  `json:"lastError"`
 
 	// XrayState and XrayError are captured from the remote node's /panel/api/server/status
 	// during heartbeats. They let the central panel distinguish "panel API reachable"
@@ -844,7 +862,7 @@ type NodeSummary struct {
 	Status        string `json:"status"`
 	LastHeartbeat int64  `json:"lastHeartbeat"`
 	LatencyMs     int    `json:"latencyMs"`
-	PanelVersion  string `json:"panelVersion"`
+	PanelVersion  string `json:"panelVersion" example:"v0.0.1"`
 	XrayVersion   string `json:"xrayVersion"`
 	// XrayState/XrayError forwarded so masters can surface xray failure on transitive sub-nodes too.
 	XrayState string `json:"xrayState"`

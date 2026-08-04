@@ -4,15 +4,15 @@ export type InstallMethod = 'script' | 'docker';
 
 export interface InstallOptions {
   method: InstallMethod;
-  /** A release tag like `v3.4.1`, or empty/`latest` for the latest release. */
+  /** A release tag like `v0.0.1`, or empty/`latest` for the latest release. */
   version: string;
   enableFail2ban: boolean;
   panelPort: string;
   webBasePath: string;
 }
 
-const REPO_RAW = 'https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh';
-const IMAGE = 'ghcr.io/mhsanaei/3x-ui:latest';
+const REPO_RAW = 'https://raw.githubusercontent.com/sllikmll/unified-vpn-panel/main/install.sh';
+const IMAGE = 'ghcr.io/sllikmll/unified-vpn-panel:latest';
 
 function isLatest(version: string): boolean {
   const v = version.trim().toLowerCase();
@@ -20,9 +20,9 @@ function isLatest(version: string): boolean {
 }
 
 /**
- * The one-line script install command. The master install script reads the
+ * The one-line script install command. The main install script reads the
  * version as its first argument: empty = latest stable release, a tag like
- * `v3.4.0` = that release, and `dev-latest` = the rolling per-commit dev build.
+ * `v0.0.1` = that release, and `dev-latest` = the rolling per-commit dev build.
  */
 export function buildScriptCommand(options: InstallOptions): string {
   if (isLatest(options.version)) {

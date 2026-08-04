@@ -30,12 +30,30 @@ type NodeView struct {
 	LastHeartbeat       int64    `json:"lastHeartbeat" example:"1700000000"`
 	LatencyMs           int      `json:"latencyMs" example:"42"`
 	XrayVersion         string   `json:"xrayVersion" example:"25.10.31"`
-	PanelVersion        string   `json:"panelVersion" example:"v3.x.x"`
+	PanelVersion        string   `json:"panelVersion" example:"v0.0.1"`
 	CpuPct              float64  `json:"cpuPct" example:"12.5"`
+	CpuCores            int      `json:"cpuCores" example:"4"`
+	LogicalPro          int      `json:"logicalPro" example:"8"`
+	CpuSpeedMhz         int      `json:"cpuSpeedMhz" example:"2400"`
+	MemCurrent          uint64   `json:"memCurrent" example:"1073741824"`
+	MemTotal            uint64   `json:"memTotal" example:"2147483648"`
 	MemPct              float64  `json:"memPct" example:"45.2"`
+	SwapCurrent         uint64   `json:"swapCurrent" example:"0"`
+	SwapTotal           uint64   `json:"swapTotal" example:"0"`
+	DiskCurrent         uint64   `json:"diskCurrent" example:"10737418240"`
+	DiskTotal           uint64   `json:"diskTotal" example:"21474836480"`
 	UptimeSecs          uint64   `json:"uptimeSecs" example:"86400"`
 	NetUp               uint64   `json:"netUp" example:"2097152"`
 	NetDown             uint64   `json:"netDown" example:"1048576"`
+	NetTrafficSent      uint64   `json:"netTrafficSent" example:"104857600"`
+	NetTrafficRecv      uint64   `json:"netTrafficRecv" example:"209715200"`
+	TcpCount            int      `json:"tcpCount" example:"128"`
+	UdpCount            int      `json:"udpCount" example:"16"`
+	AppStatsMem         uint64   `json:"appStatsMem" example:"67108864"`
+	AppStatsThreads     int      `json:"appStatsThreads" example:"12"`
+	AppStatsUptime      uint64   `json:"appStatsUptime" example:"3600"`
+	PublicIPV4          string   `json:"publicIpV4" example:"203.0.113.10"`
+	PublicIPV6          string   `json:"publicIpV6" example:"2001:db8::10"`
 	LastError           string   `json:"lastError" example:""`
 	XrayState           string   `json:"xrayState" example:"running"`
 	XrayError           string   `json:"xrayError" example:""`
@@ -80,10 +98,28 @@ func toNodeView(n *model.Node) *NodeView {
 		XrayVersion:         n.XrayVersion,
 		PanelVersion:        n.PanelVersion,
 		CpuPct:              n.CpuPct,
+		CpuCores:            n.CpuCores,
+		LogicalPro:          n.LogicalPro,
+		CpuSpeedMhz:         n.CpuSpeedMhz,
+		MemCurrent:          n.MemCurrent,
+		MemTotal:            n.MemTotal,
 		MemPct:              n.MemPct,
+		SwapCurrent:         n.SwapCurrent,
+		SwapTotal:           n.SwapTotal,
+		DiskCurrent:         n.DiskCurrent,
+		DiskTotal:           n.DiskTotal,
 		UptimeSecs:          n.UptimeSecs,
 		NetUp:               n.NetUp,
 		NetDown:             n.NetDown,
+		NetTrafficSent:      n.NetTrafficSent,
+		NetTrafficRecv:      n.NetTrafficRecv,
+		TcpCount:            n.TcpCount,
+		UdpCount:            n.UdpCount,
+		AppStatsMem:         n.AppStatsMem,
+		AppStatsThreads:     n.AppStatsThreads,
+		AppStatsUptime:      n.AppStatsUptime,
+		PublicIPV4:          n.PublicIPV4,
+		PublicIPV6:          n.PublicIPV6,
 		LastError:           n.LastError,
 		XrayState:           n.XrayState,
 		XrayError:           n.XrayError,

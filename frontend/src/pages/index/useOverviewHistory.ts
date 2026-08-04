@@ -65,10 +65,22 @@ export function peak(values: number[]): number {
 
 /* the seed bucket must be in the backend's allowedHistoryBuckets whitelist;
    2s is the smallest and matches the status poll cadence */
-export function useOverviewHistory(status: Status, hasData: boolean): OverviewHistory {
+export interface OverviewHistoryOptions {
+  targetKey?: string;
+  seedLocal?: boolean;
+}
+
+export function useOverviewHistory(status: Status, hasData: boolean, options?: OverviewHistoryOptions): OverviewHistory {
+  const targetKey = options?.targetKey ?? 'local';
+  const seedLocal = options?.seedLocal ?? true;
   const [trend, setTrend] = useState<HistoryWindow>(emptyWindow);
 
   useEffect(() => {
+    setTrend(emptyWindow());
+  }, [targetKey]);
+
+  useEffect(() => {
+    if (!seedLocal) return undefined;
     let cancelled = false;
 
     const seed = async () => {
@@ -114,7 +126,7 @@ export function useOverviewHistory(status: Status, hasData: boolean): OverviewHi
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [seedLocal, targetKey]);
 
   useEffect(() => {
     if (!hasData) return;

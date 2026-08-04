@@ -106,9 +106,7 @@
     "routing": "路由",
     "outbounds": "出站",
     "apiDocs": "API 文档",
-    "donate": "捐赠",
     "hosts": "主机",
-    "docs": "文档",
     "openMenu": "打开菜单",
     "pinSidebar": "固定侧边栏",
     "unpinSidebar": "取消固定侧边栏",
@@ -258,7 +256,17 @@
       "healthCritical": "{list} — 危险",
       "panel": "面板",
       "threads": "线程",
-      "uptime": "运行时间"
+      "uptime": "运行时间",
+      "dashboardTarget": "Dashboard target",
+      "localServer": "Local server",
+      "remoteReadOnly": "Remote node telemetry is read-only. Local server actions are disabled for this target.",
+      "readOnlyTarget": "Read-only target",
+      "remoteUnavailable": {
+        "disabled": "This node is disabled.",
+        "offline": "This node is offline.",
+        "stale": "The latest heartbeat snapshot is stale.",
+        "unavailable": "Telemetry is unavailable for this node."
+      }
     },
     "inbounds": {
       "totalDownUp": "总上传 / 下载",

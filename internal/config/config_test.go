@@ -25,6 +25,12 @@ func TestGetPanelVersion(t *testing.T) {
 	}
 }
 
+func TestGetBaseVersionIsProductVersion(t *testing.T) {
+	if got := GetBaseVersion(); got != "0.0.1" {
+		t.Fatalf("GetBaseVersion = %q, want 0.0.1", got)
+	}
+}
+
 func TestGetPortOverride(t *testing.T) {
 	tests := []struct {
 		name       string
