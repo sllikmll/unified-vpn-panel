@@ -12,8 +12,11 @@ import (
 
 	"gorm.io/gorm"
 
+	awg "github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/mieru"
+	"github.com/mhsanaei/3x-ui/v3/internal/naiveproxy"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/provisioner"
 )
@@ -280,7 +283,7 @@ func TestManagedEndpointSecretGenerationUsesNewestForRestartReconstruction(t *te
 	if count != 2 {
 		t.Fatalf("historical privateKey generations retained = %d, want 2", count)
 	}
-	clients, err := mutations.awgClientsFromDB(database.GetDB(), endpoint.Id)
+	clients, err := mutations.awgClientsFromDB(database.GetDB(), endpoint.Id, awg.ClientDefaults{})
 	if err != nil {
 		t.Fatalf("awgClientsFromDB: %v", err)
 	}
@@ -988,5 +991,68 @@ func TestManagedEndpointListSuppressesLegacyRowWhenManagedProjectionReferencesIt
 	}
 	if len(rows) != 1 || rows[0].Id != fmt.Sprintf("managed-%d", managed.Id) {
 		t.Fatalf("expected only managed projection, got %#v", rows)
+	}
+}
+
+func TestManagedFrontendConfigsDecodeAndReachDesiredState(t *testing.T) {
+	mutations := ManagedEndpointMutationService{Secrets: testSecretService(23)}
+
+	awgReq := ManagedEndpointCreateRequest{
+		RuntimeKind: model.RuntimeAmneziaWG, Protocol: "amneziawg", Tag: "awg", Port: 32001,
+		Config: json.RawMessage(`{"interfaceName":"awg0","listenPort":32001,"mtu":1420,"ipv4Address":"10.77.0.1/24","ipv4Pool":"10.77.0.0/24","dns":"1.1.1.1","clientAllowedIPs":"0.0.0.0/0","persistentKeepalive":25,"jc":7,"jmin":40,"jmax":120,"s1":80,"s2":149,"s3":24,"s4":12,"h1":"100-200","h2":"300-400","h3":"500-600","h4":"700-800"}`),
+	}
+	if err := awgReq.normalizeConfig(); err != nil {
+		t.Fatalf("AWG frontend config: %v", err)
+	}
+	awgRaw, _, err := mutations.buildAWGDesired(model.ManagedEndpoint{Id: 1, Port: 32001, Enable: true}, awgReq.AWG)
+	if err != nil {
+		t.Fatalf("build AWG desired: %v", err)
+	}
+	var awgCfg awg.DesiredConfig
+	if err := json.Unmarshal([]byte(awgRaw), &awgCfg); err != nil {
+		t.Fatal(err)
+	}
+	if awgCfg.Server.Jc != 7 || awgCfg.Server.IPv4Pool != "10.77.0.0/24" || awgCfg.ClientDefaults.PersistentKeepalive != 25 {
+		t.Fatalf("AWG form values lost: %#v", awgCfg)
+	}
+
+	mieruReq := ManagedEndpointCreateRequest{
+		RuntimeKind: model.RuntimeMieru, Protocol: "mieru", Tag: "mieru", Port: 32002,
+		Config: json.RawMessage(`{"portBindings":[{"protocol":"TCP","port":32002}],"mtu":1400}`),
+	}
+	if err := mieruReq.normalizeConfig(); err != nil {
+		t.Fatalf("Mieru frontend config: %v", err)
+	}
+	mieruRaw, _, err := mutations.buildMieruDesired(model.ManagedEndpoint{Id: 2, Port: 32002, Enable: true}, mieruReq.Mieru)
+	if err != nil {
+		t.Fatalf("build Mieru desired: %v", err)
+	}
+	var mieruCfg mieru.ServerConfig
+	if err := json.Unmarshal([]byte(mieruRaw), &mieruCfg); err != nil {
+		t.Fatal(err)
+	}
+	if len(mieruCfg.PortBindings) != 1 || mieruCfg.PortBindings[0].Port != 32002 || mieruCfg.MTU != 1400 {
+		t.Fatalf("Mieru form values lost: %#v", mieruCfg)
+	}
+
+	naiveReq := ManagedEndpointCreateRequest{
+		RuntimeKind: model.RuntimeNaiveProxy, Protocol: "naiveproxy", Tag: "naive", Port: 32003,
+		Config: json.RawMessage(`{"domain":"3xamstnew.dogonin.ru","sni":"3xamstnew.dogonin.ru","listenIp":"0.0.0.0","port":32003,"tlsMode":"acme","acmeEmail":""}`),
+	}
+	if err := naiveReq.normalizeConfig(); err != nil {
+		t.Fatalf("Naive frontend config: %v", err)
+	}
+	naiveRaw, _, err := mutations.buildNaiveDesired(model.ManagedEndpoint{Id: 3, Port: 32003, Enable: true}, naiveReq.NaiveProxy)
+	if err != nil {
+		t.Fatalf("build Naive desired: %v", err)
+	}
+	var naiveCfg struct {
+		Endpoint naiveproxy.Endpoint `json:"endpoint"`
+	}
+	if err := json.Unmarshal([]byte(naiveRaw), &naiveCfg); err != nil {
+		t.Fatal(err)
+	}
+	if naiveCfg.Endpoint.Domain != "3xamstnew.dogonin.ru" || naiveCfg.Endpoint.Port != 32003 {
+		t.Fatalf("Naive form values lost: %#v", naiveCfg)
 	}
 }

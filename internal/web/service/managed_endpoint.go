@@ -21,6 +21,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/mieru"
 	"github.com/mhsanaei/3x-ui/v3/internal/naiveproxy"
+	wgutil "github.com/mhsanaei/3x-ui/v3/internal/util/wireguard"
 	webruntime "github.com/mhsanaei/3x-ui/v3/internal/web/runtime"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/provisioner"
@@ -224,23 +225,48 @@ type ManagedEndpointUpdateRequest struct {
 }
 
 type ManagedAWGConfig struct {
-	Endpoint         string `json:"endpoint,omitempty"`
-	IPv4Address      string `json:"ipv4Address,omitempty"`
-	IPv4Pool         string `json:"ipv4Pool,omitempty"`
-	DNS              string `json:"dns,omitempty"`
-	MTU              int    `json:"mtu,omitempty"`
-	ServerPrivateKey string `json:"serverPrivateKey,omitempty"`
-	ServerPublicKey  string `json:"serverPublicKey,omitempty"`
+	Endpoint            string `json:"endpoint,omitempty"`
+	InterfaceName       string `json:"interfaceName,omitempty"`
+	ListenPort          int    `json:"listenPort,omitempty"`
+	IPv4Address         string `json:"ipv4Address,omitempty"`
+	IPv4Pool            string `json:"ipv4Pool,omitempty"`
+	DNS                 string `json:"dns,omitempty"`
+	MTU                 int    `json:"mtu,omitempty"`
+	ClientAllowedIPs    string `json:"clientAllowedIPs,omitempty"`
+	PersistentKeepalive int    `json:"persistentKeepalive,omitempty"`
+	Jc                  int    `json:"jc,omitempty"`
+	Jmin                int    `json:"jmin,omitempty"`
+	Jmax                int    `json:"jmax,omitempty"`
+	S1                  int    `json:"s1,omitempty"`
+	S2                  int    `json:"s2,omitempty"`
+	S3                  int    `json:"s3,omitempty"`
+	S4                  int    `json:"s4,omitempty"`
+	H1                  string `json:"h1,omitempty"`
+	H2                  string `json:"h2,omitempty"`
+	H3                  string `json:"h3,omitempty"`
+	H4                  string `json:"h4,omitempty"`
+	ServerPrivateKey    string `json:"serverPrivateKey,omitempty"`
+	ServerPublicKey     string `json:"serverPublicKey,omitempty"`
 }
 
 type ManagedMieruConfig struct {
-	MTU       int    `json:"mtu,omitempty"`
-	Transport string `json:"transport,omitempty"`
+	MTU          int                       `json:"mtu,omitempty"`
+	Transport    string                    `json:"transport,omitempty"`
+	PortBindings []ManagedMieruPortBinding `json:"portBindings,omitempty"`
+}
+
+type ManagedMieruPortBinding struct {
+	Port      int    `json:"port,omitempty"`
+	Protocol  string `json:"protocol,omitempty"`
+	PortRange string `json:"portRange,omitempty"`
 }
 
 type ManagedNaiveProxyConfig struct {
 	Domain    string `json:"domain,omitempty"`
+	SNI       string `json:"sni,omitempty"`
 	ListenIP  string `json:"listenIp,omitempty"`
+	Port      int    `json:"port,omitempty"`
+	TLSMode   string `json:"tlsMode,omitempty"`
 	ACMEEmail string `json:"acmeEmail,omitempty"`
 }
 
@@ -730,7 +756,7 @@ func (s ManagedEndpointMutationService) CreateClient(ctx context.Context, userId
 		if req.Address != "" {
 			client.Address = strings.TrimSpace(req.Address)
 		} else if endpoint.RuntimeKind == model.RuntimeAmneziaWG {
-			addr, err := allocateAWGIPv4(tx, endpoint.Id)
+			addr, err := allocateAWGIPv4(tx, endpoint)
 			if err != nil {
 				return err
 			}
@@ -947,7 +973,11 @@ func (s ManagedEndpointMutationService) ClientExport(userId int, endpointRef str
 	out := ManagedClientExportResponse{Filename: strings.TrimSpace(endpoint.Tag) + "-" + strings.TrimSpace(client.SubID) + ".txt", Subscriptions: managedSubscriptionURLs(client.SubID)}
 	switch endpoint.RuntimeKind {
 	case model.RuntimeAmneziaWG:
-		clients, err := s.awgClientsFromDB(database.GetDB(), endpoint.Id)
+		var cfg awg.DesiredConfig
+		if err := json.Unmarshal([]byte(endpoint.DesiredConfig), &cfg); err != nil {
+			return ManagedClientExportResponse{}, err
+		}
+		clients, err := s.awgClientsFromDB(database.GetDB(), endpoint.Id, cfg.ClientDefaults)
 		if err != nil {
 			return ManagedClientExportResponse{}, err
 		}
@@ -1601,7 +1631,14 @@ func (s ManagedEndpointMutationService) buildAWGDesired(endpoint model.ManagedEn
 	if req == nil {
 		req = &ManagedAWGConfig{}
 	}
-	server := awg.DefaultServer("awg0", endpoint.Port)
+	interfaceName := strings.TrimSpace(req.InterfaceName)
+	if interfaceName == "" {
+		interfaceName = "awg0"
+	}
+	if req.ListenPort != 0 && req.ListenPort != endpoint.Port {
+		return "", nil, errors.New("amneziawg listenPort must match endpoint port")
+	}
+	server := awg.DefaultServer(interfaceName, endpoint.Port)
 	server.Enable = endpoint.Enable
 	server.Endpoint = strings.TrimSpace(req.Endpoint)
 	if req.IPv4Address != "" {
@@ -1616,22 +1653,52 @@ func (s ManagedEndpointMutationService) buildAWGDesired(endpoint model.ManagedEn
 	if req.MTU != 0 {
 		server.MTU = req.MTU
 	}
+	if req.Jc != 0 {
+		server.Obfuscation20 = awg.Obfuscation20{
+			Jc: req.Jc, Jmin: req.Jmin, Jmax: req.Jmax,
+			S1: req.S1, S2: req.S2, S3: req.S3, S4: req.S4,
+			H1: strings.TrimSpace(req.H1), H2: strings.TrimSpace(req.H2),
+			H3: strings.TrimSpace(req.H3), H4: strings.TrimSpace(req.H4),
+		}
+	}
 	privateKey := strings.TrimSpace(req.ServerPrivateKey)
 	publicKey := strings.TrimSpace(req.ServerPublicKey)
 	if privateKey == "" {
 		var err error
-		privateKey, err = awg.GenerateKey()
+		privateKey, publicKey, err = wgutil.GenerateWireguardKeypair()
 		if err != nil {
 			return "", nil, err
 		}
 	}
 	if publicKey == "" {
-		publicKey = "managed-public-" + shortHash(privateKey)
+		var err error
+		publicKey, err = wgutil.PublicKeyFromPrivate(privateKey)
+		if err != nil {
+			return "", nil, err
+		}
+	}
+	server.PrivateKey = privateKey
+	server.PublicKey = publicKey
+	if err := awg.ValidateServer(server); err != nil {
+		return "", nil, err
+	}
+	clientAllowedIPs := strings.TrimSpace(req.ClientAllowedIPs)
+	if clientAllowedIPs == "" {
+		clientAllowedIPs = "0.0.0.0/0"
+	}
+	keepalive := req.PersistentKeepalive
+	if keepalive == 0 {
+		keepalive = 25
 	}
 	redacted := server
 	redacted.PrivateKey = secretRef("managed_endpoint", endpoint.Id, "server.privateKey")
 	redacted.PublicKey = publicKey
-	raw, err := json.Marshal(awg.DesiredConfig{Server: redacted})
+	raw, err := json.Marshal(awg.DesiredConfig{
+		Server: redacted,
+		ClientDefaults: awg.ClientDefaults{
+			AllowedIPs: clientAllowedIPs, PersistentKeepalive: keepalive,
+		},
+	})
 	if err != nil {
 		return "", nil, err
 	}
@@ -1646,11 +1713,27 @@ func (s ManagedEndpointMutationService) buildMieruDesired(endpoint model.Managed
 	if req == nil {
 		req = &ManagedMieruConfig{}
 	}
-	transport := mieru.TransportTCP
-	if strings.EqualFold(req.Transport, string(mieru.TransportUDP)) {
-		transport = mieru.TransportUDP
+	bindings := make([]mieru.PortBinding, 0, len(req.PortBindings))
+	for _, input := range req.PortBindings {
+		transport := mieru.Transport(strings.ToUpper(strings.TrimSpace(input.Protocol)))
+		if transport == "" {
+			transport = mieru.TransportTCP
+		}
+		bindings = append(bindings, mieru.PortBinding{
+			Port: input.Port, Protocol: transport, PortRange: strings.TrimSpace(input.PortRange),
+		})
 	}
-	cfg := mieru.ServerConfig{PortBindings: []mieru.PortBinding{{Port: endpoint.Port, Protocol: transport}}, MTU: req.MTU}
+	if len(bindings) == 0 {
+		transport := mieru.TransportTCP
+		if strings.EqualFold(req.Transport, string(mieru.TransportUDP)) {
+			transport = mieru.TransportUDP
+		}
+		bindings = []mieru.PortBinding{{Port: endpoint.Port, Protocol: transport}}
+	}
+	cfg := mieru.ServerConfig{PortBindings: bindings, MTU: req.MTU}
+	if err := cfg.ValidateFull(); err != nil {
+		return "", nil, err
+	}
 	raw, err := json.Marshal(mieru.RedactConfig(cfg))
 	return string(raw), nil, err
 }
@@ -1658,6 +1741,18 @@ func (s ManagedEndpointMutationService) buildMieruDesired(endpoint model.Managed
 func (s ManagedEndpointMutationService) buildNaiveDesired(endpoint model.ManagedEndpoint, req *ManagedNaiveProxyConfig) (string, []model.ManagedSecret, error) {
 	if req == nil {
 		return "", nil, errors.New("naiveproxy config is required")
+	}
+	domain := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(req.Domain)), ".")
+	sni := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(req.SNI)), ".")
+	if sni != "" && sni != domain {
+		return "", nil, errors.New("naiveproxy sni must match domain")
+	}
+	if req.Port != 0 && req.Port != endpoint.Port {
+		return "", nil, errors.New("naiveproxy config port must match endpoint port")
+	}
+	tlsMode := strings.ToLower(strings.TrimSpace(req.TLSMode))
+	if tlsMode != "" && tlsMode != "acme" {
+		return "", nil, errors.New("naiveproxy managed TLS is not supported; use acme")
 	}
 	listenIP := strings.TrimSpace(req.ListenIP)
 	if listenIP == "" {
@@ -1668,7 +1763,7 @@ func (s ManagedEndpointMutationService) buildNaiveDesired(endpoint model.Managed
 		// state without accepting arbitrary bind paths or command flags.
 		listenIP = "127.0.0.1"
 	}
-	server := naiveproxy.Server{Endpoint: naiveproxy.Endpoint{Domain: strings.TrimSpace(req.Domain), ListenIP: listenIP, Port: endpoint.Port, ACMEEmail: strings.TrimSpace(req.ACMEEmail)}}
+	server := naiveproxy.Server{Endpoint: naiveproxy.Endpoint{Domain: domain, ListenIP: listenIP, Port: endpoint.Port, ACMEEmail: strings.TrimSpace(req.ACMEEmail)}}
 	if err := server.Endpoint.Validate(); err != nil {
 		return "", nil, err
 	}
@@ -1878,7 +1973,7 @@ func (s ManagedEndpointMutationService) inboundFromDurable(endpoint model.Manage
 			return nil, err
 		}
 		cfg.Server.PrivateKey = string(plaintext)
-		clients, err := s.awgClientsFromDB(database.GetDB(), endpoint.Id)
+		clients, err := s.awgClientsFromDB(database.GetDB(), endpoint.Id, cfg.ClientDefaults)
 		if err != nil {
 			return nil, err
 		}
@@ -1956,13 +2051,16 @@ func (s ManagedEndpointMutationService) clientSecrets(endpoint model.ManagedEndp
 		psk := strings.TrimSpace(req.PreSharedKey)
 		var err error
 		if privateKey == "" {
-			privateKey, err = awg.GenerateKey()
+			privateKey, publicKey, err = wgutil.GenerateWireguardKeypair()
 			if err != nil {
 				return nil, err
 			}
 		}
 		if publicKey == "" {
-			publicKey = "managed-public-" + shortHash(privateKey)
+			publicKey, err = wgutil.PublicKeyFromPrivate(privateKey)
+			if err != nil {
+				return nil, err
+			}
 		}
 		if psk == "" {
 			psk, err = awg.GenerateKey()
@@ -1998,7 +2096,7 @@ func (s ManagedEndpointMutationService) rebuildDesiredFromDB(tx *gorm.DB, endpoi
 		if err := json.Unmarshal([]byte(endpoint.DesiredConfig), &cfg); err != nil {
 			return "", err
 		}
-		clients, err := s.awgClientsFromDB(tx, endpoint.Id)
+		clients, err := s.awgClientsFromDB(tx, endpoint.Id, cfg.ClientDefaults)
 		if err != nil {
 			return "", err
 		}
@@ -2010,7 +2108,11 @@ func (s ManagedEndpointMutationService) rebuildDesiredFromDB(tx *gorm.DB, endpoi
 		raw, err := json.Marshal(cfg)
 		return string(raw), err
 	case model.RuntimeMieru:
-		cfg := mieru.ServerConfig{PortBindings: []mieru.PortBinding{{Port: endpoint.Port, Protocol: mieru.TransportTCP}}}
+		var cfg mieru.ServerConfig
+		if err := json.Unmarshal([]byte(endpoint.DesiredConfig), &cfg); err != nil {
+			return "", err
+		}
+		cfg.Users = nil
 		var clients []model.ManagedEndpointClient
 		if err := tx.Where("endpoint_id = ? AND state <> ?", endpoint.Id, model.EndpointClientDeleted).Order("id asc").Find(&clients).Error; err != nil {
 			return "", err
@@ -2042,7 +2144,13 @@ func (s ManagedEndpointMutationService) rebuildDesiredFromDB(tx *gorm.DB, endpoi
 	}
 }
 
-func (s ManagedEndpointMutationService) awgClientsFromDB(tx *gorm.DB, endpointID int) ([]awg.Client, error) {
+func (s ManagedEndpointMutationService) awgClientsFromDB(tx *gorm.DB, endpointID int, defaults awg.ClientDefaults) ([]awg.Client, error) {
+	if strings.TrimSpace(defaults.AllowedIPs) == "" {
+		defaults.AllowedIPs = "0.0.0.0/0"
+	}
+	if defaults.PersistentKeepalive == 0 {
+		defaults.PersistentKeepalive = 25
+	}
 	var rows []model.ManagedEndpointClient
 	if err := tx.Where("endpoint_id = ? AND state <> ?", endpointID, model.EndpointClientDeleted).Order("id asc").Find(&rows).Error; err != nil {
 		return nil, err
@@ -2064,27 +2172,45 @@ func (s ManagedEndpointMutationService) awgClientsFromDB(tx *gorm.DB, endpointID
 			}
 			secrets[secretRow.SecretKind] = string(plaintext)
 		}
-		clients = append(clients, awg.Client{ID: row.PublicIdentity, Email: row.Email, PrivateKey: secrets["privateKey"], PublicKey: secrets["publicKey"], PresharedKey: secrets["presharedKey"], IPv4Address: row.Address, AllowedIPs: row.Address, ClientAllowedIPs: "0.0.0.0/0", PersistentKeepalive: 25, Enable: row.Enable})
+		clients = append(clients, awg.Client{ID: row.PublicIdentity, Email: row.Email, PrivateKey: secrets["privateKey"], PublicKey: secrets["publicKey"], PresharedKey: secrets["presharedKey"], IPv4Address: row.Address, AllowedIPs: row.Address, ClientAllowedIPs: defaults.AllowedIPs, PersistentKeepalive: defaults.PersistentKeepalive, Enable: row.Enable})
 	}
 	return clients, nil
 }
 
-func allocateAWGIPv4(tx *gorm.DB, endpointID int) (string, error) {
+func allocateAWGIPv4(tx *gorm.DB, endpoint model.ManagedEndpoint) (string, error) {
 	var used []string
-	if err := tx.Model(&model.ManagedEndpointClient{}).Where("endpoint_id = ?", endpointID).Pluck("address", &used).Error; err != nil {
+	if err := tx.Model(&model.ManagedEndpointClient{}).Where("endpoint_id = ?", endpoint.Id).Pluck("address", &used).Error; err != nil {
 		return "", err
 	}
 	seen := map[string]bool{}
 	for _, addr := range used {
 		seen[strings.TrimSpace(addr)] = true
 	}
-	prefix := netip.MustParsePrefix("10.66.66.0/24")
-	for i := 2; i < 255; i++ {
-		addr := netip.AddrFrom4([4]byte{10, 66, 66, byte(i)})
+	var desired awg.DesiredConfig
+	if err := json.Unmarshal([]byte(endpoint.DesiredConfig), &desired); err != nil {
+		return "", err
+	}
+	prefix, err := netip.ParsePrefix(strings.TrimSpace(desired.Server.IPv4Pool))
+	if err != nil || !prefix.Addr().Is4() || prefix.Bits() > 30 {
+		return "", errors.New("invalid amneziawg IPv4 pool")
+	}
+	prefix = prefix.Masked()
+	serverPrefix, err := netip.ParsePrefix(strings.TrimSpace(desired.Server.IPv4Address))
+	if err != nil || !serverPrefix.Addr().Is4() {
+		return "", errors.New("invalid amneziawg server IPv4 address")
+	}
+	serverAddr := serverPrefix.Addr()
+	addr := prefix.Addr().Next()
+	for scanned := 0; scanned < 65536 && addr.IsValid() && prefix.Contains(addr); scanned++ {
+		next := addr.Next()
+		if !next.IsValid() || !prefix.Contains(next) {
+			break // IPv4 broadcast address
+		}
 		cidr := addr.String() + "/32"
-		if prefix.Contains(addr) && !seen[cidr] {
+		if addr != serverAddr && !seen[cidr] {
 			return cidr, nil
 		}
+		addr = next
 	}
 	return "", errors.New("amneziawg IPv4 pool exhausted")
 }
@@ -2094,11 +2220,6 @@ func secretRef(ownerType string, ownerID int, kind string) string {
 		return "managed-secret://" + ownerType + "/" + kind
 	}
 	return fmt.Sprintf("managed-secret://%s/%d/%s", ownerType, ownerID, kind)
-}
-
-func shortHash(value string) string {
-	sum := sha256.Sum256([]byte(value))
-	return fmt.Sprintf("%x", sum[:6])
 }
 
 func randomPassword() string {

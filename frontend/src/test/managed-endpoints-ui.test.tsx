@@ -14,6 +14,9 @@ describe('ManagedEndpointsPanel', () => {
 
   beforeEach(() => {
     vi.spyOn(HttpUtil, 'get').mockImplementation(async (url: string) => {
+      if (url.endsWith('/install-plan')) {
+        return { success: true, msg: '', obj: [] } as never;
+      }
       if (url.endsWith('/list')) {
         return { success: true, msg: '', obj: [{
           id: 'managed-1',

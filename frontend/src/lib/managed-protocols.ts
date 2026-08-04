@@ -85,7 +85,7 @@ export const NaiveConfigSchema = z.object({
   sni: domain.optional().or(z.literal('')),
   listenIP: z.string().trim().regex(/^(\d{1,3}\.){3}\d{1,3}$/, 'Listen IP must be IPv4'),
   port: z.number().int().min(1).max(65535),
-  tlsMode: z.enum(['acme', 'managed']),
+  tlsMode: z.literal('acme'),
   acmeEmail: z.string().trim().email().optional().or(z.literal('')),
 });
 

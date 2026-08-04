@@ -256,7 +256,7 @@ export default function ManagedInboundForm({
             <Form.Item label={t('managedProtocols.domain')} required><Input aria-label={t('managedProtocols.domain')} value={String(cfg.domain ?? '')} onChange={(e) => setConfig('domain', e.target.value)} /></Form.Item>
             <Form.Item label={t('managedProtocols.sni')}><Input aria-label={t('managedProtocols.sni')} value={String(cfg.sni ?? '')} onChange={(e) => setConfig('sni', e.target.value)} /></Form.Item>
             <Form.Item label={t('managedProtocols.tlsMode')}>
-              <Select aria-label={t('managedProtocols.tlsMode')} value={String(cfg.tlsMode ?? 'acme')} options={[{ value: 'acme', label: 'ACME' }, { value: 'managed', label: t('managedProtocols.managedTls') }]} onChange={(value) => setConfig('tlsMode', value)} />
+              <Select aria-label={t('managedProtocols.tlsMode')} value="acme" options={[{ value: 'acme', label: 'ACME' }]} disabled />
             </Form.Item>
             <Form.Item label={t('managedProtocols.acmeContact')}><Input aria-label={t('managedProtocols.acmeContact')} value={String(cfg.acmeEmail ?? '')} onChange={(e) => setConfig('acmeEmail', e.target.value)} /></Form.Item>
           </>

@@ -100,8 +100,14 @@ type Client struct {
 }
 
 type DesiredConfig struct {
-	Server  Server   `json:"server"`
-	Clients []Client `json:"clients"`
+	Server         Server         `json:"server"`
+	ClientDefaults ClientDefaults `json:"clientDefaults,omitempty"`
+	Clients        []Client       `json:"clients"`
+}
+
+type ClientDefaults struct {
+	AllowedIPs          string `json:"allowedIPs,omitempty"`
+	PersistentKeepalive int    `json:"persistentKeepalive,omitempty"`
 }
 
 type SafeStatus struct {

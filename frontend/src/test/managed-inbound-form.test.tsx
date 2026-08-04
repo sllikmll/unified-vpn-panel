@@ -208,14 +208,14 @@ describe('managed edit payload sanitization', () => {
         sni: 'example.com',
         listenIP: '0.0.0.0',
         port: 443,
-        tlsMode: 'managed',
+        tlsMode: 'acme',
         acmeEmail: '',
         secret: 'redacted',
         raw: 'redacted',
       } as never,
     });
 
-    expect(payload.config).toMatchObject({ domain: 'example.com', tlsMode: 'managed' });
+    expect(payload.config).toMatchObject({ domain: 'example.com', tlsMode: 'acme' });
     expect(payload.config).not.toHaveProperty('secret');
     expect(payload.config).not.toHaveProperty('raw');
   });
