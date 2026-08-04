@@ -34,13 +34,13 @@ describe('isPanelUpdateAvailable', () => {
 
 describe('formatPanelVersion', () => {
   it('adds a single v prefix to bare semantic versions', () => {
-    expect(formatPanelVersion('3.4.0')).toBe('v3.4.0');
+    expect(formatPanelVersion('0.0.1')).toBe('v0.0.1');
     expect(formatPanelVersion('2.6.5')).toBe('v2.6.5');
   });
 
   it('does not double up the v on already-prefixed tags', () => {
-    expect(formatPanelVersion('v3.4.0')).toBe('v3.4.0');
-    expect(formatPanelVersion('V3.4.0')).toBe('v3.4.0');
+    expect(formatPanelVersion('v0.0.1')).toBe('v0.0.1');
+    expect(formatPanelVersion('V0.0.1')).toBe('v0.0.1');
   });
 
   it('shows dev builds verbatim without a v prefix', () => {

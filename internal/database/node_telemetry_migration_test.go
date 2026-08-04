@@ -3,9 +3,10 @@ package database
 import (
 	"testing"
 
-	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
+	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 )
 
 func TestNodeTelemetryColumnsAutoMigrate(t *testing.T) {
