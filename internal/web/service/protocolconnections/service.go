@@ -1,9 +1,7 @@
 package protocolconnections
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,10 +12,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
-
-	"gorm.io/gorm"
 )
 
 const (
@@ -127,15 +126,23 @@ func (s *Service) Import(req ImportRequest) (*ConnectionView, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
+	selectorsSpecified := req.Selectors != nil
 	conn.Selectors = dedupeStrings(req.Selectors)
 	var existing model.ProtocolConnection
 	err = s.db.Where("name = ?", conn.Name).First(&existing).Error
-	if err == nil && existing.Id != conn.Id {
-		return nil, false, fmt.Errorf("duplicate connection name")
+	if err == nil {
+		if !sameConnectionIdentity(existing, *conn) {
+			return nil, false, fmt.Errorf("duplicate connection name")
+		}
+		conn.Id = existing.Id
 	}
 	replaced := false
 	if err == nil {
 		conn.CreatedAt = existing.CreatedAt
+		conn.Enabled = existing.Enabled
+		if !selectorsSpecified {
+			conn.Selectors = existing.Selectors
+		}
 		replaced = true
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, false, err
@@ -294,7 +301,7 @@ func ParseConnection(protocol, raw, customName string) (*model.ProtocolConnectio
 		yamlText = fmt.Sprintf("# Mieru connection %s is stored, but current Mihomo injection is disabled.\n", finalName)
 	}
 	return &model.ProtocolConnection{
-		Id:         connectionID(proto, finalName, text),
+		Id:         connectionID(proto, finalName),
 		Protocol:   proto,
 		Name:       finalName,
 		Enabled:    true,
@@ -345,7 +352,10 @@ func parseByProtocol(proto, raw, name string) (map[string]any, bool, error) {
 		if !strings.HasPrefix(strings.ToLower(raw), "mieru://") && !strings.HasPrefix(strings.ToLower(raw), "mierus://") {
 			return nil, false, fmt.Errorf("not a Mieru URI")
 		}
-		u, _ := url.Parse(raw)
+		u, err := url.Parse(raw)
+		if err != nil || u.Hostname() == "" {
+			return nil, false, fmt.Errorf("invalid Mieru URI")
+		}
 		return map[string]any{"name": firstNonEmpty(name, unescape(u.Fragment), u.Hostname(), "Mieru")}, false, nil
 	case "naiveproxy":
 		return parseNaive(raw, name)
@@ -546,9 +556,10 @@ func parseWireGuard(raw string) (map[string]any, error) {
 		}
 		key := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(k), "-", ""))
 		val := stripInlineComment(v)
-		if section == "interface" {
+		switch section {
+		case "interface":
 			iface[key] = val
-		} else if section == "peer" {
+		case "peer":
 			peer[key] = val
 		}
 	}
@@ -761,9 +772,27 @@ func normalizeOptionalName(name string) (string, error) {
 	return normalizeName(name)
 }
 
-func connectionID(protocol, name, raw string) string {
-	sum := sha256.Sum256([]byte(protocol + "\n" + name + "\n" + raw))
-	return slug(protocol) + "-" + slug(name) + "-" + hex.EncodeToString(sum[:])[:12]
+func connectionID(protocol, name string) string {
+	return slug(protocol) + "-" + slug(name) + "-" + uuid.NewString()
+}
+
+func sameConnectionIdentity(left, right model.ProtocolConnection) bool {
+	if left.Protocol != right.Protocol {
+		return false
+	}
+	if left.Protocol == "mieru" {
+		leftEndpoint := mieruEndpoint(left.RawSource)
+		return leftEndpoint != "" && leftEndpoint == mieruEndpoint(right.RawSource)
+	}
+	return redactJSONSecrets(left.MihomoJSON) == redactJSONSecrets(right.MihomoJSON)
+}
+
+func mieruEndpoint(raw string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(u.Scheme) + "://" + strings.ToLower(u.Host)
 }
 
 func slug(s string) string {

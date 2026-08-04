@@ -163,6 +163,8 @@ func TestMalformedInputRejected(t *testing.T) {
 		{protocol: "vless", raw: "vless://missing-host"},
 		{protocol: "naiveproxy", raw: "https://example.com/no-credentials"},
 		{protocol: "shadowsocks", raw: "ss://not-base64"},
+		{protocol: "mieru", raw: "mieru://"},
+		{protocol: "mieru", raw: "mieru://%zz"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.protocol, func(t *testing.T) {
@@ -220,6 +222,68 @@ func TestMieruProtocolLabelIsSpelledCorrectly(t *testing.T) {
 		}
 	}
 	t.Fatal("Mieru protocol missing")
+}
+
+func TestImportRotatedCredentialsReplacesExistingConnection(t *testing.T) {
+	svc := NewService(testDB(t))
+	first, replaced, err := svc.Import(ImportRequest{Protocol: "trojan", Name: "edge", Content: "trojan://first-secret@example.com:443"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replaced {
+		t.Fatal("first import reported replacement")
+	}
+	rotated, replaced, err := svc.Import(ImportRequest{Protocol: "trojan", Name: "edge", Content: "trojan://rotated-secret@example.com:443"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !replaced {
+		t.Fatal("credential rotation did not replace existing connection")
+	}
+	if first.Id != rotated.Id {
+		t.Fatalf("credential rotation changed connection id: %q != %q", first.Id, rotated.Id)
+	}
+	var count int64
+	if err := svc.db.Model(&model.ProtocolConnection{}).Where("name = ?", "edge").Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("connection count after credential rotation = %d", count)
+	}
+}
+
+func TestImportRotatedCredentialsPreservesOperationalState(t *testing.T) {
+	svc := NewService(testDB(t))
+	created, _, err := svc.Import(ImportRequest{
+		Protocol:  "trojan",
+		Name:      "edge-state",
+		Content:   "trojan://first-secret@example.com:443",
+		Selectors: []string{"GLOBAL"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disabled := false
+	if _, err := svc.Update(created.Id, UpdateRequest{Enabled: &disabled}); err != nil {
+		t.Fatal(err)
+	}
+	rotated, replaced, err := svc.Import(ImportRequest{
+		Protocol: "trojan",
+		Name:     "edge-state",
+		Content:  "trojan://rotated-secret@example.com:443",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !replaced {
+		t.Fatal("credential rotation did not replace existing connection")
+	}
+	if rotated.Enabled {
+		t.Fatal("credential rotation re-enabled a disabled connection")
+	}
+	if len(rotated.Selectors) != 1 || rotated.Selectors[0] != "GLOBAL" {
+		t.Fatalf("credential rotation changed selectors: %#v", rotated.Selectors)
+	}
 }
 
 func TestManagedBlockAndRoundTripExport(t *testing.T) {
