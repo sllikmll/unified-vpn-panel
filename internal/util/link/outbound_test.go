@@ -37,6 +37,20 @@ func TestParseVlessLink(t *testing.T) {
 	}
 }
 
+func TestParseWireguardPreservesPercentEncodedPlusInSecretKey(t *testing.T) {
+	res, err := ParseLink("wireguard://private%2Bkey@wg.example.com:51820?publickey=peer-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings, ok := res.Outbound["settings"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing WireGuard settings: %v", res.Outbound)
+	}
+	if got := settings["secretKey"]; got != "private+key" {
+		t.Fatalf("secretKey = %q, want %q", got, "private+key")
+	}
+}
+
 func TestParseVlessLink_FinalMaskQuicParamsSanitized(t *testing.T) {
 	fm := url.QueryEscape(`{"mask":"dtls","quicParams":{"keepAlivePeriod":"10s","maxIdleTimeout":"30","initStreamReceiveWindow":524288,"maxIncomingStreams":true,"brutalUp":"100 mbps"}}`)
 	res, err := ParseLink("vless://uuid@1.2.3.4:443?type=tcp&security=none&fm=" + fm + "#node1")

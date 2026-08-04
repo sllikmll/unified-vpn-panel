@@ -479,7 +479,7 @@ func parseWireguard(link string) (*ParseResult, error) {
 	if u.Scheme != "wireguard" && u.Scheme != "wg" {
 		return nil, fmt.Errorf("not wireguard")
 	}
-	secret, _ := url.QueryUnescape(u.User.Username())
+	secret := u.User.Username()
 	params := u.Query()
 	host := u.Hostname()
 	portStr := u.Port()
