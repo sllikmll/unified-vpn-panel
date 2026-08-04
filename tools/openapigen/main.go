@@ -41,6 +41,7 @@ func run(root, outDir string) error {
 				"ConfigProfile",
 				"ConfigProfileNodeAssignment",
 				"Host",
+				"ProtocolConnection",
 			),
 			AliasAllow: setOf("Protocol"),
 			Overrides: map[string][]walkOverride{

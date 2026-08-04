@@ -10,6 +10,7 @@ const GroupsPage = lazy(() => import('@/pages/groups/GroupsPage'));
 const NodesPage = lazy(() => import('@/pages/nodes/NodesPage'));
 const HostsPage = lazy(() => import('@/pages/hosts/HostsPage'));
 const ProfilesPage = lazy(() => import('@/pages/profiles/ProfilesPage'));
+const ProtocolLibraryPage = lazy(() => import('@/pages/protocol-library/ProtocolLibraryPage'));
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'));
 const XrayPage = lazy(() => import('@/pages/xray/XrayPage'));
 const ApiDocsPage = lazy(() => import('@/pages/api-docs/ApiDocsPage'));
@@ -30,6 +31,7 @@ const routes: RouteObject[] = [
       { path: 'nodes', element: withSuspense(<NodesPage />) },
       { path: 'hosts', element: withSuspense(<HostsPage />) },
       { path: 'profiles', element: withSuspense(<ProfilesPage />) },
+      { path: 'protocol-library', element: withSuspense(<ProtocolLibraryPage />) },
       { path: 'settings', element: withSuspense(<SettingsPage />) },
       { path: 'xray', element: withSuspense(<XrayPage />) },
       { path: 'outbound', element: withSuspense(<XrayPage />) },

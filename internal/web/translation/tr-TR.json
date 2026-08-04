@@ -112,7 +112,8 @@
     "openMenu": "Menüyü aç",
     "pinSidebar": "Kenar çubuğunu sabitle",
     "unpinSidebar": "Kenar çubuğu sabitlemesini kaldır",
-    "profiles": "Profiles"
+    "profiles": "Profiles",
+    "protocolLibrary": "Protocol Library"
   },
   "pages": {
     "login": {
@@ -1897,6 +1898,33 @@
         "clone": "Profile cloned",
         "delete": "Profile deleted",
         "invalidJson": "Profile must be valid JSON"
+      }
+    },
+    "protocolLibrary": {
+      "title": "Protocol Library",
+      "subtitle": "Import, normalize, preview, and export managed Mihomo protocol connections.",
+      "importTitle": "Import connection",
+      "connectionsTitle": "Saved connections",
+      "previewTitle": "Managed Mihomo preview",
+      "preview": "Preview",
+      "previewPlaceholder": "Preview appears after running preview.",
+      "exportYaml": "Export YAML",
+      "importFile": "Import file",
+      "saveConnection": "Save connection",
+      "namePlaceholder": "Connection name",
+      "selectorsPlaceholder": "Selectors separated by commas",
+      "contentPlaceholder": "Paste a supported link or config here.",
+      "mihomoReady": "Mihomo ready",
+      "storedOnly": "Stored only",
+      "copyYaml": "Copy YAML",
+      "copyId": "Copy ID",
+      "deleteConfirm": "Delete protocol connection?",
+      "empty": "No connections for this protocol",
+      "fields": {
+        "enabled": "Enabled",
+        "name": "Name",
+        "selectors": "Selectors",
+        "actions": "Actions"
       }
     }
   },

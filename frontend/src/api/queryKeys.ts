@@ -17,6 +17,10 @@ export const keys = {
     root: () => ['profiles'] as const,
     list: () => ['profiles', 'list'] as const,
   },
+  protocolConnections: {
+    root: () => ['protocolConnections'] as const,
+    list: () => ['protocolConnections', 'list'] as const,
+  },
   settings: {
     root: () => ['settings'] as const,
     all: () => ['settings', 'all'] as const,

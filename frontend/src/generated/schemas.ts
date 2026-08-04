@@ -3140,6 +3140,63 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "ProtocolConnection": {
+    "properties": {
+      "createdAt": {
+        "example": 1700000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "enabled": {
+        "example": true,
+        "type": "boolean"
+      },
+      "id": {
+        "example": "trojan-node-a-abcdef123456",
+        "type": "string"
+      },
+      "mihomoJson": {
+        "example": "{\"type\":\"trojan\"}",
+        "type": "string"
+      },
+      "mihomoYaml": {
+        "example": "- name: de-frankfurt\\n  type: trojan\\n",
+        "type": "string"
+      },
+      "name": {
+        "example": "de-frankfurt",
+        "maxLength": 128,
+        "type": "string"
+      },
+      "protocol": {
+        "example": "trojan",
+        "type": "string"
+      },
+      "selectors": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "updatedAt": {
+        "example": 1700000000000,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "createdAt",
+      "enabled",
+      "id",
+      "mihomoJson",
+      "mihomoYaml",
+      "name",
+      "protocol",
+      "selectors",
+      "updatedAt"
+    ],
+    "type": "object"
+  },
   "RealityScanResult": {
     "properties": {
       "alpn": {

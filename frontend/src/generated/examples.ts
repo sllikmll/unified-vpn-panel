@@ -743,6 +743,19 @@ export const EXAMPLES: Record<string, unknown> = {
     "xrayState": "",
     "xrayVersion": "25.10.31"
   },
+  "ProtocolConnection": {
+    "createdAt": 1700000000000,
+    "enabled": true,
+    "id": "trojan-node-a-abcdef123456",
+    "mihomoJson": "{\"type\":\"trojan\"}",
+    "mihomoYaml": "- name: de-frankfurt\\n  type: trojan\\n",
+    "name": "de-frankfurt",
+    "protocol": "trojan",
+    "selectors": [
+      ""
+    ],
+    "updatedAt": 1700000000000
+  },
   "RealityScanResult": {
     "alpn": "h2",
     "certIssuer": "Google Trust Services",
