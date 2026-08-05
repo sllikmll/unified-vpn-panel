@@ -22,6 +22,9 @@ func (OSRunner) Run(ctx context.Context, cmd Command) error {
 	if !isAllowedCommand(cmd) {
 		return errors.New("naiveproxy runtime command is not allowlisted")
 	}
+	if dockerContainerExists(ctx) {
+		return runDockerCommand(ctx, cmd)
+	}
 	c := exec.CommandContext(ctx, cmd.Name, cmd.Argv...)
 	if err := c.Run(); err != nil {
 		return errors.New("naiveproxy runtime command failed")
@@ -37,6 +40,27 @@ func (OSRunner) Observe(ctx context.Context, service string) (Observation, error
 		ServiceName: FixedServiceName,
 		Executable:  FixedExecutableName,
 		CheckedAt:   time.Now().UTC(),
+	}
+	if dockerContainerExists(ctx) {
+		obs.Executable = "docker:" + DockerContainerName
+		out, err := exec.CommandContext(ctx, "docker", "container", "inspect", DockerContainerName, "--format", "{{.State.Status}}").Output()
+		if err != nil {
+			obs.State = BackendUnknown
+			return obs, errors.New("naiveproxy docker runtime observation failed")
+		}
+		switch strings.TrimSpace(string(out)) {
+		case "running":
+			obs.State = BackendActive
+		case "restarting":
+			obs.State = BackendActivating
+		case "exited", "created", "paused":
+			obs.State = BackendInactive
+		case "dead", "removing":
+			obs.State = BackendFailed
+		default:
+			obs.State = BackendUnknown
+		}
+		return obs, nil
 	}
 	if _, err := exec.LookPath(FixedExecutableName); err != nil {
 		obs.State = BackendNotFound
@@ -64,6 +88,29 @@ func (OSRunner) Observe(ctx context.Context, service string) (Observation, error
 		}
 	}
 	return obs, nil
+}
+
+func dockerContainerExists(ctx context.Context) bool {
+	return exec.CommandContext(ctx, "docker", "container", "inspect", DockerContainerName).Run() == nil
+}
+
+func runDockerCommand(ctx context.Context, cmd Command) error {
+	var argv []string
+	switch cmd.Name {
+	case FixedExecutableName:
+		if err := exec.CommandContext(ctx, "docker", "start", DockerContainerName).Run(); err != nil {
+			return errors.New("naiveproxy docker runtime start failed")
+		}
+		argv = append([]string{"exec", DockerContainerName, "caddy"}, cmd.Argv...)
+	case "systemctl":
+		argv = []string{cmd.Argv[0], DockerContainerName}
+	default:
+		return errors.New("naiveproxy docker command is not allowlisted")
+	}
+	if err := exec.CommandContext(ctx, "docker", argv...).Run(); err != nil {
+		return errors.New("naiveproxy docker runtime command failed")
+	}
+	return nil
 }
 
 type HTTPSHealthVerifier struct {

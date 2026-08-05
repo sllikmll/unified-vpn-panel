@@ -69,9 +69,13 @@ const (
 	MieruMitaVersion     = "v3.35.0"
 	MieruManifestPath    = "runtime-images/mieru/mita-v3.35.0.manifest.json"
 	AWG2ContainerName    = "unified-vpn-awg2-runtime"
-	NaiveContainerName   = "unified-vpn-naive-runtime"
+	NaiveContainerName   = naiveproxy.DockerContainerName
+	AWG2HostConfigDir    = awg.DockerHostStateDir
+	AWG2GuestConfigDir   = awg.DockerContainerConfigDir
 	AWG2HostConfigPath   = awg.DockerHostStateDir + "/awg0.conf"
 	AWG2GuestConfigPath  = awg.DockerContainerConfigDir + "/awg0.conf"
+	NaiveHostConfigDir   = naiveproxy.FixedConfigDir
+	NaiveGuestConfigDir  = naiveproxy.FixedConfigDir
 	NaiveHostConfigPath  = naiveproxy.FixedConfigPath
 	NaiveGuestConfig     = naiveproxy.FixedConfigPath
 	DefaultMitaPath      = "/usr/local/bin/mita"
@@ -434,11 +438,17 @@ func (p *LocalProvisioner) removeIfExists(ctx context.Context, name string) erro
 }
 
 func awg2DockerArgs(image string) []string {
-	return []string{"--network", "host", "--cap-add", "NET_ADMIN", "--device", "/dev/net/tun", "-v", AWG2HostConfigPath + ":" + AWG2GuestConfigPath + ":ro", image}
+	return []string{"--network", "host", "--cap-add", "NET_ADMIN", "--device", "/dev/net/tun", "-v", AWG2HostConfigDir + ":" + AWG2GuestConfigDir + ":ro", image}
 }
 
 func naiveDockerArgs(image string) []string {
-	return []string{"--network", "host", "-v", NaiveHostConfigPath + ":" + NaiveGuestConfig + ":ro", image}
+	return []string{
+		"--network", "host",
+		"-v", NaiveHostConfigDir + ":" + NaiveGuestConfigDir + ":ro",
+		"-v", naiveproxy.DockerDataVolume + ":/data",
+		"-v", naiveproxy.DockerConfigVolume + ":/config",
+		image,
+	}
 }
 
 func ValidGHCRDigestRef(ref string) bool {

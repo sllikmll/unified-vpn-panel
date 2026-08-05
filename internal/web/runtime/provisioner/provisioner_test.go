@@ -221,25 +221,32 @@ func TestDockerUninstallMissingContainerIsNoop(t *testing.T) {
 	}
 }
 
-func TestNaiveDockerMountSourceMatchesNativeFixedConfigPath(t *testing.T) {
+func TestNaiveDockerMountUsesOwnedDirectoryForAtomicConfigReplacement(t *testing.T) {
 	args := naiveDockerArgs(strings.Replace(validDigest, "awg2", "naiveproxy", 1))
 	mount := findMountArg(t, args)
-	if want := naiveproxy.FixedConfigPath + ":" + naiveproxy.FixedConfigPath + ":ro"; mount != want {
+	if want := naiveproxy.FixedConfigDir + ":" + naiveproxy.FixedConfigDir + ":ro"; mount != want {
 		t.Fatalf("naive mount = %q, want %q", mount, want)
 	}
-	if NaiveHostConfigPath != naiveproxy.FixedConfigPath || NaiveGuestConfig != naiveproxy.FixedConfigPath {
-		t.Fatalf("naive provisioner paths host=%q guest=%q runtime=%q", NaiveHostConfigPath, NaiveGuestConfig, naiveproxy.FixedConfigPath)
+	if strings.Contains(mount, filepath.Base(naiveproxy.FixedConfigPath)) {
+		t.Fatalf("naive bind source must be a directory, got %q", mount)
+	}
+	joined := strings.Join(args, " ")
+	for _, want := range []string{naiveproxy.DockerDataVolume + ":/data", naiveproxy.DockerConfigVolume + ":/config"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("naive create args missing persistent volume %q: %q", want, joined)
+		}
 	}
 }
 
-func TestAWG2DockerMountSourceMatchesRuntimeBackendConfigPath(t *testing.T) {
+func TestAWG2DockerMountUsesOwnedDirectoryForAtomicConfigReplacement(t *testing.T) {
 	profile := awg.DockerBackendProfile()
-	source := filepath.Join(profile.HostConfigDir, "awg0.conf")
-	dest := filepath.Join(profile.ContainerConfigDir, "awg0.conf")
 	args := awg2DockerArgs(validDigest)
 	mount := findMountArg(t, args)
-	if want := source + ":" + dest + ":ro"; mount != want {
+	if want := profile.HostConfigDir + ":" + profile.ContainerConfigDir + ":ro"; mount != want {
 		t.Fatalf("awg2 mount = %q, want %q", mount, want)
+	}
+	if strings.Contains(mount, "awg0.conf") {
+		t.Fatalf("awg2 bind source must be a directory, got %q", mount)
 	}
 }
 

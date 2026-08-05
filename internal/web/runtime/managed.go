@@ -36,7 +36,7 @@ func (l *Local) Driver(kind model.RuntimeKind) (driver.Driver, error) {
 	case model.RuntimeMieru:
 		return mierudriver.New(mieru.NewRuntime(mieru.OSRunner{}, mieru.OSFileSystem{})), nil
 	case model.RuntimeNaiveProxy:
-		rt, err := naiveproxy.NewRuntime(naiveproxy.NewOSRunner(), naiveproxy.NewOSConfigStore(), naiveproxy.NewHTTPSHealthVerifier(5*time.Second))
+		rt, err := naiveproxy.NewRuntime(naiveproxy.NewOSRunner(), naiveproxy.NewOSConfigStore(), naiveproxy.NewHTTPSHealthVerifier(30*time.Second))
 		if err != nil {
 			return nil, err
 		}

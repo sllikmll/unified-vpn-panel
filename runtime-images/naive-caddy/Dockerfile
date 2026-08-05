@@ -29,7 +29,7 @@ LABEL org.opencontainers.image.title="unified-vpn-panel Naive Caddy runtime prer
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.version="caddy-${CADDY_VERSION}-xcaddy-${XCADDY_VERSION}-forwardproxy-${FORWARDPROXY_COMMIT}"
 
-RUN apk add --no-cache ca-certificates coreutils tzdata wget \
+RUN apk add --no-cache ca-certificates coreutils libcap tzdata wget \
   && addgroup -S -g 10001 caddy \
   && adduser -S -D -H -u 10001 -h /var/lib/caddy -s /sbin/nologin -G caddy caddy \
   && mkdir -p /etc/caddy-naive/examples /data/caddy /config/caddy \
@@ -41,6 +41,7 @@ COPY entrypoint.sh /usr/local/bin/naive-caddy-entrypoint
 
 RUN chmod 0644 /etc/caddy-naive/examples/Caddyfile.naiveproxy.example \
   && chmod 0755 /usr/local/bin/naive-caddy-entrypoint \
+  && setcap cap_net_bind_service=+ep /usr/local/bin/caddy \
   && chown root:root /etc/caddy-naive/examples/Caddyfile.naiveproxy.example /usr/local/bin/naive-caddy-entrypoint
 
 EXPOSE 443/tcp

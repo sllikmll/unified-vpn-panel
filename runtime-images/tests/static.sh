@@ -94,6 +94,9 @@ if "COPY Caddyfile.naiveproxy /etc/caddy-naive/Caddyfile.naiveproxy" in naive_do
     raise SystemExit("naive image must not bake an active Caddy config")
 if "/etc/caddy-naive/examples/Caddyfile.naiveproxy.example" not in naive_dockerfile:
     raise SystemExit("naive image must keep only a non-active example config")
+for required in ["libcap", "setcap cap_net_bind_service=+ep /usr/local/bin/caddy"]:
+    if required not in naive_dockerfile:
+        raise SystemExit(f"missing non-root low-port capability setup: {required}")
 for required in [
     "readonly_config=\"/etc/caddy-naive/Caddyfile.naiveproxy\"",
     'owner="$(stat -c \'%u:%g\' "$readonly_config")"',

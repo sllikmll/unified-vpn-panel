@@ -17,7 +17,7 @@ func TestGenerateCaddyfileGolden(t *testing.T) {
     exclude http.log.error
   }
 }
-:443, example.com {
+:443, example.com:443 {
   tls ops@example.com
   encode
   forward_proxy {

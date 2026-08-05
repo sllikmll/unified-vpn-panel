@@ -73,6 +73,9 @@ func (s *OSConfigStore) AtomicWrite(ctx context.Context, server Server, rendered
 	if err := atomicWrite0600(s.configPath, rendered); err != nil {
 		return Backup{}, fmt.Errorf("write naiveproxy config: %w", err)
 	}
+	if err := ensureRuntimeConfigOwner(s.configPath); err != nil {
+		return Backup{}, fmt.Errorf("secure naiveproxy config ownership: %w", err)
+	}
 	if err := atomicWrite0600(s.statePath, state); err != nil {
 		_ = s.Rollback(backup)
 		return Backup{}, fmt.Errorf("write naiveproxy typed state: %w", err)
@@ -94,7 +97,17 @@ func (s *OSConfigStore) Rollback(backup Backup) error {
 	if err := atomicWrite0600(s.configPath, backup.OldConfig); err != nil {
 		return err
 	}
+	if err := ensureRuntimeConfigOwner(s.configPath); err != nil {
+		return err
+	}
 	return atomicWrite0600(s.statePath, backup.OldState)
+}
+
+func ensureRuntimeConfigOwner(path string) error {
+	if filepath.Clean(path) != filepath.Clean(FixedConfigPath) {
+		return nil
+	}
+	return os.Chown(path, 10001, 10001)
 }
 
 func (s *OSConfigStore) Delete(context.Context) error {

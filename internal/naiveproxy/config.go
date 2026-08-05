@@ -18,7 +18,7 @@ func GenerateCaddyfile(s Server) (string, error) {
 	b.WriteString("    exclude http.log.error\n")
 	b.WriteString("  }\n")
 	b.WriteString("}\n")
-	fmt.Fprintf(&b, ":%d, %s {\n", s.Endpoint.Port, canonicalDomain(s.Endpoint.Domain))
+	fmt.Fprintf(&b, ":%d, %s:%d {\n", s.Endpoint.Port, canonicalDomain(s.Endpoint.Domain), s.Endpoint.Port)
 	if s.Endpoint.ACMEEmail != "" {
 		fmt.Fprintf(&b, "  tls %s\n", s.Endpoint.ACMEEmail)
 	} else {

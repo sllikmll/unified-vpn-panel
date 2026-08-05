@@ -12,8 +12,12 @@ type Command struct {
 }
 
 const (
-	FixedConfigPath = "/etc/caddy-naive/Caddyfile"
-	FixedStatePath  = "/etc/caddy-naive/server.json"
+	FixedConfigDir      = "/etc/caddy-naive"
+	FixedConfigPath     = FixedConfigDir + "/Caddyfile.naiveproxy"
+	FixedStatePath      = "/etc/caddy-naive/server.json"
+	DockerContainerName = "unified-vpn-naive-runtime"
+	DockerDataVolume    = "unified-vpn-naive-data"
+	DockerConfigVolume  = "unified-vpn-naive-config"
 )
 
 type Backend interface {
