@@ -41,6 +41,7 @@ func NewIndexController(g *gin.RouterGroup) *IndexController {
 // initRouter sets up the routes for index, login, logout, and two-factor authentication.
 func (a *IndexController) initRouter(g *gin.RouterGroup) {
 	g.GET("/", a.index)
+	g.GET("/login", a.index)
 	g.GET("/csrf-token", a.csrfToken)
 
 	g.POST("/login", middleware.CSRFMiddleware(), a.login)
