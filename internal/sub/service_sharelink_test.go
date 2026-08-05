@@ -124,40 +124,26 @@ func spxParam(t *testing.T, link string) string {
 	return spx
 }
 
-// spx must be stable for a given client across repeated exports (the #5718
-// complaint) yet differ between clients so the value can't be fingerprinted.
-func TestGenVlessLink_RealitySpiderXPerClientStable(t *testing.T) {
+// spx must match the server-side Reality spiderX exactly. It is an auth path,
+// not a per-client derivation seed; changing it in subscriptions breaks Mihomo.
+func TestGenVlessLink_RealitySpiderXLiteral(t *testing.T) {
 	s := &SubService{}
 	inbound := realityTwoClientInbound()
 
-	aliceFirst := spxParam(t, s.genVlessLink(inbound, "alice"))
-	aliceSecond := spxParam(t, s.genVlessLink(inbound, "alice"))
+	alice := spxParam(t, s.genVlessLink(inbound, "alice"))
 	bob := spxParam(t, s.genVlessLink(inbound, "bob"))
 
-	if aliceFirst != aliceSecond {
-		t.Fatalf("spx not stable for the same client: %q vs %q", aliceFirst, aliceSecond)
-	}
-	if aliceFirst == bob {
-		t.Fatalf("spx identical across clients (fingerprintable): %q", aliceFirst)
+	if alice != "/seed" || bob != "/seed" {
+		t.Fatalf("spx must equal inbound spiderX for every client, got alice=%q bob=%q", alice, bob)
 	}
 }
 
 func TestDeriveSpiderX(t *testing.T) {
-	if got := deriveSpiderX("seed", "clientA"); got != deriveSpiderX("seed", "clientA") {
-		t.Fatalf("deriveSpiderX not deterministic: %q", got)
+	if got := deriveSpiderX("/seed", "clientA"); got != "/seed" {
+		t.Fatalf("deriveSpiderX must return literal seed, got %q", got)
 	}
-	if deriveSpiderX("seed", "clientA") == deriveSpiderX("seed", "clientB") {
-		t.Fatal("deriveSpiderX must differ per client")
-	}
-	if deriveSpiderX("seedA", "clientA") == deriveSpiderX("seedB", "clientA") {
-		t.Fatal("rotating the seed must rotate a client's spx")
-	}
-	got := deriveSpiderX("seed", "clientA")
-	if len(got) != 16 || got[0] != '/' {
-		t.Fatalf("deriveSpiderX shape = %q, want /-prefixed 15-char path", got)
-	}
-	if fallback := deriveSpiderX("", ""); len(fallback) != 16 || fallback[0] != '/' {
-		t.Fatalf("empty-input fallback = %q, want /-prefixed path", fallback)
+	if got := deriveSpiderX("", "clientA"); got != "/" {
+		t.Fatalf("empty spiderX fallback = %q, want /", got)
 	}
 }
 
@@ -165,8 +151,9 @@ func TestDeriveSpiderX(t *testing.T) {
 // panel builds these links in TS, so both derivations must agree byte-for-byte.
 func TestDeriveSpiderXMatchesFrontendVectors(t *testing.T) {
 	vectors := map[string]struct{ seed, clientKey, want string }{
-		"seed and subId": {"/seed", "subAlice", "/c252fbc3ecd3e3c"},
-		"seed only":      {"/", "", "/d08ed99bd9afc60"},
+		"seed and subId": {"/seed", "subAlice", "/seed"},
+		"seed only":      {"/", "", "/"},
+		"empty fallback": {"", "subAlice", "/"},
 	}
 	for name, v := range vectors {
 		t.Run(name, func(t *testing.T) {

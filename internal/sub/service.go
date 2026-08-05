@@ -1719,14 +1719,15 @@ func subKey(c model.Client) string {
 	return c.Email
 }
 
-// deriveSpiderX maps the inbound's spiderX seed plus a stable client key to a
-// deterministic per-client "/path"; frontend/src/lib/xray/spider-x.ts mirrors it.
+// deriveSpiderX returns the exact inbound spiderX path exported to clients.
+// Reality servers authenticate against the configured spiderX; deriving a
+// per-client value from it makes clients disagree with the live Xray runtime.
+// frontend/src/lib/xray/spider-x.ts mirrors this behavior.
 func deriveSpiderX(seed, clientKey string) string {
-	if seed == "" && clientKey == "" {
-		return "/" + random.Seq(15)
+	if seed != "" {
+		return seed
 	}
-	sum := sha256.Sum256([]byte(seed + "|" + clientKey))
-	return "/" + hex.EncodeToString(sum[:])[:15]
+	return "/"
 }
 
 func buildVmessLink(obj map[string]any) string {
