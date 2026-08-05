@@ -5,8 +5,13 @@ import {
   ManagedEndpointCapabilitiesSchema,
   ManagedEndpointListSchema,
 } from '@/schemas/api/managed-endpoint';
+import { parseNodeManagedProtocols } from '@/lib/managed-protocols';
 
 describe('managed endpoint generated schemas', () => {
+	it('reads managed runtimes from the node heartbeat contract', () => {
+		const node = { runtimeCapabilities: ['amneziawg', 'mieru', 'naiveproxy'] } as never;
+		expect(parseNodeManagedProtocols(node)).toEqual(['amneziawg', 'mieru', 'naiveproxy']);
+	});
   it('parses projected Xray, MTProto, and native rows without secret fields', () => {
     const rows = ManagedEndpointListSchema.parse([
       {

@@ -88,6 +88,10 @@ type Driver interface {
 	Clients() ClientDriver
 }
 
+type Stopper interface {
+	Stop(ctx context.Context, inbound *model.Inbound) error
+}
+
 type ClientDriver interface {
 	Create(ctx context.Context, inbound *model.Inbound, client model.Client) (ClientResult, error)
 	Update(ctx context.Context, inbound *model.Inbound, oldEmail string, client model.Client) (ClientResult, error)

@@ -33,6 +33,10 @@ func newAuthenticatedSession(nodeID int, targetGUID, principal, channelID string
 	}
 }
 
+func NewAuthenticatedSession(nodeID int, targetGUID, principal, channelID string, authenticatedAt, expiresAt time.Time) AuthenticatedSession {
+	return newAuthenticatedSession(nodeID, targetGUID, principal, channelID, authenticatedAt, expiresAt)
+}
+
 func (s AuthenticatedSession) NodeID() int {
 	return s.nodeID
 }

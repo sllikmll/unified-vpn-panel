@@ -1,0 +1,22 @@
+{
+	admin 127.0.0.1:2019
+	storage file_system /data/caddy
+}
+
+:443 {
+	bind 0.0.0.0
+	tls /etc/caddy-naive/tls/fullchain.pem /etc/caddy-naive/tls/privkey.pem
+
+	route {
+		forward_proxy {
+			# Example only. The panel secret store must render a real bcrypt hash
+			# into /etc/caddy-naive/Caddyfile.naiveproxy at runtime.
+			basic_auth example-user JDJhJDE0JHJlcGxhY2UtdGhpcy1ub24tc2VjcmV0LWV4YW1wbGU=
+			hide_ip
+			hide_via
+			probe_resistance
+		}
+		respond /healthz 204
+		respond 404
+	}
+}

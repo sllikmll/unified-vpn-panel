@@ -1,9 +1,9 @@
 ---
 title: Managed Endpoints
-description: Read-only Phase 0 unified endpoint projection. Existing inbounds
-  are projected alongside native managed endpoint rows, with desired/observed
-  config and secrets redacted. Native lifecycle, mutation, detection, and export
-  endpoints are intentionally unavailable until drivers land.
+description: Backend control-plane API for native AmneziaWG 2.0, Mieru, and
+  NaiveProxy managed endpoints. Legacy Xray/MTProto/WireGuard rows remain
+  read-only projections. Desired config, observed config, and secret material
+  are never returned.
 full: true
 _openapi:
   preload:
@@ -20,11 +20,15 @@ _openapi:
         response is redacted like the list endpoint.
       url: '#fetch-one-projected-managed-endpoint-by-its-stable-read-model-id-the-response-is-redacted-like-the-list-endpoint'
     - depth: 2
-      title: Return static Phase 0 runtime capability metadata. Native lifecycle,
-        client CRUD, traffic collection, detection, firewall policy,
-        subscription, and export are marked unavailable until drivers are
-        implemented.
-      url: '#return-static-phase-0-runtime-capability-metadata-native-lifecycle-client-crud-traffic-collection-detection-firewall-policy-subscription-and-export-are-marked-unavailable-until-drivers-are-implemented'
+      title: Return runtime capability metadata for read-only legacy projections and
+        native managed backends.
+      url: '#return-runtime-capability-metadata-for-read-only-legacy-projections-and-native-managed-backends'
+    - depth: 2
+      title: Create, update, delete, and operate native managed endpoints.
+      url: '#create-update-delete-and-operate-native-managed-endpoints'
+    - depth: 2
+      title: Manage native endpoint clients from durable control-plane state.
+      url: '#manage-native-endpoint-clients-from-durable-control-plane-state'
   structuredData:
     headings:
       - content: List projected Xray/MTProto inbounds and native managed endpoint rows
@@ -35,13 +39,49 @@ _openapi:
       - content: Fetch one projected managed endpoint by its stable read-model ID. The
           response is redacted like the list endpoint.
         id: fetch-one-projected-managed-endpoint-by-its-stable-read-model-id-the-response-is-redacted-like-the-list-endpoint
-      - content: Return static Phase 0 runtime capability metadata. Native lifecycle,
-          client CRUD, traffic collection, detection, firewall policy,
-          subscription, and export are marked unavailable until drivers are
-          implemented.
-        id: return-static-phase-0-runtime-capability-metadata-native-lifecycle-client-crud-traffic-collection-detection-firewall-policy-subscription-and-export-are-marked-unavailable-until-drivers-are-implemented
-    contents: []
+      - content: Return runtime capability metadata for read-only legacy projections and
+          native managed backends.
+        id: return-runtime-capability-metadata-for-read-only-legacy-projections-and-native-managed-backends
+      - content: Create, update, delete, and operate native managed endpoints.
+        id: create-update-delete-and-operate-native-managed-endpoints
+      - content: Manage native endpoint clients from durable control-plane state.
+        id: manage-native-endpoint-clients-from-durable-control-plane-state
+    contents:
+      - >-
+        Native mutation requests are strict JSON objects. Unknown fields are
+        rejected. Runtime kind and protocol are allowlisted to amneziawg, mieru,
+        and naiveproxy for native managed rows.
+      - >-
+        Secrets are stored only as ManagedSecret AES-256-GCM envelopes. Public
+        DesiredConfig rows contain redacted secret references only.
+      - >-
+        Install and update lifecycle actions are unblocked only when the runtime
+        install plan has immutable artifact metadata. AWG2 and NaiveProxy use
+        pinned GHCR digest refs; Mieru uses the checked v3.35.0 mita manifest.
+        No latest image or curl|bash install is exposed.
+      - >-
+        Managed clients bind to one existing enabled subscription client by
+        subId. Responses show binding metadata only: id, clientId, subId, email,
+        enable, state/status, publicIdentity, address, and timestamps.
+      - >-
+        Subscription compatibility: raw subscriptions include amneziawg, mieru,
+        and naiveproxy native links. JSON/Xray configs do not carry these
+        managed-native protocols. Clash/Mihomo includes AmneziaWG 2.0 as a
+        WireGuard proxy with amnezia-wg-option and NaiveProxy as HTTPS HTTP
+        proxy credentials. Mieru remains raw-only and is omitted from
+        Clash/Mihomo.
 ---
+
+## Subscription compatibility
+
+| Protocol | Raw subscription | JSON subscription | Clash/Mihomo |
+| --- | --- | --- | --- |
+| VMess, VLESS, Trojan, Shadowsocks, Hysteria, MTProto | emitted unchanged | emitted where existing Xray JSON supports it | emitted where existing Clash/Mihomo builders support it |
+| WireGuard legacy inbound | existing behavior unchanged | existing WireGuard JSON behavior unchanged | existing Mihomo WireGuard behavior unchanged |
+| HTTP, Mixed, Tunnel and other no-link legacy protocols | existing behavior unchanged; omitted when there is no share URL | omitted | omitted |
+| AmneziaWG 2.0 managed endpoint | `awg://` plus base64url-encoded full WireGuard/Amnezia config with keys, address, DNS, MTU, endpoint, keepalive, and AWG2 Jc/Jmin/Jmax/S1-S4/H1-H4 fields | unsupported, omitted | emitted as `type: wireguard` with `amnezia-wg-option` |
+| Mieru managed endpoint | `mierus://` server-generated link accepted by current Mieru simple-link clients | unsupported, omitted | unsupported, omitted |
+| NaiveProxy managed endpoint | `naive+https://user:password@host:port` with URL-escaped credentials | unsupported, omitted | emitted as `type: http` with TLS, username, and password |
 
 {/* This file was generated by Fumadocs. Do not edit this file directly. Any changes should be made by running the generation command again. */}
 
@@ -52,7 +92,7 @@ export default function Layout(props) {
   return (
     <>
       {props.children}
-      <Comp document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/managed-endpoints/list","method":"get"},{"path":"/panel/api/managed-endpoints/{id}","method":"get"},{"path":"/panel/api/managed-endpoints/capabilities","method":"get"}]} showTitle />
+      <Comp document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/managed-endpoints/list","method":"get"},{"path":"/panel/api/managed-endpoints/{id}","method":"get"},{"path":"/panel/api/managed-endpoints/capabilities","method":"get"},{"path":"/panel/api/managed-endpoints/install-plan","method":"get"},{"path":"/panel/api/managed-endpoints/install-plan/{runtimeKind}","method":"get"},{"path":"/panel/api/managed-endpoints/create","method":"post"},{"path":"/panel/api/managed-endpoints/{id}","method":"patch"},{"path":"/panel/api/managed-endpoints/{id}","method":"delete"},{"path":"/panel/api/managed-endpoints/{id}/actions/{action}","method":"post"},{"path":"/panel/api/managed-endpoints/{id}/clients","method":"get"},{"path":"/panel/api/managed-endpoints/{id}/clients","method":"post"},{"path":"/panel/api/managed-endpoints/{id}/clients/{clientId}","method":"patch"},{"path":"/panel/api/managed-endpoints/{id}/clients/{clientId}","method":"delete"},{"path":"/panel/api/managed-endpoints/{id}/clients/{clientId}/actions/{action}","method":"post"},{"path":"/panel/api/managed-endpoints/{id}/clients/{clientId}/export","method":"get"}]} showTitle />
     </>
   );
 }

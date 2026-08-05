@@ -46,6 +46,7 @@ const AttachClientsModal = lazy(() => import('./clients/AttachClientsModal'));
 const AttachExistingClientsModal = lazy(() => import('./clients/AttachExistingClientsModal'));
 const DetachClientsModal = lazy(() => import('./clients/DetachClientsModal'));
 const AddClientsToGroupModal = lazy(() => import('./clients/AddClientsToGroupModal'));
+const ManagedEndpointsPanel = lazy(() => import('./managed/ManagedEndpointsPanel'));
 
 type RowAction =
   | 'edit'
@@ -632,6 +633,11 @@ export default function InboundsPage() {
                       onRowAction={({ key, dbInbound }) => onRowAction({ key, dbInbound: dbInbound as unknown as DBInbound })}
                       onBulkDelete={confirmBulkDelete}
                     />
+                  </Col>
+                  <Col span={24}>
+                    <LazyMount when={fetched && !fetchError}>
+                      <ManagedEndpointsPanel />
+                    </LazyMount>
                   </Col>
                 </Row>
               )}

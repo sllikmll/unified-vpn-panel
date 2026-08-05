@@ -16,9 +16,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 
+	awg "github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
+	"github.com/mhsanaei/3x-ui/v3/internal/mieru"
+	"github.com/mhsanaei/3x-ui/v3/internal/naiveproxy"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/random"
 	wgutil "github.com/mhsanaei/3x-ui/v3/internal/util/wireguard"
@@ -292,12 +295,17 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 	if err != nil {
 		return nil, nil, 0, traffic, err
 	}
+	managedLinks, managedEmails, err := s.getManagedRawLinksBySubId(subId)
+	if err != nil {
+		return nil, nil, 0, traffic, err
+	}
 
-	if len(inbounds) == 0 && len(externalLinks) == 0 {
+	if len(inbounds) == 0 && len(externalLinks) == 0 && len(managedLinks) == 0 {
 		return nil, nil, 0, traffic, nil
 	}
 
 	seenEmails := make(map[string]struct{})
+	seenLinks := make(map[string]struct{})
 	for _, inbound := range inbounds {
 		clients := s.matchingClients(inbound, subId)
 		if len(clients) == 0 {
@@ -317,7 +325,13 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 			} else {
 				link = s.GetLink(inbound, client.Email)
 			}
-			result = append(result, link)
+			for _, single := range splitLinkLines(link) {
+				if _, dup := seenLinks[single]; dup || single == "" {
+					continue
+				}
+				seenLinks[single] = struct{}{}
+				result = append(result, single)
+			}
 			emails = append(emails, client.Email)
 			seenEmails[client.Email] = struct{}{}
 		}
@@ -328,11 +342,26 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 		}
 		for _, el := range expandEntry(ext) {
 			if link := applyRemarkToLink(el.Link, el.Name); link != "" {
-				result = append(result, link)
+				if _, dup := seenLinks[link]; !dup {
+					seenLinks[link] = struct{}{}
+					result = append(result, link)
+				}
 				emails = append(emails, ext.Email)
 				seenEmails[ext.Email] = struct{}{}
 			}
 		}
+	}
+	for i, link := range managedLinks {
+		if _, dup := seenLinks[link]; dup || link == "" {
+			continue
+		}
+		seenLinks[link] = struct{}{}
+		result = append(result, link)
+		if i < len(managedEmails) {
+			emails = append(emails, managedEmails[i])
+			seenEmails[managedEmails[i]] = struct{}{}
+		}
+		hasEnabledClient = true
 	}
 
 	uniqueEmails := make([]string, 0, len(seenEmails))
@@ -342,6 +371,192 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 	traffic, lastOnline := s.AggregateTrafficByEmails(uniqueEmails)
 	traffic.Enable = hasEnabledClient
 	return result, emails, lastOnline, traffic, nil
+}
+
+func (s *SubService) getManagedRawLinksBySubId(subId string) ([]string, []string, error) {
+	type managedSubRow struct {
+		Endpoint model.ManagedEndpoint       `gorm:"embedded;embeddedPrefix:endpoint__"`
+		Client   model.ManagedEndpointClient `gorm:"embedded;embeddedPrefix:client__"`
+	}
+	var rows []managedSubRow
+	db := database.GetDB()
+	if err := db.Table("managed_endpoint_clients AS mec").
+		Select("me.id AS endpoint__id, me.user_id AS endpoint__user_id, me.inbound_id AS endpoint__inbound_id, me.node_id AS endpoint__node_id, me.runtime_kind AS endpoint__runtime_kind, me.protocol AS endpoint__protocol, me.tag AS endpoint__tag, me.remark AS endpoint__remark, me.listen AS endpoint__listen, me.port AS endpoint__port, me.enable AS endpoint__enable, me.status AS endpoint__status, me.desired_config AS endpoint__desired_config, me.observed_config AS endpoint__observed_config, me.capabilities AS endpoint__capabilities, me.last_applied_hash AS endpoint__last_applied_hash, me.last_observed_hash AS endpoint__last_observed_hash, me.last_error AS endpoint__last_error, me.last_health_at AS endpoint__last_health_at, me.created_at AS endpoint__created_at, me.updated_at AS endpoint__updated_at, mec.id AS client__id, mec.endpoint_id AS client__endpoint_id, mec.client_id AS client__client_id, c.sub_id AS client__sub_id, mec.email AS client__email, mec.enable AS client__enable, mec.state AS client__state, mec.state AS client__status, mec.public_identity AS client__public_identity, mec.address AS client__address, mec.credential_ref AS client__credential_ref, mec.client_config AS client__client_config, mec.observed_config AS client__observed_config, mec.last_applied_hash AS client__last_applied_hash, mec.last_error AS client__last_error, mec.created_at AS client__created_at, mec.updated_at AS client__updated_at").
+		Joins("JOIN managed_endpoints me ON me.id = mec.endpoint_id").
+		Joins("JOIN clients c ON c.id = mec.client_id AND c.sub_id = ? AND c.enable = ?", subId, true).
+		Where("mec.enable = ? AND mec.state = ? AND me.enable = ? AND me.status = ?", true, model.EndpointClientApplied, true, model.EndpointActive).
+		Order("me.id ASC").Order("mec.id ASC").
+		Scan(&rows).Error; err != nil {
+		return nil, nil, err
+	}
+	links := make([]string, 0, len(rows))
+	emails := make([]string, 0, len(rows))
+	for _, row := range rows {
+		link, err := s.managedRawLink(row.Endpoint, row.Client)
+		if err != nil {
+			logger.Warning("SubService - getManagedRawLinksBySubId: managed link unavailable:", err)
+			continue
+		}
+		links = append(links, link)
+		emails = append(emails, row.Client.Email)
+	}
+	return links, emails, nil
+}
+
+func (s *SubService) managedRawLink(endpoint model.ManagedEndpoint, client model.ManagedEndpointClient) (string, error) {
+	host := s.resolveManagedEndpointAddress(endpoint)
+	switch endpoint.RuntimeKind {
+	case model.RuntimeAmneziaWG:
+		var cfg awg.DesiredConfig
+		if err := json.Unmarshal([]byte(endpoint.DesiredConfig), &cfg); err != nil {
+			return "", err
+		}
+		secrets, err := managedClientSecrets(client.Id)
+		if err != nil {
+			return "", err
+		}
+		if err := requireManagedSecrets(secrets, "privateKey", "publicKey", "presharedKey"); err != nil {
+			return "", err
+		}
+		conf := managedAWGClientConfig(cfg.Server, client, secrets, joinHostPort(host, endpoint.Port))
+		return "awg://" + base64.RawURLEncoding.EncodeToString([]byte(conf)) + "#" + url.QueryEscape(endpoint.Remark), nil
+	case model.RuntimeMieru:
+		var cfg mieru.ServerConfig
+		if err := json.Unmarshal([]byte(endpoint.DesiredConfig), &cfg); err != nil {
+			return "", err
+		}
+		password, err := managedClientPassword(client.Id)
+		if err != nil {
+			return "", err
+		}
+		if password == "" {
+			return "", fmt.Errorf("managed client password is empty")
+		}
+		publicHost := strings.TrimSpace(endpoint.Listen)
+		if publicHost == "" {
+			publicHost = host
+		}
+		links, err := mieru.SimpleLinks(mieru.ClientExport{ProfileName: endpoint.Remark, UserName: client.PublicIdentity, Password: password, Endpoints: []mieru.Endpoint{{Host: publicHost, PortBinding: cfg.PortBindings}}, MTU: cfg.MTU})
+		if err != nil || len(links) == 0 {
+			return "", err
+		}
+		return links[0], nil
+	case model.RuntimeNaiveProxy:
+		var payload struct {
+			Endpoint naiveproxy.Endpoint `json:"endpoint"`
+		}
+		if err := json.Unmarshal([]byte(endpoint.DesiredConfig), &payload); err != nil {
+			return "", err
+		}
+		password, err := managedClientPassword(client.Id)
+		if err != nil {
+			return "", err
+		}
+		if password == "" {
+			return "", fmt.Errorf("managed client password is empty")
+		}
+		e := payload.Endpoint
+		if host != "" {
+			e.Domain = host
+		}
+		return (naiveproxy.User{ID: client.PublicIdentity, Username: client.PublicIdentity, Password: password, Enabled: true}).ExportURI(e)
+	default:
+		return "", fmt.Errorf("unsupported managed subscription runtime %q", endpoint.RuntimeKind)
+	}
+}
+
+func (s *SubService) resolveManagedEndpointAddress(endpoint model.ManagedEndpoint) string {
+	if endpoint.NodeID != nil {
+		if node := s.nodesByID[*endpoint.NodeID]; node != nil && node.Address != "" {
+			return node.Address
+		}
+	}
+	if isRoutableHost(endpoint.Listen) {
+		return endpoint.Listen
+	}
+	return s.address
+}
+
+func managedClientPassword(clientID int) (string, error) {
+	secrets, err := managedClientSecrets(clientID)
+	return secrets["password"], err
+}
+
+func requireManagedSecrets(secrets map[string]string, kinds ...string) error {
+	for _, kind := range kinds {
+		if strings.TrimSpace(secrets[kind]) == "" {
+			return fmt.Errorf("managed client secret %s is missing", kind)
+		}
+	}
+	return nil
+}
+
+func managedClientSecrets(clientID int) (map[string]string, error) {
+	var rows []model.ManagedSecret
+	if err := database.GetDB().
+		Where("owner_type = ? AND owner_id = ?", "managed_endpoint_client", clientID).
+		Order("secret_kind ASC, generation DESC, created_at DESC, id DESC").
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	seal := service.NewManagedSecretEnvelopeService(nil)
+	out := make(map[string]string, len(rows))
+	for _, row := range rows {
+		if _, seen := out[row.SecretKind]; seen {
+			continue
+		}
+		plaintext, err := seal.Decrypt(row, service.ManagedSecretAAD{OwnerType: row.OwnerType, OwnerId: row.OwnerId, SecretKind: row.SecretKind})
+		if err != nil {
+			return nil, err
+		}
+		if len(plaintext) == 0 {
+			return nil, fmt.Errorf("managed client secret %s is empty", row.SecretKind)
+		}
+		out[row.SecretKind] = string(plaintext)
+	}
+	return out, nil
+}
+
+func managedAWGClientConfig(server awg.Server, client model.ManagedEndpointClient, secrets map[string]string, endpoint string) string {
+	var b strings.Builder
+	b.WriteString("[Interface]\n")
+	fmt.Fprintf(&b, "PrivateKey = %s\n", secrets["privateKey"])
+	fmt.Fprintf(&b, "Address = %s\n", client.Address)
+	if server.DNS != "" {
+		fmt.Fprintf(&b, "DNS = %s\n", server.DNS)
+	}
+	if server.MTU > 0 {
+		fmt.Fprintf(&b, "MTU = %d\n", server.MTU)
+	}
+	for _, kv := range []struct {
+		key string
+		val any
+	}{
+		{"Jc", server.Jc},
+		{"Jmin", server.Jmin},
+		{"Jmax", server.Jmax},
+		{"S1", server.S1},
+		{"S2", server.S2},
+		{"S3", server.S3},
+		{"S4", server.S4},
+		{"H1", server.H1},
+		{"H2", server.H2},
+		{"H3", server.H3},
+		{"H4", server.H4},
+	} {
+		if fmt.Sprint(kv.val) != "" && fmt.Sprint(kv.val) != "0" {
+			fmt.Fprintf(&b, "%s = %v\n", kv.key, kv.val)
+		}
+	}
+	b.WriteString("\n[Peer]\n")
+	fmt.Fprintf(&b, "PublicKey = %s\n", server.PublicKey)
+	if secrets["presharedKey"] != "" {
+		fmt.Fprintf(&b, "PresharedKey = %s\n", secrets["presharedKey"])
+	}
+	fmt.Fprintf(&b, "Endpoint = %s\n", endpoint)
+	b.WriteString("AllowedIPs = 0.0.0.0/0\n")
+	b.WriteString("PersistentKeepalive = 25\n")
+	return b.String()
 }
 
 // inboundLinks builds the share links for every distinct client of one inbound

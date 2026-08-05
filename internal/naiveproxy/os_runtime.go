@@ -1,0 +1,214 @@
+package naiveproxy
+
+import (
+	"context"
+	"crypto/tls"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"os/exec"
+	"strings"
+	"time"
+)
+
+type OSRunner struct{}
+
+func NewOSRunner() OSRunner {
+	return OSRunner{}
+}
+
+func (OSRunner) Run(ctx context.Context, cmd Command) error {
+	if !isAllowedCommand(cmd) {
+		return errors.New("naiveproxy runtime command is not allowlisted")
+	}
+	if dockerContainerExists(ctx) {
+		return runDockerCommand(ctx, cmd)
+	}
+	c := exec.CommandContext(ctx, cmd.Name, cmd.Argv...)
+	if err := c.Run(); err != nil {
+		return errors.New("naiveproxy runtime command failed")
+	}
+	return nil
+}
+
+func (OSRunner) Observe(ctx context.Context, service string) (Observation, error) {
+	if service != FixedServiceName {
+		return Observation{State: BackendNotFound}, nil
+	}
+	obs := Observation{
+		ServiceName: FixedServiceName,
+		Executable:  FixedExecutableName,
+		CheckedAt:   time.Now().UTC(),
+	}
+	if dockerContainerExists(ctx) {
+		obs.Executable = "docker:" + DockerContainerName
+		out, err := exec.CommandContext(ctx, "docker", "container", "inspect", DockerContainerName, "--format", "{{.State.Status}}").Output()
+		if err != nil {
+			obs.State = BackendUnknown
+			return obs, errors.New("naiveproxy docker runtime observation failed")
+		}
+		switch strings.TrimSpace(string(out)) {
+		case "running":
+			obs.State = BackendActive
+		case "restarting":
+			obs.State = BackendActivating
+		case "exited", "created", "paused":
+			obs.State = BackendInactive
+		case "dead", "removing":
+			obs.State = BackendFailed
+		default:
+			obs.State = BackendUnknown
+		}
+		return obs, nil
+	}
+	if _, err := exec.LookPath(FixedExecutableName); err != nil {
+		obs.State = BackendNotFound
+		return obs, nil
+	}
+	cmd := exec.CommandContext(ctx, "systemctl", "is-active", FixedServiceName+".service")
+	out, err := cmd.Output()
+	state := strings.TrimSpace(string(out))
+	switch state {
+	case "active":
+		obs.State = BackendActive
+	case "activating":
+		obs.State = BackendActivating
+	case "reloading":
+		obs.State = BackendReloading
+	case "failed":
+		obs.State = BackendFailed
+	case "inactive", "deactivating":
+		obs.State = BackendInactive
+	default:
+		if err != nil {
+			obs.State = BackendUnknown
+		} else {
+			obs.State = BackendInactive
+		}
+	}
+	return obs, nil
+}
+
+func dockerContainerExists(ctx context.Context) bool {
+	return exec.CommandContext(ctx, "docker", "container", "inspect", DockerContainerName).Run() == nil
+}
+
+func runDockerCommand(ctx context.Context, cmd Command) error {
+	switch cmd.Name {
+	case FixedExecutableName:
+		if err := exec.CommandContext(ctx, "docker", "restart", DockerContainerName).Run(); err != nil {
+			return errors.New("naiveproxy docker runtime restart failed")
+		}
+		argv := append([]string{"exec", DockerContainerName, "caddy"}, cmd.Argv...)
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			if err := exec.CommandContext(ctx, "docker", argv...).Run(); err == nil {
+				return nil
+			}
+			if time.Now().After(deadline) {
+				return errors.New("naiveproxy docker runtime command failed")
+			}
+			select {
+			case <-ctx.Done():
+				return errors.New("naiveproxy docker runtime command canceled")
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+	case "systemctl":
+		if err := exec.CommandContext(ctx, "docker", cmd.Argv[0], DockerContainerName).Run(); err != nil {
+			return errors.New("naiveproxy docker runtime command failed")
+		}
+		return nil
+	default:
+		return errors.New("naiveproxy docker command is not allowlisted")
+	}
+}
+
+type HTTPSHealthVerifier struct {
+	Timeout time.Duration
+}
+
+func NewHTTPSHealthVerifier(timeout time.Duration) HTTPSHealthVerifier {
+	return HTTPSHealthVerifier{Timeout: timeout}
+}
+
+func (v HTTPSHealthVerifier) Verify(ctx context.Context, endpoint Endpoint) error {
+	if err := endpoint.Validate(); err != nil {
+		return err
+	}
+	timeout := v.Timeout
+	if timeout <= 0 {
+		timeout = 5 * time.Second
+	}
+	dialer := &net.Dialer{Timeout: 2 * time.Second}
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			ServerName: canonicalDomain(endpoint.Domain),
+			MinVersion: tls.VersionTLS12,
+		},
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialer.DialContext(ctx, network, net.JoinHostPort(endpoint.ListenIP, fmt.Sprint(endpoint.Port)))
+		},
+		TLSHandshakeTimeout:   2 * time.Second,
+		ResponseHeaderTimeout: 2 * time.Second,
+		ForceAttemptHTTP2:     true,
+	}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport}
+	deadline := time.Now().Add(timeout)
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return errors.New("naiveproxy https health check failed")
+		}
+		attemptTimeout := min(2*time.Second, remaining)
+		attemptCtx, cancel := context.WithTimeout(ctx, attemptTimeout)
+		req, err := http.NewRequestWithContext(attemptCtx, http.MethodGet, "https://"+canonicalDomain(endpoint.Domain)+"/", nil)
+		if err != nil {
+			cancel()
+			return errors.New("build naiveproxy health request failed")
+		}
+		resp, err := client.Do(req)
+		if err == nil {
+			_ = resp.Body.Close()
+			cancel()
+			if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+				return nil
+			}
+		} else {
+			cancel()
+		}
+		select {
+		case <-ctx.Done():
+			return errors.New("naiveproxy https health check canceled")
+		case <-time.After(250 * time.Millisecond):
+		}
+	}
+}
+
+func isAllowedCommand(cmd Command) bool {
+	switch cmd.Name {
+	case FixedExecutableName:
+		return equalStrings(cmd.Argv, []string{"validate", "--config", FixedConfigPath, "--adapter", "caddyfile"}) ||
+			equalStrings(cmd.Argv, []string{"reload", "--config", FixedConfigPath, "--adapter", "caddyfile"})
+	case "systemctl":
+		return equalStrings(cmd.Argv, []string{"start", FixedServiceName + ".service"}) ||
+			equalStrings(cmd.Argv, []string{"stop", FixedServiceName + ".service"}) ||
+			equalStrings(cmd.Argv, []string{"restart", FixedServiceName + ".service"})
+	default:
+		return false
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

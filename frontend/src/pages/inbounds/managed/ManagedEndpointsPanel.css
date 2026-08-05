@@ -1,0 +1,68 @@
+.managed-export-block {
+  max-height: 280px;
+  overflow: auto;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--ant-color-border);
+  border-radius: 4px;
+  background: var(--ant-color-fill-quaternary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.managed-action-error {
+  margin-bottom: 12px;
+}
+
+.managed-download-button,
+.managed-link-input,
+.managed-qr-wrap {
+  margin-top: 12px;
+}
+
+.managed-copy-line {
+  width: 100%;
+}
+
+.managed-copy-line .ant-input,
+.managed-link-input {
+  min-width: 0;
+}
+
+.managed-unavailable {
+  color: var(--ant-color-text-tertiary);
+}
+
+.managed-qr-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  border: 1px solid var(--ant-color-border);
+  border-radius: 4px;
+  overflow: auto;
+}
+
+.managed-inbound-form .ant-space {
+  flex-wrap: wrap;
+}
+
+.managed-inbound-form .ant-btn,
+.managed-inbound-form .ant-input,
+.managed-inbound-form .ant-input-number,
+.managed-inbound-form .ant-select-selector,
+.managed-copy-line .ant-btn,
+.managed-copy-line .ant-input {
+  border-radius: 4px;
+}
+
+@media (max-width: 640px) {
+  .managed-inbound-form .ant-form-item {
+    margin-bottom: 14px;
+  }
+
+  .managed-inbound-form .ant-input-number,
+  .managed-inbound-form .ant-select,
+  .managed-inbound-form .ant-input {
+    width: 100%;
+  }
+}

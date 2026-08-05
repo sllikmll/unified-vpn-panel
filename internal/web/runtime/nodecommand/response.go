@@ -38,6 +38,7 @@ const (
 	SummaryAccepted             SummaryCode = "accepted"
 	SummaryApplied              SummaryCode = "applied"
 	SummaryDeleted              SummaryCode = "deleted"
+	SummaryExported             SummaryCode = "exported"
 	SummaryStatusAvailable      SummaryCode = "status_available"
 	SummaryUnsupportedOperation SummaryCode = "unsupported_operation"
 	SummaryValidationFailed     SummaryCode = "validation_failed"
@@ -46,6 +47,10 @@ const (
 	SummaryRuntimeFailed        SummaryCode = "runtime_failed"
 	SummaryUnavailable          SummaryCode = "unavailable"
 	SummaryUnauthorized         SummaryCode = "unauthorized"
+	SummaryInstalled            SummaryCode = "installed"
+	SummaryUpdated              SummaryCode = "updated"
+	SummaryUninstalled          SummaryCode = "uninstalled"
+	SummaryBlocked              SummaryCode = "blocked"
 )
 
 type ResultState string
@@ -57,6 +62,7 @@ const (
 	ResultStateStopped   ResultState = "stopped"
 	ResultStateApplied   ResultState = "applied"
 	ResultStateDeleted   ResultState = "deleted"
+	ResultStateExported  ResultState = "exported"
 	ResultStateHealthy   ResultState = "healthy"
 	ResultStateUnhealthy ResultState = "unhealthy"
 	ResultStateEnabled   ResultState = "enabled"
@@ -76,14 +82,18 @@ type Response struct {
 	ErrorCode          ErrorCode       `json:"errorCode,omitempty"`
 	SummaryCode        SummaryCode     `json:"summaryCode,omitempty"`
 	Result             Result          `json:"result,omitempty"`
+	SealedResult       string          `json:"sealedResult,omitempty"`
+	SecretOutput       []byte          `json:"-"`
 }
 
 type Result struct {
-	RuntimeKind model.RuntimeKind `json:"runtimeKind,omitempty"`
-	EndpointID  int               `json:"endpointId,omitempty"`
-	ClientID    string            `json:"clientId,omitempty"`
-	Enabled     *bool             `json:"enabled,omitempty"`
-	State       ResultState       `json:"state,omitempty"`
+	RuntimeKind     model.RuntimeKind `json:"runtimeKind,omitempty"`
+	EndpointID      int               `json:"endpointId,omitempty"`
+	ClientID        string            `json:"clientId,omitempty"`
+	Enabled         *bool             `json:"enabled,omitempty"`
+	State           ResultState       `json:"state,omitempty"`
+	ArtifactRef     string            `json:"artifactRef,omitempty"`
+	ArtifactVersion string            `json:"artifactVersion,omitempty"`
 }
 
 func (r Response) Validate() error {
@@ -125,6 +135,9 @@ func (r Response) Validate() error {
 	}
 	if err := r.Result.Validate(); err != nil {
 		return err
+	}
+	if r.SealedResult != "" && !isSafeSealedPayload(r.SealedResult) {
+		return fmt.Errorf("%w: sealedResult", ErrUnsafeResponse)
 	}
 	return validateResponseStatusConsistency(r)
 }
@@ -193,7 +206,7 @@ func isAllowedErrorCode(code ErrorCode) bool {
 
 func isAllowedSummaryCode(code SummaryCode) bool {
 	switch code {
-	case SummaryNone, SummaryAccepted, SummaryApplied, SummaryDeleted, SummaryStatusAvailable, SummaryUnsupportedOperation, SummaryValidationFailed, SummaryExpired, SummaryReplayConflict, SummaryRuntimeFailed, SummaryUnavailable, SummaryUnauthorized:
+	case SummaryNone, SummaryAccepted, SummaryApplied, SummaryDeleted, SummaryExported, SummaryStatusAvailable, SummaryUnsupportedOperation, SummaryValidationFailed, SummaryExpired, SummaryReplayConflict, SummaryRuntimeFailed, SummaryUnavailable, SummaryUnauthorized, SummaryInstalled, SummaryUpdated, SummaryUninstalled, SummaryBlocked:
 		return true
 	default:
 		return false
@@ -239,7 +252,7 @@ func validateResponseStatusConsistency(r Response) error {
 
 func isFailureSummaryCode(code SummaryCode) bool {
 	switch code {
-	case SummaryUnsupportedOperation, SummaryValidationFailed, SummaryExpired, SummaryReplayConflict, SummaryRuntimeFailed, SummaryUnavailable, SummaryUnauthorized:
+	case SummaryUnsupportedOperation, SummaryValidationFailed, SummaryExpired, SummaryReplayConflict, SummaryRuntimeFailed, SummaryUnavailable, SummaryUnauthorized, SummaryBlocked:
 		return true
 	default:
 		return false
@@ -248,7 +261,7 @@ func isFailureSummaryCode(code SummaryCode) bool {
 
 func isSuccessSummaryCode(code SummaryCode) bool {
 	switch code {
-	case SummaryNone, SummaryAccepted, SummaryApplied, SummaryDeleted, SummaryStatusAvailable:
+	case SummaryNone, SummaryAccepted, SummaryApplied, SummaryDeleted, SummaryExported, SummaryStatusAvailable, SummaryInstalled, SummaryUpdated, SummaryUninstalled:
 		return true
 	default:
 		return false
@@ -257,7 +270,7 @@ func isSuccessSummaryCode(code SummaryCode) bool {
 
 func isSuccessResultState(state ResultState) bool {
 	switch state {
-	case ResultStateUnknown, ResultStatePending, ResultStateRunning, ResultStateStopped, ResultStateApplied, ResultStateDeleted, ResultStateHealthy, ResultStateUnhealthy, ResultStateEnabled, ResultStateDisabled:
+	case ResultStateUnknown, ResultStatePending, ResultStateRunning, ResultStateStopped, ResultStateApplied, ResultStateDeleted, ResultStateExported, ResultStateHealthy, ResultStateUnhealthy, ResultStateEnabled, ResultStateDisabled:
 		return true
 	default:
 		return false
@@ -277,16 +290,22 @@ func (r Result) Validate() error {
 	if !isAllowedResultState(r.State) {
 		return fmt.Errorf("%w: result.state", ErrUnsafeResponse)
 	}
+	if r.ArtifactRef != "" && (len(r.ArtifactRef) > MaxArtifactRefLength || strings.ContainsAny(r.ArtifactRef, "\x00\r\n")) {
+		return fmt.Errorf("%w: result.artifactRef", ErrUnsafeResponse)
+	}
+	if r.ArtifactVersion != "" && !isSafeBoundedToken(r.ArtifactVersion, MaxArtifactRefLength) {
+		return fmt.Errorf("%w: result.artifactVersion", ErrUnsafeResponse)
+	}
 	return nil
 }
 
 func (r Result) hasFields() bool {
-	return r.RuntimeKind != "" || r.EndpointID != 0 || r.ClientID != "" || r.Enabled != nil || r.State != ResultStateUnknown
+	return r.RuntimeKind != "" || r.EndpointID != 0 || r.ClientID != "" || r.Enabled != nil || r.State != ResultStateUnknown || r.ArtifactRef != "" || r.ArtifactVersion != ""
 }
 
 func isAllowedResultState(state ResultState) bool {
 	switch state {
-	case ResultStateUnknown, ResultStatePending, ResultStateRunning, ResultStateStopped, ResultStateApplied, ResultStateDeleted, ResultStateHealthy, ResultStateUnhealthy, ResultStateEnabled, ResultStateDisabled:
+	case ResultStateUnknown, ResultStatePending, ResultStateRunning, ResultStateStopped, ResultStateApplied, ResultStateDeleted, ResultStateExported, ResultStateHealthy, ResultStateUnhealthy, ResultStateEnabled, ResultStateDisabled:
 		return true
 	default:
 		return false

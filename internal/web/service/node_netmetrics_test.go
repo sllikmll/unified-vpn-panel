@@ -11,14 +11,14 @@ import (
 )
 
 func TestProbeParsesNetIO(t *testing.T) {
-	patch, err := decodeHeartbeatStatus(strings.NewReader(`{"success":true,"obj":{"cpu":5,"cpuCores":4,"logicalPro":8,"cpuSpeedMhz":2400,"mem":{"current":1,"total":2},"swap":{"current":3,"total":4},"disk":{"current":5,"total":6},"netIO":{"up":1000,"down":2000},"netTraffic":{"sent":3000,"recv":4000},"tcpCount":9,"udpCount":10,"appStats":{"mem":11,"threads":12,"uptime":13},"publicIP":{"ipv4":"203.0.113.9","ipv6":"2001:db8::9"},"xray":{"version":"26.6.27","state":"running","errorMsg":""},"panelVersion":"0.0.1","panelGuid":"g","uptime":42}}`))
+	patch, err := decodeHeartbeatStatus(strings.NewReader(`{"success":true,"obj":{"cpu":5,"cpuCores":4,"logicalPro":8,"cpuSpeedMhz":2396.4,"mem":{"current":1,"total":2},"swap":{"current":3,"total":4},"disk":{"current":5,"total":6},"netIO":{"up":1000,"down":2000},"netTraffic":{"sent":3000,"recv":4000},"tcpCount":9,"udpCount":10,"appStats":{"mem":11,"threads":12,"uptime":13},"publicIP":{"ipv4":"203.0.113.9","ipv6":"2001:db8::9"},"xray":{"version":"26.6.27","state":"running","errorMsg":""},"panelVersion":"0.0.1","panelGuid":"g","runtimeCapabilities":["amneziawg","mieru","naiveproxy"],"uptime":42}}`))
 	if err != nil {
 		t.Fatalf("decodeHeartbeatStatus: %v", err)
 	}
 	if patch.NetUp != 1000 || patch.NetDown != 2000 {
 		t.Fatalf("net throughput not parsed from status: up=%d down=%d", patch.NetUp, patch.NetDown)
 	}
-	if patch.CpuCores != 4 || patch.LogicalPro != 8 || patch.CpuSpeedMhz != 2400 {
+	if patch.CpuCores != 4 || patch.LogicalPro != 8 || patch.CpuSpeedMhz != 2396.4 {
 		t.Fatalf("cpu details not parsed: %+v", patch)
 	}
 	if patch.MemCurrent != 1 || patch.MemTotal != 2 || patch.SwapCurrent != 3 || patch.SwapTotal != 4 || patch.DiskCurrent != 5 || patch.DiskTotal != 6 {
@@ -33,6 +33,9 @@ func TestProbeParsesNetIO(t *testing.T) {
 	if patch.PublicIPV4 != "203.0.113.9" || patch.PublicIPV6 != "2001:db8::9" || patch.PanelVersion != "0.0.1" || patch.Guid != "g" {
 		t.Fatalf("identity/public details not parsed: %+v", patch)
 	}
+	if patch.RuntimeCapabilities != `["amneziawg","mieru","naiveproxy"]` {
+		t.Fatalf("runtime capabilities not parsed: %q", patch.RuntimeCapabilities)
+	}
 }
 
 func TestUpdateHeartbeatStoresNetMetrics(t *testing.T) {
@@ -45,28 +48,29 @@ func TestUpdateHeartbeatStoresNetMetrics(t *testing.T) {
 	}
 
 	patch := HeartbeatPatch{
-		Status:          "online",
-		LastHeartbeat:   time.Now().Unix(),
-		CpuCores:        4,
-		LogicalPro:      8,
-		CpuSpeedMhz:     2400,
-		MemCurrent:      100,
-		MemTotal:        200,
-		SwapCurrent:     10,
-		SwapTotal:       20,
-		DiskCurrent:     300,
-		DiskTotal:       400,
-		NetUp:           111,
-		NetDown:         222,
-		NetTrafficSent:  333,
-		NetTrafficRecv:  444,
-		TcpCount:        5,
-		UdpCount:        6,
-		AppStatsMem:     777,
-		AppStatsThreads: 8,
-		AppStatsUptime:  999,
-		PublicIPV4:      "203.0.113.10",
-		PublicIPV6:      "2001:db8::10",
+		Status:              "online",
+		LastHeartbeat:       time.Now().Unix(),
+		CpuCores:            4,
+		LogicalPro:          8,
+		CpuSpeedMhz:         2400,
+		MemCurrent:          100,
+		MemTotal:            200,
+		SwapCurrent:         10,
+		SwapTotal:           20,
+		DiskCurrent:         300,
+		DiskTotal:           400,
+		NetUp:               111,
+		NetDown:             222,
+		NetTrafficSent:      333,
+		NetTrafficRecv:      444,
+		TcpCount:            5,
+		UdpCount:            6,
+		AppStatsMem:         777,
+		AppStatsThreads:     8,
+		AppStatsUptime:      999,
+		PublicIPV4:          "203.0.113.10",
+		PublicIPV6:          "2001:db8::10",
+		RuntimeCapabilities: `["amneziawg","mieru","naiveproxy"]`,
 	}
 	if err := s.UpdateHeartbeat(n.Id, patch); err != nil {
 		t.Fatalf("UpdateHeartbeat: %v", err)
@@ -90,6 +94,9 @@ func TestUpdateHeartbeatStoresNetMetrics(t *testing.T) {
 	}
 	if got.AppStatsMem != 777 || got.AppStatsThreads != 8 || got.AppStatsUptime != 999 || got.PublicIPV4 != "203.0.113.10" || got.PublicIPV6 != "2001:db8::10" {
 		t.Fatalf("app/public columns not persisted: %+v", got)
+	}
+	if got.RuntimeCapabilities != `["amneziawg","mieru","naiveproxy"]` {
+		t.Fatalf("runtime capabilities not persisted: %q", got.RuntimeCapabilities)
 	}
 	if len(s.AggregateNodeMetric(n.Id, "netUp", 2, 60)) == 0 {
 		t.Fatal("expected netUp history points after an online heartbeat")

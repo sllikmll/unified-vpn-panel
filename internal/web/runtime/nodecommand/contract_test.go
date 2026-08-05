@@ -140,7 +140,6 @@ func TestValidateRequestExactFailures(t *testing.T) {
 		{name: "target guid path-like", mutate: func(r *Request) { r.TargetGUID = "../target" }, wantError: ErrInvalidField},
 		{name: "target guid too long", mutate: func(r *Request) { r.TargetGUID = strings.Repeat("a", MaxTargetGUIDLength+1) }, wantError: ErrInvalidField},
 		{name: "zero endpoint", mutate: func(r *Request) { r.EndpointID = 0 }, wantError: ErrInvalidField},
-		{name: "endpoint too large", mutate: func(r *Request) { r.EndpointID = MaxEndpointID + 1 }, wantError: ErrInvalidField},
 		{name: "zero generation", mutate: func(r *Request) { r.DesiredGeneration = 0 }, wantError: ErrInvalidField},
 		{name: "generation too large", mutate: func(r *Request) { r.DesiredGeneration = MaxDesiredGeneration + 1 }, wantError: ErrInvalidField},
 		{name: "command id whitespace", mutate: func(r *Request) { r.CommandID = "cmd 1" }, wantError: ErrInvalidField},
@@ -151,6 +150,14 @@ func TestValidateRequestExactFailures(t *testing.T) {
 		}, wantError: ErrNotYetValid},
 		{name: "lifetime too long", mutate: func(r *Request) { r.ExpiresAt = r.IssuedAt.Add(MaxCommandLifetime + time.Second) }, wantError: ErrInvalidField},
 		{name: "issued after expires", mutate: func(r *Request) { r.IssuedAt = now.Add(time.Minute); r.ExpiresAt = now.Add(30 * time.Second) }, wantError: ErrInvalidField},
+	}
+	if int64(^uint(0)>>1) > int64(MaxEndpointID) {
+		tooLarge := int64(MaxEndpointID) + 1
+		tests = append(tests, struct {
+			name      string
+			mutate    func(*Request)
+			wantError error
+		}{name: "endpoint too large", mutate: func(r *Request) { r.EndpointID = int(tooLarge) }, wantError: ErrInvalidField})
 	}
 
 	for _, tt := range tests {
@@ -269,6 +276,51 @@ func TestRequestSecretInputDoesNotSerialize(t *testing.T) {
 	}
 	if bytes.Contains(raw, []byte("SecretInput")) {
 		t.Fatalf("serialized request exposed secret field: %s", raw)
+	}
+}
+
+func TestSealedSecretInputRoundTripsRefsWithoutPlaintext(t *testing.T) {
+	key := []byte("token")
+	secret := &SecretInput{
+		Material: []byte("private-config"),
+		Refs:     map[string]string{"interfaceName": "awg0"},
+	}
+	sealed, err := SealSecretInput(key, secret)
+	if err != nil {
+		t.Fatalf("SealSecretInput: %v", err)
+	}
+	if strings.Contains(sealed, "private-config") || strings.Contains(sealed, "interfaceName") || strings.Contains(sealed, "awg0") {
+		t.Fatalf("sealed secret leaked plaintext: %q", sealed)
+	}
+	opened, err := OpenSealedSecretInput(key, sealed)
+	if err != nil {
+		t.Fatalf("OpenSealedSecretInput: %v", err)
+	}
+	if string(opened.Material) != "private-config" || opened.Refs["interfaceName"] != "awg0" {
+		t.Fatalf("opened secret = %+v", opened)
+	}
+}
+
+func TestClientExportOperationValidation(t *testing.T) {
+	now := time.Unix(100, 0).UTC()
+	req := validRequest(now)
+	req.Operation = OperationClientExport
+	req.Payload = ClientPayload{ClientID: "client-1"}
+	if err := req.Validate(now); err != nil {
+		t.Fatalf("client export request: %v", err)
+	}
+
+	resp := validResponse(req)
+	resp.SummaryCode = SummaryExported
+	resp.Result.State = ResultStateExported
+	resp.SealedResult = "abc123_-"
+	if err := resp.ValidateFor(req); err != nil {
+		t.Fatalf("client export response: %v", err)
+	}
+
+	resp.SealedResult = "abc/123"
+	if err := resp.ValidateFor(req); !errors.Is(err, ErrUnsafeResponse) {
+		t.Fatalf("unsafe sealed result error = %v, want ErrUnsafeResponse", err)
 	}
 }
 

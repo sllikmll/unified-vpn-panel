@@ -37,6 +37,7 @@ export const keys = {
     list: () => ['managedEndpoints', 'list'] as const,
     detail: (id: string) => ['managedEndpoints', 'detail', id] as const,
     capabilities: () => ['managedEndpoints', 'capabilities'] as const,
+    installPlans: () => ['managedEndpoints', 'installPlans'] as const,
   },
   clients: {
     root: () => ['clients'] as const,

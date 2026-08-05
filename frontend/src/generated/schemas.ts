@@ -2583,8 +2583,8 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "number"
       },
       "cpuSpeedMhz": {
-        "example": 2400,
-        "type": "integer"
+        "example": 2396.4,
+        "type": "number"
       },
       "createdAt": {
         "example": 1700000000,
@@ -2728,6 +2728,10 @@ export const SCHEMAS: Record<string, unknown> = {
       "remark": {
         "type": "string"
       },
+      "runtimeCapabilities": {
+        "description": "RuntimeCapabilities is a JSON array of managed runtime kinds the node\nexplicitly advertised. Empty means the node has not advertised managed\nendpoint support and must not receive managed runtime commands.",
+        "type": "string"
+      },
       "scheme": {
         "enum": [
           "http",
@@ -2838,6 +2842,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "publicIpV4",
       "publicIpV6",
       "remark",
+      "runtimeCapabilities",
       "scheme",
       "status",
       "swapCurrent",
@@ -3181,8 +3186,8 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "number"
       },
       "cpuSpeedMhz": {
-        "example": 2400,
-        "type": "integer"
+        "example": 2396.4,
+        "type": "number"
       },
       "createdAt": {
         "example": 1700000000,
@@ -3328,6 +3333,12 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "Primary edge",
         "type": "string"
       },
+      "runtimeCapabilities": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
       "scheme": {
         "example": "https",
         "type": "string"
@@ -3430,6 +3441,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "publicIpV4",
       "publicIpV6",
       "remark",
+      "runtimeCapabilities",
       "scheme",
       "status",
       "swapCurrent",
@@ -3530,8 +3542,8 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "number"
       },
       "cpuSpeedMhz": {
-        "example": 2400,
-        "type": "integer"
+        "example": 2396.4,
+        "type": "number"
       },
       "diskCurrent": {
         "example": 10737418240,

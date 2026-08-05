@@ -1,0 +1,155 @@
+name: Protocol Runtime Images
+
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "protocol-runtime-*"
+    paths:
+      - "runtime-images/**"
+      - ".github/workflows/protocol-runtime-images.yml"
+      - "docs/protocol-runtime-artifacts.md"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/unified-vpn-panel
+  AWG_GO_COMMIT: cf9d2dd202821301f7039093b0a1b3d4b574c47c
+  AWG_TOOLS_COMMIT: d09ecc38425082e472368dd2bf8c4c42d10cae03
+  CADDY_VERSION: v2.11.4
+  XCADDY_VERSION: v0.4.5
+  FORWARDPROXY_COMMIT: d62c80d3dd2c706b6b87579844d2397bddd18317
+  MIERU_VERSION: v3.35.0
+
+jobs:
+  validate-mieru-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate Mieru mita manifest checksums
+        run: runtime-images/mieru/verify-mieru-manifest.sh runtime-images/mieru/mita-v3.35.0.manifest.json
+
+  build-runtime-images:
+    runs-on: ubuntu-latest
+    needs: validate-mieru-manifest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: awg2
+            context: runtime-images/awg2
+            image_suffix: protocol-awg2
+            tag_prefix: awg2-go-cf9d2dd-tools-d09ecc3
+          - id: naive-caddy
+            context: runtime-images/naive-caddy
+            image_suffix: protocol-naive-caddy
+            tag_prefix: naive-caddy-v2.11.4-xcaddy-v0.4.5-forwardproxy-d62c80d
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compute immutable tag
+        id: vars
+        run: |
+          short_sha="${GITHUB_SHA::12}"
+          image="${IMAGE_PREFIX}-${{ matrix.image_suffix }}"
+          tag="${{ matrix.tag_prefix }}-${short_sha}"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "ref=${image}:${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.id }}
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.vars.outputs.ref }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.vars.outputs.tag }}
+          provenance: true
+          sbom: true
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-name: ${{ steps.vars.outputs.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Write digest artifact
+        run: |
+          mkdir -p digest
+          image="${{ steps.vars.outputs.image }}"
+          digest="${{ steps.build.outputs.digest }}"
+          case "$digest" in
+            sha256:*) ;;
+            *) echo "unexpected digest: $digest" >&2; exit 1 ;;
+          esac
+          printf '%s@%s\n' "$image" "$digest" > "digest/${{ matrix.id }}.image-ref"
+          printf '%s\n' "$digest" > "digest/${{ matrix.id }}.digest"
+
+      - name: Upload digest artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: protocol-runtime-${{ matrix.id }}-digest
+          path: digest/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Summary
+        run: |
+          {
+            echo "### ${{ matrix.id }}"
+            echo ""
+            echo "Image: \`${{ steps.vars.outputs.ref }}\`"
+            echo "Digest: \`${{ steps.build.outputs.digest }}\`"
+            echo "Immutable ref: \`${{ steps.vars.outputs.image }}@${{ steps.build.outputs.digest }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  verify-published-digests:
+    runs-on: ubuntu-latest
+    needs: build-runtime-images
+    steps:
+      - name: Download digest artifacts
+        uses: actions/download-artifact@v6
+        with:
+          pattern: protocol-runtime-*-digest
+          path: digests
+          merge-multiple: true
+
+      - name: Validate immutable image refs
+        run: |
+          set -eu
+          for id in awg2 naive-caddy; do
+            ref_file="digests/${id}.image-ref"
+            test -s "$ref_file"
+            ref="$(cat "$ref_file")"
+            case "$ref" in
+              ghcr.io/*@sha256:*) ;;
+              *) echo "unexpected immutable ref for ${id}: ${ref}" >&2; exit 1 ;;
+            esac
+            echo "${id}: ${ref}" >> "$GITHUB_STEP_SUMMARY"
+          done

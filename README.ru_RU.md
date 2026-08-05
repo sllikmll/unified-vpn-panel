@@ -24,12 +24,15 @@
 
 ## Возможности
 
-- **Многопротокольные входящие подключения** — VLESS, VMess, Trojan, Shadowsocks, WireGuard, Hysteria2, HTTP, SOCKS (Mixed), Dokodemo-door / Tunnel и TUN.
+- **Многопротокольные входящие подключения** — VLESS, VMess, Trojan, Shadowsocks, WireGuard, Hysteria2, HTTP, SOCKS (Mixed), Dokodemo-door / Tunnel, TUN и MTProto.
+- **Managed server-side протоколы** — AmneziaWG 2.0, Mieru и NaiveProxy с установкой runtime, lifecycle, health/traffic, client CRUD, экспортом и включением клиентов в общую подписку.
 - **Современные транспорты и безопасность** — TCP (Raw), mKCP, WebSocket, gRPC, HTTPUpgrade и XHTTP, защищённые с помощью TLS, XTLS и REALITY.
 - **Fallback** — обслуживание нескольких протоколов на одном порту (например, VLESS и Trojan на 443) с помощью функции fallback в Xray.
 - **Управление по каждому клиенту** — квоты трафика, даты истечения, лимиты IP, статус «онлайн» в реальном времени, а также ссылки для общего доступа, QR-коды и подписки в один клик.
 - **Статистика трафика** — по каждому входящему, по каждому клиенту и по каждому исходящему, с возможностью сброса.
 - **Поддержка нескольких узлов** — управление и масштабирование на несколько серверов из одной панели.
+- **Безопасное управление нодами** — стабильный GUID, authenticated typed-команды без произвольного shell API и fail-closed capability negotiation.
+- **Защита секретов** — AES-256-GCM, contextual AAD, внешний master key и отсутствие plaintext credentials в SQLite/API/logs.
 - **Исходящие подключения и маршрутизация** — WARP, NordVPN, пользовательские правила маршрутизации, балансировщики нагрузки и цепочки исходящих прокси.
 - **Встроенный сервер подписок** с несколькими форматами вывода и [пользовательскими шаблонами страниц](docs/custom-subscription-templates.md).
 - **Telegram-бот** для удалённого мониторинга и управления.

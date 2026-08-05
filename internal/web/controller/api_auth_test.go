@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net/http"
-	"net/http/cookiejar"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
@@ -175,29 +174,20 @@ func TestCheckAPIAuth_SessionLoginPasses(t *testing.T) {
 		}
 	}
 
-	ts := httptest.NewServer(engine)
-	defer ts.Close()
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		t.Fatalf("cookiejar: %v", err)
-	}
-	client := &http.Client{Jar: jar}
-
-	loginResp, err := client.Get(ts.URL + "/test-login")
-	if err != nil {
-		t.Fatalf("login: %v", err)
-	}
-	loginResp.Body.Close()
-	if loginResp.StatusCode != http.StatusOK {
-		t.Fatalf("login status = %d, want 200", loginResp.StatusCode)
+	loginReq := httptest.NewRequest(http.MethodGet, "/test-login", nil)
+	loginRec := httptest.NewRecorder()
+	engine.ServeHTTP(loginRec, loginReq)
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("login status = %d, want 200", loginRec.Code)
 	}
 
-	pingResp, err := client.Get(ts.URL + "/panel/api/ping")
-	if err != nil {
-		t.Fatalf("ping: %v", err)
+	pingReq := httptest.NewRequest(http.MethodGet, "/panel/api/ping", nil)
+	for _, cookie := range loginRec.Result().Cookies() {
+		pingReq.AddCookie(cookie)
 	}
-	pingResp.Body.Close()
-	if pingResp.StatusCode != http.StatusOK {
-		t.Fatalf("session ping status = %d, want 200", pingResp.StatusCode)
+	pingRec := httptest.NewRecorder()
+	engine.ServeHTTP(pingRec, pingReq)
+	if pingRec.Code != http.StatusOK {
+		t.Fatalf("session ping status = %d, want 200", pingRec.Code)
 	}
 }

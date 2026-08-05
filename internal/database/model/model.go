@@ -414,7 +414,9 @@ func StripVmessClientSecurity(settings string) (string, bool) {
 // full-config path (XrayService.GetXrayConfig) and the live AddInbound path
 // (WireguardClientsToPeers), so both emit identical peers. The client's
 // privateKey is intentionally omitted — it is the client's secret, not part of
-// the server-side peer.
+// the server-side peer. KeepAlive is also client-side only: an inbound peer has
+// no endpoint to dial, so passing it to xray causes endless "no known endpoint"
+// handshake warnings. Subscription exporters still read Client.KeepAlive.
 func WireguardPeerFromClient(c Client) map[string]any {
 	peer := map[string]any{"email": c.Email, "level": 0}
 	if c.PublicKey != "" {
@@ -425,9 +427,6 @@ func WireguardPeerFromClient(c Client) map[string]any {
 	}
 	if c.PreSharedKey != "" {
 		peer["preSharedKey"] = c.PreSharedKey
-	}
-	if c.KeepAlive > 0 {
-		peer["keepAlive"] = c.KeepAlive
 	}
 	return peer
 }
@@ -783,6 +782,11 @@ type Node struct {
 	// Observed-state only — never user-edited.
 	Guid string `json:"guid" gorm:"column:guid;index"`
 
+	// RuntimeCapabilities is a JSON array of managed runtime kinds the node
+	// explicitly advertised. Empty means the node has not advertised managed
+	// endpoint support and must not receive managed runtime commands.
+	RuntimeCapabilities string `json:"runtimeCapabilities" gorm:"column:runtime_capabilities;type:text"`
+
 	// Heartbeat-updated fields. UpdatedAt advances on every probe even when
 	// the row is otherwise unchanged so the UI's "last seen" tooltip is
 	// truthful without us having to read LastHeartbeat separately.
@@ -794,7 +798,7 @@ type Node struct {
 	CpuPct          float64 `json:"cpuPct" example:"23.5"`
 	CpuCores        int     `json:"cpuCores" gorm:"column:cpu_cores" example:"4"`
 	LogicalPro      int     `json:"logicalPro" gorm:"column:logical_pro" example:"8"`
-	CpuSpeedMhz     int     `json:"cpuSpeedMhz" gorm:"column:cpu_speed_mhz" example:"2400"`
+	CpuSpeedMhz     float64 `json:"cpuSpeedMhz" gorm:"column:cpu_speed_mhz" example:"2396.4"`
 	MemCurrent      uint64  `json:"memCurrent" gorm:"column:mem_current" example:"1073741824"`
 	MemTotal        uint64  `json:"memTotal" gorm:"column:mem_total" example:"2147483648"`
 	MemPct          float64 `json:"memPct" example:"45.1"`

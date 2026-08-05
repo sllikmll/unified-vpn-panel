@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/provisioner"
 )
 
 type ProtocolVersion string
@@ -32,6 +33,7 @@ const (
 	MaxSecretRefCount       = 16
 	MaxSecretRefKeyLength   = 128
 	MaxSecretRefValueLength = 4096
+	MaxArtifactRefLength    = 256
 )
 
 var safeIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*$`)
@@ -41,23 +43,28 @@ var supportedVersions = []ProtocolVersion{ProtocolV1}
 type Operation string
 
 const (
-	OperationEndpointApply     Operation = "endpoint.apply"
-	OperationEndpointDelete    Operation = "endpoint.delete"
-	OperationEndpointEnable    Operation = "endpoint.enable"
-	OperationEndpointDisable   Operation = "endpoint.disable"
-	OperationEndpointStart     Operation = "endpoint.start"
-	OperationEndpointStop      Operation = "endpoint.stop"
-	OperationEndpointRestart   Operation = "endpoint.restart"
-	OperationEndpointReconcile Operation = "endpoint.reconcile"
-	OperationEndpointStatus    Operation = "endpoint.status"
-	OperationEndpointHealth    Operation = "endpoint.health"
-	OperationEndpointDetect    Operation = "endpoint.detect"
-	OperationClientCreate      Operation = "client.create"
-	OperationClientUpdate      Operation = "client.update"
-	OperationClientDelete      Operation = "client.delete"
-	OperationClientEnable      Operation = "client.enable"
-	OperationClientDisable     Operation = "client.disable"
-	OperationClientStatus      Operation = "client.status"
+	OperationEndpointApply      Operation = "endpoint.apply"
+	OperationEndpointDelete     Operation = "endpoint.delete"
+	OperationEndpointEnable     Operation = "endpoint.enable"
+	OperationEndpointDisable    Operation = "endpoint.disable"
+	OperationEndpointStart      Operation = "endpoint.start"
+	OperationEndpointStop       Operation = "endpoint.stop"
+	OperationEndpointRestart    Operation = "endpoint.restart"
+	OperationEndpointReconcile  Operation = "endpoint.reconcile"
+	OperationEndpointStatus     Operation = "endpoint.status"
+	OperationEndpointHealth     Operation = "endpoint.health"
+	OperationEndpointDetect     Operation = "endpoint.detect"
+	OperationClientCreate       Operation = "client.create"
+	OperationClientUpdate       Operation = "client.update"
+	OperationClientDelete       Operation = "client.delete"
+	OperationClientEnable       Operation = "client.enable"
+	OperationClientDisable      Operation = "client.disable"
+	OperationClientStatus       Operation = "client.status"
+	OperationClientExport       Operation = "client.export"
+	OperationRuntimeInstall     Operation = "runtime.install"
+	OperationRuntimeUpdate      Operation = "runtime.update"
+	OperationRuntimeUninstall   Operation = "runtime.uninstall"
+	OperationRuntimeInstallPlan Operation = "runtime.install-plan"
 )
 
 type Payload interface {
@@ -79,6 +86,13 @@ type ClientPayload struct {
 
 func (ClientPayload) nodeCommandPayload() {}
 
+type RuntimePayload struct {
+	RuntimeKind model.RuntimeKind `json:"runtimeKind"`
+	ArtifactRef string            `json:"artifactRef,omitempty"`
+}
+
+func (RuntimePayload) nodeCommandPayload() {}
+
 type SecretInput struct {
 	Material []byte
 	Refs     map[string]string
@@ -99,6 +113,7 @@ type Request struct {
 	ExpiresAt          time.Time         `json:"expiresAt"`
 	Payload            Payload           `json:"-"`
 	SecretInput        *SecretInput      `json:"-"`
+	SealedPayload      string            `json:"sealedPayload,omitempty"`
 	rawPayload         json.RawMessage
 	negotiatedProtocol ProtocolVersion
 }
@@ -117,6 +132,7 @@ type requestWire struct {
 	IssuedAt          time.Time         `json:"issuedAt"`
 	ExpiresAt         time.Time         `json:"expiresAt"`
 	Payload           json.RawMessage   `json:"payload,omitempty"`
+	SealedPayload     string            `json:"sealedPayload,omitempty"`
 }
 
 func NegotiateVersion(offered []ProtocolVersion) (ProtocolVersion, error) {
@@ -138,6 +154,8 @@ func (r Request) MarshalJSON() ([]byte, error) {
 		payload = p
 	case ClientPayload:
 		payload = p
+	case RuntimePayload:
+		payload = p
 	default:
 		return nil, fmt.Errorf("%w: unsupported payload type %T", ErrPayloadMismatch, r.Payload)
 	}
@@ -155,6 +173,7 @@ func (r Request) MarshalJSON() ([]byte, error) {
 		IssuedAt          time.Time         `json:"issuedAt"`
 		ExpiresAt         time.Time         `json:"expiresAt"`
 		Payload           any               `json:"payload,omitempty"`
+		SealedPayload     string            `json:"sealedPayload,omitempty"`
 	}{
 		Version:           r.Version,
 		SupportedVersions: r.SupportedVersions,
@@ -169,6 +188,7 @@ func (r Request) MarshalJSON() ([]byte, error) {
 		IssuedAt:          r.IssuedAt,
 		ExpiresAt:         r.ExpiresAt,
 		Payload:           payload,
+		SealedPayload:     r.SealedPayload,
 	})
 }
 
@@ -235,8 +255,14 @@ func (r Request) Validate(now time.Time) error {
 	if err := validatePayloadForOperation(r.Operation, r.Payload); err != nil {
 		return err
 	}
+	if p, ok := r.Payload.(RuntimePayload); ok && p.RuntimeKind != r.RuntimeKind {
+		return fmt.Errorf("%w: runtimeKind", ErrInvalidField)
+	}
 	if err := validateSecretInput(r.SecretInput); err != nil {
 		return err
+	}
+	if r.SealedPayload != "" && !isSafeSealedPayload(r.SealedPayload) {
+		return fmt.Errorf("%w: sealedPayload", ErrInvalidField)
 	}
 	return nil
 }
@@ -252,7 +278,7 @@ func isSupportedRuntime(kind model.RuntimeKind) bool {
 
 func isSupportedOperation(operation Operation) bool {
 	switch operation {
-	case OperationEndpointApply, OperationEndpointDelete, OperationEndpointEnable, OperationEndpointDisable, OperationEndpointStart, OperationEndpointStop, OperationEndpointRestart, OperationEndpointReconcile, OperationEndpointStatus, OperationEndpointHealth, OperationEndpointDetect, OperationClientCreate, OperationClientUpdate, OperationClientDelete, OperationClientEnable, OperationClientDisable, OperationClientStatus:
+	case OperationEndpointApply, OperationEndpointDelete, OperationEndpointEnable, OperationEndpointDisable, OperationEndpointStart, OperationEndpointStop, OperationEndpointRestart, OperationEndpointReconcile, OperationEndpointStatus, OperationEndpointHealth, OperationEndpointDetect, OperationClientCreate, OperationClientUpdate, OperationClientDelete, OperationClientEnable, OperationClientDisable, OperationClientStatus, OperationClientExport, OperationRuntimeInstall, OperationRuntimeUpdate, OperationRuntimeUninstall, OperationRuntimeInstallPlan:
 		return true
 	default:
 		return false
@@ -290,15 +316,57 @@ func validatePayloadForOperation(operation Operation, payload Payload) error {
 			return fmt.Errorf("%w: %s rejects payload", ErrPayloadMismatch, operation)
 		}
 		return nil
-	case OperationClientCreate, OperationClientUpdate, OperationClientDelete, OperationClientEnable, OperationClientDisable, OperationClientStatus:
+	case OperationClientCreate, OperationClientUpdate, OperationClientDelete, OperationClientEnable, OperationClientDisable, OperationClientStatus, OperationClientExport:
 		p, ok := payload.(ClientPayload)
 		if !ok {
 			return fmt.Errorf("%w: %s requires client payload", ErrPayloadMismatch, operation)
 		}
 		return validateClientPayload(operation, p)
+	case OperationRuntimeInstall, OperationRuntimeUpdate, OperationRuntimeUninstall, OperationRuntimeInstallPlan:
+		p, ok := payload.(RuntimePayload)
+		if !ok {
+			return fmt.Errorf("%w: %s requires runtime payload", ErrPayloadMismatch, operation)
+		}
+		return validateRuntimePayload(operation, p)
 	default:
 		return fmt.Errorf("%w: %s", ErrUnsupportedOperation, operation)
 	}
+}
+
+func validateRuntimePayload(operation Operation, payload RuntimePayload) error {
+	if payload.RuntimeKind == "" {
+		return fmt.Errorf("%w: runtimeKind", ErrMissingField)
+	}
+	if payload.RuntimeKind != model.RuntimeAmneziaWG && payload.RuntimeKind != model.RuntimeMieru && payload.RuntimeKind != model.RuntimeNaiveProxy {
+		return fmt.Errorf("%w: runtimeKind", ErrUnsupportedRuntime)
+	}
+	if payload.RuntimeKind != "" && payload.RuntimeKind != model.RuntimeKind(strings.TrimSpace(string(payload.RuntimeKind))) {
+		return fmt.Errorf("%w: runtimeKind", ErrInvalidField)
+	}
+	if operation != OperationRuntimeUninstall && operation != OperationRuntimeInstallPlan {
+		if strings.TrimSpace(payload.ArtifactRef) == "" {
+			return fmt.Errorf("%w: artifactRef", ErrMissingField)
+		}
+	}
+	if operation == OperationRuntimeUninstall && strings.TrimSpace(payload.ArtifactRef) != "" {
+		return fmt.Errorf("%w: artifactRef", ErrForbiddenField)
+	}
+	if len(payload.ArtifactRef) > MaxArtifactRefLength || strings.ContainsAny(payload.ArtifactRef, "\x00\r\n") {
+		return fmt.Errorf("%w: artifactRef", ErrInvalidField)
+	}
+	if operation == OperationRuntimeInstall || operation == OperationRuntimeUpdate {
+		switch payload.RuntimeKind {
+		case model.RuntimeAmneziaWG, model.RuntimeNaiveProxy:
+			if !provisioner.ValidGHCRDigestRef(payload.ArtifactRef) {
+				return fmt.Errorf("%w: artifactRef", ErrInvalidField)
+			}
+		case model.RuntimeMieru:
+			if !strings.HasPrefix(payload.ArtifactRef, "mieru:mita:v3.35.0:linux/") || !strings.Contains(payload.ArtifactRef, ":sha256:") || strings.Contains(payload.ArtifactRef, "://") || strings.Contains(payload.ArtifactRef, "latest") {
+				return fmt.Errorf("%w: artifactRef", ErrInvalidField)
+			}
+		}
+	}
+	return nil
 }
 
 func validateEndpointPayload(payload EndpointPayload, allowTag bool) error {
@@ -338,7 +406,7 @@ func validateClientPayload(operation Operation, payload ClientPayload) error {
 			return validateEmail(payload.Email)
 		}
 		return nil
-	case OperationClientDelete, OperationClientStatus:
+	case OperationClientDelete, OperationClientStatus, OperationClientExport:
 		if strings.TrimSpace(payload.Email) != "" || payload.Enable != nil {
 			return fmt.Errorf("%w: client delete/status field", ErrForbiddenField)
 		}
@@ -396,6 +464,19 @@ func validateSecretInput(secret *SecretInput) error {
 		}
 	}
 	return nil
+}
+
+func isSafeSealedPayload(value string) bool {
+	if len(value) > MaxSecretMaterialBytes*2 {
+		return false
+	}
+	for _, r := range value {
+		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func isSafeBoundedToken(value string, maxLen int) bool {

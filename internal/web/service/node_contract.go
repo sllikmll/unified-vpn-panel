@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -26,6 +27,7 @@ type NodeView struct {
 	InboundTags         []string `json:"inboundTags" example:"[\"in-443-tcp\"]"`
 	OutboundTag         string   `json:"outboundTag" example:"direct"`
 	Guid                string   `json:"guid" example:"node-guid"`
+	RuntimeCapabilities []string `json:"runtimeCapabilities"`
 	Status              string   `json:"status" example:"online"`
 	LastHeartbeat       int64    `json:"lastHeartbeat" example:"1700000000"`
 	LatencyMs           int      `json:"latencyMs" example:"42"`
@@ -34,7 +36,7 @@ type NodeView struct {
 	CpuPct              float64  `json:"cpuPct" example:"12.5"`
 	CpuCores            int      `json:"cpuCores" example:"4"`
 	LogicalPro          int      `json:"logicalPro" example:"8"`
-	CpuSpeedMhz         int      `json:"cpuSpeedMhz" example:"2400"`
+	CpuSpeedMhz         float64  `json:"cpuSpeedMhz" example:"2396.4"`
 	MemCurrent          uint64   `json:"memCurrent" example:"1073741824"`
 	MemTotal            uint64   `json:"memTotal" example:"2147483648"`
 	MemPct              float64  `json:"memPct" example:"45.2"`
@@ -92,6 +94,7 @@ func toNodeView(n *model.Node) *NodeView {
 		InboundTags:         n.InboundTags,
 		OutboundTag:         n.OutboundTag,
 		Guid:                n.Guid,
+		RuntimeCapabilities: parseNodeRuntimeCapabilities(n.RuntimeCapabilities),
 		Status:              n.Status,
 		LastHeartbeat:       n.LastHeartbeat,
 		LatencyMs:           n.LatencyMs,
@@ -219,4 +222,20 @@ func (r *NodeMutationRequest) toNode() *model.Node {
 		n.ApiToken = *r.ApiToken
 	}
 	return n
+}
+
+func parseNodeRuntimeCapabilities(raw string) []string {
+	var values []string
+	if json.Unmarshal([]byte(raw), &values) != nil {
+		return nil
+	}
+	allowed := map[string]bool{"amneziawg": true, "mieru": true, "naiveproxy": true}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if allowed[value] {
+			out = append(out, value)
+		}
+	}
+	return out
 }

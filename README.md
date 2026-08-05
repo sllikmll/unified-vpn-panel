@@ -13,9 +13,23 @@
 - массовое развертывание протокольных профилей;
 - мониторинг, история метрик, health-check и восстановление;
 - VLESS Reality, VLESS TLS/gRPC/XHTTP, VMess, Trojan, Shadowsocks 2022, WireGuard, Hysteria2, HTTP, SOCKS/Mixed, Tunnel/TUN и MTProto;
+- полноценные managed server-side runtimes AmneziaWG 2.0, Mieru и NaiveProxy;
 - raw/JSON/Clash/Mihomo подписки;
 - SQLite и PostgreSQL;
 - современный React UI, REST/OpenAPI, WebSocket и API-токены.
+
+## Managed-протоколы
+
+AmneziaWG 2.0, Mieru и NaiveProxy — не шаблоны для импорта. Панель управляет полным серверным lifecycle локально или на удалённой GUID-node:
+
+- установка runtime по immutable digest/checksum;
+- authenticated typed node-команды без произвольного remote shell API;
+- create, update, start, stop, repair, rollback и uninstall;
+- client CRUD, encrypted credentials, health и traffic state;
+- raw/JSON/QR export и включение клиентов в общую подписку, когда формат поддерживает протокол;
+- явный статус `unsupported` вместо повреждённых ссылок для несовместимых форматов.
+
+Managed-секреты защищены AES-256-GCM с contextual AAD. Master key хранится вне SQLite и доступен только сервисному аккаунту панели.
 
 ## Архитектурная база
 
@@ -48,7 +62,7 @@
 4. frontend typecheck/lint/test/build;
 5. Go test/build;
 6. Docker build;
-7. deploy и smoke/e2e на canary `msknew`.
+7. deploy и smoke/e2e на production master `msknew` и удалённой GUID-node `amstnew`.
 
 Проект не считает функцию готовой, пока она не проверена реальным запуском.
 

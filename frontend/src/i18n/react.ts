@@ -3,6 +3,7 @@ import { initReactI18next } from 'react-i18next';
 
 import { LanguageManager } from '@/utils';
 import enUS from '../../../internal/web/translation/en-US.json';
+import { managedTranslations } from './managed';
 
 const FALLBACK = 'en-US';
 
@@ -24,7 +25,7 @@ export async function readyI18n() {
   await i18next.use(initReactI18next).init({
     lng: active,
     fallbackLng: FALLBACK,
-    resources: { [FALLBACK]: { translation: enUS } },
+    resources: { [FALLBACK]: { translation: { ...enUS, ...managedTranslations[FALLBACK] } } },
     interpolation: { escapeValue: false, prefix: '{', suffix: '}' },
     returnNull: false,
   });
@@ -34,6 +35,13 @@ export async function readyI18n() {
       const mod = await loader();
       const messages = (mod.default ?? mod) as Record<string, unknown>;
       i18next.addResourceBundle(active, 'translation', messages, true, true);
+      i18next.addResourceBundle(
+        active,
+        'translation',
+        managedTranslations[active as keyof typeof managedTranslations] ?? managedTranslations[FALLBACK],
+        true,
+        true,
+      );
       await i18next.changeLanguage(active);
     }
   }

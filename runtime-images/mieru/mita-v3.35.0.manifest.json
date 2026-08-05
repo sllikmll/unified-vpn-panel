@@ -1,0 +1,45 @@
+{
+  "schema": "unified-vpn-panel.runtime-images.mieru.v1",
+  "upstream": {
+    "host": "github.com",
+    "owner": "enfein",
+    "repo": "mieru",
+    "version": "v3.35.0",
+    "component": "mita",
+    "license": "GPL-3.0-only"
+  },
+  "artifacts": [
+    {
+      "os": "linux",
+      "arch": "amd64",
+      "kind": "tar.gz",
+      "url": "https://github.com/enfein/mieru/releases/download/v3.35.0/mita_3.35.0_linux_amd64.tar.gz",
+      "checksum_url": "https://github.com/enfein/mieru/releases/download/v3.35.0/mita_3.35.0_linux_amd64.tar.gz.sha256.txt",
+      "sha256": "a07d5afc5e1353ab346bb3ddbe95c7f960828204be529f4a88d688dfe83e252d"
+    },
+    {
+      "os": "linux",
+      "arch": "arm64",
+      "kind": "tar.gz",
+      "url": "https://github.com/enfein/mieru/releases/download/v3.35.0/mita_3.35.0_linux_arm64.tar.gz",
+      "checksum_url": "https://github.com/enfein/mieru/releases/download/v3.35.0/mita_3.35.0_linux_arm64.tar.gz.sha256.txt",
+      "sha256": "808849223d34ccd9ad86afc0eedef4d6c827133258e96dc3f3794bd17e7d54de"
+    },
+    {
+      "os": "linux",
+      "arch": "amd64",
+      "kind": "deb",
+      "url": "https://github.com/enfein/mieru/releases/download/v3.35.0/mita_3.35.0_amd64.deb",
+      "checksum_url": "https://github.com/enfein/mieru/releases/download/v3.35.0/mita_3.35.0_amd64.deb.sha256.txt",
+      "sha256": "cca7a31e7be692bf10dd5c72f8862b92695a8b06e2a3abcb22ede936e74b2342"
+    },
+    {
+      "os": "linux",
+      "arch": "arm64",
+      "kind": "deb",
+      "url": "https://github.com/enfein/mieru/releases/download/v3.35.0/mita_3.35.0_arm64.deb",
+      "checksum_url": "https://github.com/enfein/mieru/releases/download/v3.35.0/mita_3.35.0_arm64.deb.sha256.txt",
+      "sha256": "66ff435dd5bd6078944cb4eb7fc427366afaac5ab51030ff62561c645c31a9e3"
+    }
+  ]
+}

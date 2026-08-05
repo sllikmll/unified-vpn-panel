@@ -31,24 +31,25 @@ import (
 )
 
 type HeartbeatPatch struct {
-	Status        string
-	LastHeartbeat int64
-	LatencyMs     int
-	XrayVersion   string
-	PanelVersion  string
-	Guid          string
-	CpuPct        float64
-	CpuCores      int
-	LogicalPro    int
-	CpuSpeedMhz   int
-	MemCurrent    uint64
-	MemTotal      uint64
-	MemPct        float64
-	SwapCurrent   uint64
-	SwapTotal     uint64
-	DiskCurrent   uint64
-	DiskTotal     uint64
-	UptimeSecs    uint64
+	Status              string
+	LastHeartbeat       int64
+	LatencyMs           int
+	XrayVersion         string
+	PanelVersion        string
+	Guid                string
+	RuntimeCapabilities string
+	CpuPct              float64
+	CpuCores            int
+	LogicalPro          int
+	CpuSpeedMhz         float64
+	MemCurrent          uint64
+	MemTotal            uint64
+	MemPct              float64
+	SwapCurrent         uint64
+	SwapTotal           uint64
+	DiskCurrent         uint64
+	DiskTotal           uint64
+	UptimeSecs          uint64
 	// NetUp/NetDown are the node's current interface throughput (bytes/sec),
 	// summed over non-virtual interfaces, read from its status response.
 	NetUp           uint64
@@ -867,6 +868,9 @@ func (s *NodeService) UpdateHeartbeat(id int, p HeartbeatPatch) error {
 	if p.Status == "online" {
 		updates["xray_version"] = p.XrayVersion
 		updates["panel_version"] = p.PanelVersion
+		if p.RuntimeCapabilities != "" {
+			updates["runtime_capabilities"] = p.RuntimeCapabilities
+		}
 		updates["cpu_pct"] = p.CpuPct
 		updates["cpu_cores"] = p.CpuCores
 		updates["logical_pro"] = p.LogicalPro
@@ -1217,7 +1221,7 @@ func decodeHeartbeatStatus(r io.Reader) (HeartbeatPatch, error) {
 			CpuPct      float64 `json:"cpu"`
 			CpuCores    int     `json:"cpuCores"`
 			LogicalPro  int     `json:"logicalPro"`
-			CpuSpeedMhz int     `json:"cpuSpeedMhz"`
+			CpuSpeedMhz float64 `json:"cpuSpeedMhz"`
 			Mem         struct {
 				Current uint64 `json:"current"`
 				Total   uint64 `json:"total"`
@@ -1235,10 +1239,11 @@ func decodeHeartbeatStatus(r io.Reader) (HeartbeatPatch, error) {
 				State    string `json:"state"`
 				ErrorMsg string `json:"errorMsg"`
 			} `json:"xray"`
-			PanelVersion string `json:"panelVersion"`
-			PanelGuid    string `json:"panelGuid"`
-			Uptime       uint64 `json:"uptime"`
-			NetIO        struct {
+			PanelVersion        string   `json:"panelVersion"`
+			PanelGuid           string   `json:"panelGuid"`
+			RuntimeCapabilities []string `json:"runtimeCapabilities"`
+			Uptime              uint64   `json:"uptime"`
+			NetIO               struct {
 				Up   uint64 `json:"up"`
 				Down uint64 `json:"down"`
 			} `json:"netIO"`
@@ -1286,6 +1291,13 @@ func decodeHeartbeatStatus(r io.Reader) (HeartbeatPatch, error) {
 	patch.XrayError = o.Xray.ErrorMsg
 	patch.PanelVersion = o.PanelVersion
 	patch.Guid = o.PanelGuid
+	if len(o.RuntimeCapabilities) > 0 {
+		raw, err := json.Marshal(o.RuntimeCapabilities)
+		if err != nil {
+			return patch, err
+		}
+		patch.RuntimeCapabilities = string(raw)
+	}
 	patch.UptimeSecs = o.Uptime
 	patch.NetUp = o.NetIO.Up
 	patch.NetDown = o.NetIO.Down
@@ -1325,7 +1337,7 @@ type ProbeResultUI struct {
 	CpuPct          float64 `json:"cpuPct" example:"12.5"`
 	CpuCores        int     `json:"cpuCores" example:"4"`
 	LogicalPro      int     `json:"logicalPro" example:"8"`
-	CpuSpeedMhz     int     `json:"cpuSpeedMhz" example:"2400"`
+	CpuSpeedMhz     float64 `json:"cpuSpeedMhz" example:"2396.4"`
 	MemCurrent      uint64  `json:"memCurrent" example:"1073741824"`
 	MemTotal        uint64  `json:"memTotal" example:"2147483648"`
 	MemPct          float64 `json:"memPct" example:"45.2"`

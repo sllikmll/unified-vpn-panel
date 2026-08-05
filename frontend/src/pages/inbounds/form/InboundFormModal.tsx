@@ -44,6 +44,7 @@ import { SockoptStreamSettingsSchema } from '@/schemas/protocols/stream/sockopt'
 import { HysteriaStreamSettingsSchema } from '@/schemas/protocols/stream/hysteria';
 import { createHysteriaTlsSettingsWithDefaultCert } from '@/lib/xray/inbound-tls-defaults';
 import { VLESS_AUTH_LABEL_KEYS, vlessEncryptionAuthKind } from '@/lib/xray/vless-encryption';
+import { isManagedNativeProtocol, MANAGED_PROTOCOL_LABELS, MANAGED_PROTOCOLS } from '@/lib/managed-protocols';
 import { SniffingSchema } from '@/schemas/primitives/sniffing';
 import { TcpStreamSettingsSchema } from '@/schemas/protocols/stream/tcp';
 import { KcpStreamSettingsSchema } from '@/schemas/protocols/stream/kcp';
@@ -82,6 +83,7 @@ import { useSecurityActions } from './useSecurityActions';
 import { useInboundFallbacks } from './useInboundFallbacks';
 import FallbacksCard from './FallbacksCard';
 import SniffingTab from './SniffingTab';
+import ManagedInboundForm from './ManagedInboundForm';
 
 import type { DBInbound } from '@/models/dbinbound';
 import type { NodeRecord } from '@/api/queries/useNodesQuery';
@@ -97,7 +99,13 @@ const labelWithHint = (label: string, hint: string) => (
   </span>
 );
 
-const PROTOCOL_OPTIONS = Object.values(Protocols).map((p) => ({ value: p, label: p }));
+const PROTOCOL_OPTIONS = [
+  ...Object.values(Protocols).map((p) => ({ value: p, label: p })),
+  ...MANAGED_PROTOCOLS.map((p) => ({
+    value: p,
+    label: `${MANAGED_PROTOCOL_LABELS[p]} (managed)`,
+  })),
+];
 const TRAFFIC_RESETS = ['never', 'hourly', 'daily', 'weekly', 'monthly'] as const;
 const SHARE_ADDR_STRATEGIES = ['node', 'listen', 'custom'] as const;
 const SHARE_ADDR_HOSTNAME_RE = /^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$/;
@@ -200,6 +208,7 @@ export default function InboundFormModal({
   const getV = methods.getValues as unknown as (name?: string) => unknown;
   const control = methods.control;
   const [saving, setSaving] = useState(false);
+  const [managedSaving, setManagedSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<RealityScanResult | null>(null);
   const {
@@ -216,7 +225,8 @@ export default function InboundFormModal({
 
   const selectableNodes = (availableNodes || []).filter((n) => n.enable);
   const protocol = (useWatch({ control, name: 'protocol' }) ?? '') as string;
-  const isNodeEligible = NODE_ELIGIBLE_PROTOCOLS.has(protocol);
+  const isManagedProtocol = isManagedNativeProtocol(protocol);
+  const isNodeEligible = isManagedProtocol || NODE_ELIGIBLE_PROTOCOLS.has(protocol);
   /*
    * The `node` share-address strategy only means something when the inbound can
    * actually live on a node — otherwise the node address it would resolve to is
@@ -432,6 +442,12 @@ export default function InboundFormModal({
     const sub = methods.watch((_value, { name, type }) => {
       if (name !== 'protocol' || type !== 'change') return;
       const next = getV('protocol') as string;
+      if (isManagedNativeProtocol(next)) {
+        setV('settings', undefined);
+        setV('streamSettings', { security: 'none' });
+        setV('sniffing', { enabled: false });
+        return;
+      }
       const settings = createDefaultInboundSettings(next) ?? undefined;
       setV('settings', settings);
       if (!NODE_ELIGIBLE_PROTOCOLS.has(next)) {
@@ -542,7 +558,7 @@ export default function InboundFormModal({
       )}
 
       <FormField name="protocol" label={t('pages.inbounds.protocol')}>
-        <Select id="protocol" disabled={mode === 'edit'} options={PROTOCOL_OPTIONS} />
+        <Select id="protocol" disabled={mode === 'edit'} virtual={false} options={PROTOCOL_OPTIONS} />
       </FormField>
 
       <FormField
@@ -931,6 +947,24 @@ export default function InboundFormModal({
 
   const sniffingTab = <SniffingTab />;
 
+  const managedContent = isManagedProtocol ? (
+    <>
+      <Form colon={false} labelCol={{ sm: { span: 8 } }} wrapperCol={{ sm: { span: 14 } }} labelWrap>
+        <FormField name="protocol" label={t('pages.inbounds.protocol')}>
+          <Select id="protocol" disabled={mode === 'edit'} virtual={false} options={PROTOCOL_OPTIONS} />
+        </FormField>
+      </Form>
+      <ManagedInboundForm
+        protocol={protocol}
+        mode={mode}
+        availableNodes={availableNodes || []}
+        onSaved={onSaved}
+        onClose={onClose}
+        setModalSaving={setManagedSaving}
+      />
+    </>
+  ) : null;
+
   return (
     <>
       {messageContextHolder}
@@ -939,48 +973,51 @@ export default function InboundFormModal({
         title={title}
         okText={okText}
         cancelText={t('close')}
-        confirmLoading={saving}
+        confirmLoading={isManagedProtocol ? managedSaving : saving}
         mask={{ closable: false }}
         width={780}
         onOk={submit}
         onCancel={onClose}
+        footer={isManagedProtocol ? null : undefined}
         destroyOnHidden
       >
         <FormProvider {...methods}>
-          <Form
-            colon={false}
-            labelCol={{ sm: { span: 8 } }}
-            wrapperCol={{ sm: { span: 14 } }}
-            labelWrap
-          >
-            <Tabs items={[
-              { key: 'basic', label: t('pages.xray.basicTemplate'), children: basicTab, forceRender: true },
-              ...(([
-                Protocols.VLESS,
-                Protocols.SHADOWSOCKS,
-                Protocols.HTTP,
-                Protocols.MIXED,
-                Protocols.TUNNEL,
-                Protocols.TUN,
-                Protocols.WIREGUARD,
-                Protocols.MTPROTO,
-              ] as string[]).includes(protocol) || isFallbackHost
-                ? [{ key: 'protocol', label: t('pages.inbounds.protocol'), children: protocolTab, forceRender: true }]
-                : []),
-              ...(streamEnabled
-                ? [
-                  { key: 'stream', label: t('pages.inbounds.streamTab'), children: streamTab, forceRender: true },
-                  ...(protocol !== Protocols.WIREGUARD && protocol !== Protocols.TUNNEL
-                    ? [{ key: 'security', label: t('pages.inbounds.securityTab'), children: securityTab, forceRender: true }]
-                    : []),
-                ]
-                : []),
-              ...(sniffingSupported
-                ? [{ key: 'sniffing', label: t('pages.inbounds.sniffingTab'), children: sniffingTab, forceRender: true }]
-                : []),
-              { key: 'advanced', label: t('pages.xray.advancedTemplate'), children: advancedTab, forceRender: true },
-            ]} />
-          </Form>
+          {managedContent ?? (
+            <Form
+              colon={false}
+              labelCol={{ sm: { span: 8 } }}
+              wrapperCol={{ sm: { span: 14 } }}
+              labelWrap
+            >
+              <Tabs items={[
+                { key: 'basic', label: t('pages.xray.basicTemplate'), children: basicTab, forceRender: true },
+                ...(([
+                  Protocols.VLESS,
+                  Protocols.SHADOWSOCKS,
+                  Protocols.HTTP,
+                  Protocols.MIXED,
+                  Protocols.TUNNEL,
+                  Protocols.TUN,
+                  Protocols.WIREGUARD,
+                  Protocols.MTPROTO,
+                ] as string[]).includes(protocol) || isFallbackHost
+                  ? [{ key: 'protocol', label: t('pages.inbounds.protocol'), children: protocolTab, forceRender: true }]
+                  : []),
+                ...(streamEnabled
+                  ? [
+                    { key: 'stream', label: t('pages.inbounds.streamTab'), children: streamTab, forceRender: true },
+                    ...(protocol !== Protocols.WIREGUARD && protocol !== Protocols.TUNNEL
+                      ? [{ key: 'security', label: t('pages.inbounds.securityTab'), children: securityTab, forceRender: true }]
+                      : []),
+                  ]
+                  : []),
+                ...(sniffingSupported
+                  ? [{ key: 'sniffing', label: t('pages.inbounds.sniffingTab'), children: sniffingTab, forceRender: true }]
+                  : []),
+                { key: 'advanced', label: t('pages.xray.advancedTemplate'), children: advancedTab, forceRender: true },
+              ]} />
+            </Form>
+          )}
         </FormProvider>
       </Modal>
     </>
