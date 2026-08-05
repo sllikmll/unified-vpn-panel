@@ -12,24 +12,37 @@ RUN npm run build
 # ========================================================
 # Stage: Builder
 # ========================================================
-FROM golang:1.26-alpine AS builder
+FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.7.0 AS xx
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
+COPY --from=xx / /
 WORKDIR /app
+ARG TARGETPLATFORM
+ARG TARGETOS
 ARG TARGETARCH
+ARG TARGETVARIANT
 ARG XRAY_VERSION=26.6.27
 
 RUN apk --no-cache --update add \
-  build-base \
-  gcc \
+  clang \
+  lld \
   curl \
-  unzip
+  unzip \
+  && xx-apk add --no-cache musl-dev gcc
 
 COPY . .
 COPY --from=frontend /src/internal/web/dist ./internal/web/dist
 
 ENV CGO_ENABLED=1
 ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
-RUN go build -ldflags "-w -s" -o build/x-ui main.go
-RUN ./DockerInit.sh "$TARGETARCH"
+RUN xx-go build -ldflags "-w -s" -o build/x-ui main.go \
+  && xx-verify build/x-ui
+RUN case "$TARGETARCH/$TARGETVARIANT" in \
+      386/*) init_arch=i386 ;; \
+      arm/v6) init_arch=armv6 ;; \
+      arm/v7) init_arch=armv7 ;; \
+      *) init_arch="$TARGETARCH" ;; \
+    esac \
+  && ./DockerInit.sh "$init_arch"
 
 # ========================================================
 # Stage: Final Image of 3x-ui

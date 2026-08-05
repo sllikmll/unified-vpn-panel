@@ -13,6 +13,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      DOCKER_HUB_ENABLED: ${{ secrets.DOCKER_HUB_USERNAME != '' && secrets.DOCKER_HUB_TOKEN != '' }}
 
     steps:
       - uses: actions/checkout@v7
@@ -24,8 +26,8 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: |
-            hsanaeii/3x-ui
-            ghcr.io/sllikmll/unified-vpn-panel
+            name=ghcr.io/sllikmll/unified-vpn-panel,enable=true
+            name=hsanaeii/3x-ui,enable=${{ env.DOCKER_HUB_ENABLED == 'true' }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -38,6 +40,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Login to Docker Hub
+        if: env.DOCKER_HUB_ENABLED == 'true'
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
