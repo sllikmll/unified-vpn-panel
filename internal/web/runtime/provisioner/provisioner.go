@@ -301,14 +301,35 @@ func (p *LocalProvisioner) beginInstallOrUpdate(ctx context.Context, kind model.
 	}
 	switch kind {
 	case model.RuntimeAmneziaWG:
+		if err := prepareAtomicConfigMount(p.cfg.FS, AWG2HostConfigDir, AWG2HostConfigPath, 0o700); err != nil {
+			return nil, err
+		}
 		return p.beginDocker(ctx, kind, plan.ArtifactRef, AWG2ContainerName, awg2DockerArgs(plan.ArtifactRef))
 	case model.RuntimeNaiveProxy:
+		if err := prepareAtomicConfigMount(p.cfg.FS, NaiveHostConfigDir, NaiveHostConfigPath, 0o755); err != nil {
+			return nil, err
+		}
 		return p.beginDocker(ctx, kind, plan.ArtifactRef, NaiveContainerName, naiveDockerArgs(plan.ArtifactRef))
 	case model.RuntimeMieru:
 		return p.beginMieru(ctx, plan)
 	default:
 		return nil, fmt.Errorf("%w: unsupported managed runtime", ErrArtifactBlocked)
 	}
+}
+
+func prepareAtomicConfigMount(fs FileSystem, dir, configPath string, perm os.FileMode) error {
+	info, err := fs.Stat(configPath)
+	if err == nil && info.IsDir() {
+		if err := fs.Remove(configPath); err != nil {
+			return fmt.Errorf("remove malformed managed runtime config mount directory: %w", err)
+		}
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := fs.MkdirAll(dir, perm); err != nil {
+		return fmt.Errorf("prepare managed runtime config directory: %w", err)
+	}
+	return nil
 }
 
 type staticTx struct{ res Result }

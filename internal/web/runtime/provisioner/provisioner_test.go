@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -131,7 +132,7 @@ func TestDockerRejectsMutableAndShellCommands(t *testing.T) {
 
 func TestDockerInstallRollbackAfterStartFailure(t *testing.T) {
 	r := &fakeRunner{fail: map[string]bool{"docker start unified-vpn-awg2-runtime": true}}
-	p := NewLocal(Config{AWG2ImageRef: validDigest, Runner: r})
+	p := NewLocal(Config{AWG2ImageRef: validDigest, Runner: r, FS: &memFS{files: map[string][]byte{}, modes: map[string]os.FileMode{}}})
 	res, err := p.Install(context.Background(), model.RuntimeAmneziaWG)
 	if err == nil {
 		t.Fatal("Install succeeded despite failed start")
@@ -160,7 +161,7 @@ func TestDockerInstallRollbackAfterStartFailure(t *testing.T) {
 
 func TestDockerInstallFirstInstallRemovesFailedCurrentWithoutInventingPrevious(t *testing.T) {
 	r := &fakeRunner{exists: map[string]bool{}}
-	p := NewLocal(Config{AWG2ImageRef: validDigest, Runner: r, Health: func(context.Context, model.RuntimeKind) error {
+	p := NewLocal(Config{AWG2ImageRef: validDigest, Runner: r, FS: &memFS{files: map[string][]byte{}, modes: map[string]os.FileMode{}}, Health: func(context.Context, model.RuntimeKind) error {
 		return fmt.Errorf("apply failed")
 	}})
 	res, err := p.Install(context.Background(), model.RuntimeAmneziaWG)
@@ -178,7 +179,7 @@ func TestDockerInstallFirstInstallRemovesFailedCurrentWithoutInventingPrevious(t
 
 func TestDockerInspectErrorsAreNotTreatedAsAbsence(t *testing.T) {
 	r := &fakeRunner{exists: map[string]bool{}, inspectFail: map[string]error{AWG2ContainerName: fmt.Errorf("permission denied")}}
-	p := NewLocal(Config{AWG2ImageRef: validDigest, Runner: r})
+	p := NewLocal(Config{AWG2ImageRef: validDigest, Runner: r, FS: &memFS{files: map[string][]byte{}, modes: map[string]os.FileMode{}}})
 	if _, err := p.Install(context.Background(), model.RuntimeAmneziaWG); err == nil {
 		t.Fatal("Install succeeded despite docker inspect failure")
 	}
@@ -189,7 +190,7 @@ func TestDockerInspectErrorsAreNotTreatedAsAbsence(t *testing.T) {
 
 func TestDockerStalePreviousFailsClosed(t *testing.T) {
 	r := &fakeRunner{exists: map[string]bool{AWG2ContainerName + "-previous": true}}
-	p := NewLocal(Config{AWG2ImageRef: validDigest, Runner: r})
+	p := NewLocal(Config{AWG2ImageRef: validDigest, Runner: r, FS: &memFS{files: map[string][]byte{}, modes: map[string]os.FileMode{}}})
 	if _, err := p.Install(context.Background(), model.RuntimeAmneziaWG); err == nil {
 		t.Fatal("Install succeeded with stale previous container")
 	}
@@ -218,6 +219,36 @@ func TestDockerUninstallMissingContainerIsNoop(t *testing.T) {
 	}
 	if got := joinCalls(r.calls); got != "" {
 		t.Fatalf("missing uninstall ran docker commands: %q", got)
+	}
+}
+
+func TestPrepareAtomicConfigMountRemovesOnlyEmptyMalformedDirectory(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "runtime")
+	configPath := filepath.Join(dir, "awg0.conf")
+	if err := os.MkdirAll(configPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := prepareAtomicConfigMount(OSFileSystem{}, dir, configPath, 0o700); err != nil {
+		t.Fatalf("prepareAtomicConfigMount empty malformed dir: %v", err)
+	}
+	if _, err := os.Stat(configPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("malformed config directory still exists: %v", err)
+	}
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		t.Fatalf("runtime directory not prepared: info=%v err=%v", info, err)
+	}
+	if err := os.Mkdir(configPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(configPath, "unexpected"), []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := prepareAtomicConfigMount(OSFileSystem{}, dir, configPath, 0o700); err == nil {
+		t.Fatal("non-empty malformed config directory was removed")
+	}
+	if _, err := os.Stat(filepath.Join(configPath, "unexpected")); err != nil {
+		t.Fatalf("non-empty malformed directory contents were not preserved: %v", err)
 	}
 }
 

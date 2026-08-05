@@ -62,6 +62,9 @@ func TestGetSubsIncludesBoundManagedClientsAndPreservesLegacyOnlyOutput(t *testi
 			t.Fatalf("managed subscription missing %s in:\n%s", want, body)
 		}
 	}
+	if !strings.Contains(body, "@mieru-node.example.test?") {
+		t.Fatalf("managed Mieru subscription did not use endpoint public host: %s", body)
+	}
 	var awgLink string
 	for _, link := range after {
 		if strings.HasPrefix(link, "awg://") {
@@ -121,6 +124,9 @@ func createManagedEndpointForSub(t *testing.T, kind model.RuntimeKind, subID, ta
 	endpoint := model.ManagedEndpoint{
 		UserId: 1, RuntimeKind: kind, Protocol: model.ManagedProtocol(kind), Tag: tag,
 		Remark: tag, Listen: "", Port: managedTestPort(kind), Enable: true, Status: model.EndpointActive,
+	}
+	if kind == model.RuntimeMieru {
+		endpoint.Listen = "mieru-node.example.test"
 	}
 	switch kind {
 	case model.RuntimeAmneziaWG:

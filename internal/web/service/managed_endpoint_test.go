@@ -160,6 +160,7 @@ func (managedTestClientDriver) Status(context.Context, *model.Inbound, string) (
 
 func initManagedEndpointServiceDB(t *testing.T) {
 	t.Helper()
+	t.Setenv("XUI_MANAGED_SECRET_KEY_FILE", filepath.Join(t.TempDir(), "managed-secret.master"))
 	if err := database.InitDB(filepath.Join(t.TempDir(), "x-ui.db")); err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
@@ -180,7 +181,7 @@ func TestManagedEndpointCreateClientPersistsEncryptedSecretsOnly(t *testing.T) {
 		Tag:         "awg-managed",
 		Port:        51820,
 		Enable:      &enable,
-		AWG:         &ManagedAWGConfig{ServerPrivateKey: "SERVER_PRIVATE_SECRET", ServerPublicKey: "SERVER_PUBLIC"},
+		AWG:         &ManagedAWGConfig{Endpoint: "vpn.example.test:51820", ServerPrivateKey: "SERVER_PRIVATE_SECRET", ServerPublicKey: "SERVER_PUBLIC"},
 	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -204,8 +205,20 @@ func TestManagedEndpointCreateClientPersistsEncryptedSecretsOnly(t *testing.T) {
 	if client.ClientId != rec.Id || client.Email != rec.Email {
 		t.Fatalf("client binding = id %d email %q, want id %d email %q", client.ClientId, client.Email, rec.Id, rec.Email)
 	}
+	if client.State != model.EndpointClientApplied || client.Status != model.EndpointClientApplied {
+		t.Fatalf("CreateClient response state/status = %q/%q, want applied/applied", client.State, client.Status)
+	}
 	if client.Address != "10.66.66.2/32" {
 		t.Fatalf("client address = %q", client.Address)
+	}
+	exported, err := mutations.ClientExport(1, view.Id, client.Id)
+	if err != nil {
+		t.Fatalf("ClientExport: %v", err)
+	}
+	for _, want := range []string{"[Interface]", "[Peer]", "Endpoint = vpn.example.test:51820", "AllowedIPs = 0.0.0.0/0"} {
+		if !strings.Contains(exported.Content, want) {
+			t.Fatalf("AWG client export missing %q", want)
+		}
 	}
 	var endpoints []model.ManagedEndpoint
 	if err := database.GetDB().Find(&endpoints).Error; err != nil {
@@ -364,6 +377,49 @@ func TestManagedEndpointClientCreateRejectsMissingUnknownAndDisabledSubBinding(t
 	}
 	if _, err := mutations.CreateClient(context.Background(), 1, view.Id, ManagedEndpointClientCreateRequest{SubID: disabled.SubID, Password: "pw"}); err == nil {
 		t.Fatal("CreateClient accepted disabled subscription client binding")
+	}
+}
+
+func TestManagedEndpointClientExportProducesCanonicalManagedLinks(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	mutations := ManagedEndpointMutationService{Secrets: NewManagedSecretEnvelopeService(ManagedSecretStaticKeySource{Key: []byte(strings.Repeat("e", 32)), KeyID: "export-key"})}
+	cases := []struct {
+		kind    model.RuntimeKind
+		listen  string
+		desired string
+		prefix  string
+		host    string
+	}{
+		{model.RuntimeMieru, "mieru-node.example.test", `{"portBindings":[{"port":32002,"protocol":"TCP"}],"mtu":1280}`, "mierus://", "@mieru-node.example.test?"},
+		{model.RuntimeNaiveProxy, "", `{"endpoint":{"domain":"naive-node.example.test","listenIp":"127.0.0.1","port":32003,"acmeEmail":"ops@example.test"},"users":[]}`, "naive+https://", "@naive-node.example.test:32003"},
+	}
+	for i, tc := range cases {
+		endpoint := model.ManagedEndpoint{UserId: 1, RuntimeKind: tc.kind, Protocol: model.ManagedProtocol(tc.kind), Tag: string(tc.kind), Remark: string(tc.kind), Listen: tc.listen, Port: 32002 + i, Enable: true, Status: model.EndpointActive, DesiredConfig: tc.desired}
+		if err := database.GetDB().Create(&endpoint).Error; err != nil {
+			t.Fatal(err)
+		}
+		record := model.ClientRecord{Email: string(tc.kind) + "@example.test", SubID: "sub-" + string(tc.kind), Enable: true}
+		if err := database.GetDB().Create(&record).Error; err != nil {
+			t.Fatal(err)
+		}
+		client := model.ManagedEndpointClient{EndpointId: endpoint.Id, ClientId: record.Id, Email: record.Email, Enable: true, State: model.EndpointClientApplied, PublicIdentity: "user-" + string(tc.kind)}
+		if err := database.GetDB().Create(&client).Error; err != nil {
+			t.Fatal(err)
+		}
+		secret, err := mutations.encryptSecret("managed_endpoint_client", client.Id, "password", []byte("password-123456"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := upsertManagedSecrets(database.GetDB(), []model.ManagedSecret{secret}); err != nil {
+			t.Fatal(err)
+		}
+		exported, err := mutations.ClientExport(1, fmt.Sprintf("managed-%d", endpoint.Id), client.Id)
+		if err != nil {
+			t.Fatalf("ClientExport(%s): %v", tc.kind, err)
+		}
+		if !strings.HasPrefix(exported.Content, tc.prefix) || !strings.Contains(exported.Content, tc.host) || exported.Content == "password-123456" {
+			t.Fatalf("ClientExport(%s) returned non-canonical content", tc.kind)
+		}
 	}
 }
 
@@ -820,26 +876,30 @@ func TestManagedEndpointCreateRejectsSecondActiveSingletonRuntime(t *testing.T) 
 }
 
 func TestManagedEndpointDeleteTombstonesNeverAppliedFailureWithoutDriver(t *testing.T) {
-	initManagedEndpointServiceDB(t)
-	endpoint := model.ManagedEndpoint{
-		UserId: 1, RuntimeKind: model.RuntimeAmneziaWG, Protocol: "amneziawg",
-		Tag: "failed-first-install", Port: 32001, Enable: false,
-		Status: model.EndpointFailed, DesiredConfig: `{}`,
-	}
-	if err := database.GetDB().Create(&endpoint).Error; err != nil {
-		t.Fatal(err)
-	}
-	deleteCalls := 0
-	mutations := ManagedEndpointMutationService{Drivers: managedTestProvider{driver: managedTestDriver{kind: model.RuntimeAmneziaWG, deleteCalls: &deleteCalls}}}
-	if err := mutations.Delete(context.Background(), 1, fmt.Sprintf("managed-%d", endpoint.Id), "delete-never-applied"); err != nil {
-		t.Fatalf("Delete: %v", err)
-	}
-	var got model.ManagedEndpoint
-	if err := database.GetDB().First(&got, endpoint.Id).Error; err != nil {
-		t.Fatal(err)
-	}
-	if got.Status != model.EndpointDeleted || got.LastError != "" || got.Enable || deleteCalls != 0 {
-		t.Fatalf("endpoint=%+v deleteCalls=%d, want deleted tombstone without driver call", got, deleteCalls)
+	for _, status := range []model.EndpointStatus{model.EndpointFailed, model.EndpointRolledBack} {
+		t.Run(string(status), func(t *testing.T) {
+			initManagedEndpointServiceDB(t)
+			endpoint := model.ManagedEndpoint{
+				UserId: 1, RuntimeKind: model.RuntimeAmneziaWG, Protocol: "amneziawg",
+				Tag: "never-applied-" + string(status), Port: 32001, Enable: false,
+				Status: status, DesiredConfig: `{}`,
+			}
+			if err := database.GetDB().Create(&endpoint).Error; err != nil {
+				t.Fatal(err)
+			}
+			deleteCalls := 0
+			mutations := ManagedEndpointMutationService{Drivers: managedTestProvider{driver: managedTestDriver{kind: model.RuntimeAmneziaWG, deleteCalls: &deleteCalls}}}
+			if err := mutations.Delete(context.Background(), 1, fmt.Sprintf("managed-%d", endpoint.Id), "delete-never-applied-"+string(status)); err != nil {
+				t.Fatalf("Delete: %v", err)
+			}
+			var got model.ManagedEndpoint
+			if err := database.GetDB().First(&got, endpoint.Id).Error; err != nil {
+				t.Fatal(err)
+			}
+			if got.Status != model.EndpointDeleted || got.LastError != "" || got.Enable || deleteCalls != 0 {
+				t.Fatalf("endpoint=%+v deleteCalls=%d, want deleted tombstone without driver call", got, deleteCalls)
+			}
+		})
 	}
 }
 
@@ -875,12 +935,18 @@ func TestManagedEndpointCreateRevivesDeletedTagAndClearsOwnedState(t *testing.T)
 	for name, query := range map[string]*gorm.DB{
 		"clients": database.GetDB().Model(&model.ManagedEndpointClient{}).Where("endpoint_id = ?", tombstone.Id),
 		"traffic": database.GetDB().Model(&model.ManagedEndpointClientTraffic{}).Where("endpoint_id = ?", tombstone.Id),
-		"secrets": database.GetDB().Model(&model.ManagedSecret{}).Where("(owner_type = ? AND owner_id = ?) OR (owner_type = ? AND owner_id = ?)", "managed_endpoint", tombstone.Id, "managed_endpoint_client", client.Id),
 	} {
 		var count int64
 		if err := query.Count(&count).Error; err != nil || count != 0 {
 			t.Fatalf("%s count=%d err=%v, want zero", name, count, err)
 		}
+	}
+	var remainingSecrets []model.ManagedSecret
+	if err := database.GetDB().Where("(owner_type = ? AND owner_id = ?) OR (owner_type = ? AND owner_id = ?)", "managed_endpoint", tombstone.Id, "managed_endpoint_client", client.Id).Find(&remainingSecrets).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(remainingSecrets) != 1 || remainingSecrets[0].OwnerType != "managed_endpoint" || remainingSecrets[0].OwnerId != tombstone.Id || remainingSecrets[0].SecretKind != "bootstrap.password" {
+		t.Fatalf("remaining secrets=%+v, want only new endpoint bootstrap", remainingSecrets)
 	}
 	var oldLogCount int64
 	if err := database.GetDB().Model(&model.ManagedEndpointApplyLog{}).Where("idempotency_key = ?", "old-delete").Count(&oldLogCount).Error; err != nil || oldLogCount != 1 {

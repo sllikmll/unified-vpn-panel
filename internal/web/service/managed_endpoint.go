@@ -41,6 +41,7 @@ const (
 var (
 	ErrManagedIdempotencyConflict    = errors.New("managed endpoint idempotency key conflict")
 	ErrManagedRuntimeArtifactBlocked = provisioner.ErrArtifactBlocked
+	ErrManagedSecretMissing          = errors.New("managed secret missing")
 )
 
 type ManagedTrafficView struct {
@@ -250,6 +251,7 @@ type ManagedAWGConfig struct {
 }
 
 type ManagedMieruConfig struct {
+	Host         string                    `json:"host,omitempty"`
 	MTU          int                       `json:"mtu,omitempty"`
 	Transport    string                    `json:"transport,omitempty"`
 	PortBindings []ManagedMieruPortBinding `json:"portBindings,omitempty"`
@@ -348,6 +350,13 @@ func (s ManagedEndpointService) List(userId int) ([]ManagedEndpointView, error) 
 func (s ManagedEndpointMutationService) Create(ctx context.Context, userId int, req ManagedEndpointCreateRequest) (*ManagedEndpointView, error) {
 	if err := req.normalizeConfig(); err != nil {
 		return nil, err
+	}
+	if req.Mieru != nil && strings.TrimSpace(req.Mieru.Host) != "" {
+		host, err := normalizeManagedMieruHost(req.Mieru.Host)
+		if err != nil {
+			return nil, err
+		}
+		req.Listen = host
 	}
 	if err := validateManagedEndpointCreate(req); err != nil {
 		return nil, err
@@ -456,6 +465,13 @@ func (s ManagedEndpointMutationService) Update(ctx context.Context, userId int, 
 	if err := req.normalizeConfig(); err != nil {
 		return nil, err
 	}
+	if req.Mieru != nil && strings.TrimSpace(req.Mieru.Host) != "" {
+		host, err := normalizeManagedMieruHost(req.Mieru.Host)
+		if err != nil {
+			return nil, err
+		}
+		req.Listen = &host
+	}
 	endpointID, err := nativeManagedID(id)
 	if err != nil {
 		return nil, err
@@ -553,7 +569,7 @@ func (s ManagedEndpointMutationService) Delete(ctx context.Context, userId int, 
 		if endpoint.Status == model.EndpointDeleted {
 			return nil
 		}
-		neverApplied = endpoint.Status == model.EndpointFailed && strings.TrimSpace(endpoint.LastAppliedHash) == "" && strings.TrimSpace(endpoint.LastObservedHash) == ""
+		neverApplied = (endpoint.Status == model.EndpointFailed || endpoint.Status == model.EndpointRolledBack) && strings.TrimSpace(endpoint.LastAppliedHash) == "" && strings.TrimSpace(endpoint.LastObservedHash) == ""
 		endpoint.Status = model.EndpointDeleting
 		endpoint.Enable = false
 		if err := tx.Save(&endpoint).Error; err != nil {
@@ -846,9 +862,7 @@ func (s ManagedEndpointMutationService) CreateClient(ctx context.Context, userId
 	if err := s.applyEndpoint(ctx, &endpoint, "client.create"); err != nil {
 		return model.ManagedEndpointClient{}, err
 	}
-	client.Status = client.State
-	_ = hydrateManagedClientSubscription(database.GetDB(), &client)
-	return client, nil
+	return loadManagedEndpointClient(database.GetDB(), endpoint.Id, client.Id)
 }
 
 func (s ManagedEndpointMutationService) ListClients(userId, endpointID int) ([]model.ManagedEndpointClient, error) {
@@ -953,8 +967,18 @@ func (s ManagedEndpointMutationService) UpdateClient(ctx context.Context, userId
 	if err := s.applyEndpoint(ctx, &endpoint, "client.create"); err != nil {
 		return model.ManagedEndpointClient{}, err
 	}
+	return loadManagedEndpointClient(database.GetDB(), endpoint.Id, client.Id)
+}
+
+func loadManagedEndpointClient(db *gorm.DB, endpointID, clientID int) (model.ManagedEndpointClient, error) {
+	var client model.ManagedEndpointClient
+	if err := db.First(&client, "id = ? AND endpoint_id = ?", clientID, endpointID).Error; err != nil {
+		return client, err
+	}
 	client.Status = client.State
-	_ = hydrateManagedClientSubscription(database.GetDB(), &client)
+	if err := hydrateManagedClientSubscription(db, &client); err != nil {
+		return client, err
+	}
 	return client, nil
 }
 
@@ -1026,11 +1050,15 @@ func (s ManagedEndpointMutationService) ClientExport(userId int, endpointRef str
 		}
 		for _, c := range clients {
 			if c.ID == client.PublicIdentity {
-				out.Content = fmt.Sprintf("[Interface]\nPrivateKey = %s\nAddress = %s\nDNS = 1.1.1.1\n", c.PrivateKey, c.IPv4Address)
+				content, err := awg.RenderClientConfig(cfg.Server, c)
+				if err != nil {
+					return ManagedClientExportResponse{}, err
+				}
+				out.Content = content
 				return out, nil
 			}
 		}
-	case model.RuntimeMieru, model.RuntimeNaiveProxy:
+	case model.RuntimeMieru:
 		rows, err := newestManagedSecrets(database.GetDB(), "managed_endpoint_client", client.Id, "password")
 		if err != nil {
 			return ManagedClientExportResponse{}, err
@@ -1039,7 +1067,40 @@ func (s ManagedEndpointMutationService) ClientExport(userId int, endpointRef str
 		if err != nil {
 			return ManagedClientExportResponse{}, err
 		}
-		out.Content = string(password)
+		var cfg mieru.ServerConfig
+		if err := json.Unmarshal([]byte(endpoint.DesiredConfig), &cfg); err != nil {
+			return ManagedClientExportResponse{}, err
+		}
+		host, err := normalizeManagedMieruHost(endpoint.Listen)
+		if err != nil {
+			return ManagedClientExportResponse{}, err
+		}
+		links, err := mieru.SimpleLinks(mieru.ClientExport{ProfileName: endpoint.Remark, UserName: client.PublicIdentity, Password: string(password), Endpoints: []mieru.Endpoint{{Host: host, PortBinding: cfg.PortBindings}}, MTU: cfg.MTU})
+		if err != nil {
+			return ManagedClientExportResponse{}, err
+		}
+		out.Content = strings.Join(links, "\n")
+		return out, nil
+	case model.RuntimeNaiveProxy:
+		rows, err := newestManagedSecrets(database.GetDB(), "managed_endpoint_client", client.Id, "password")
+		if err != nil {
+			return ManagedClientExportResponse{}, err
+		}
+		password, err := s.decryptSecret(rows["password"])
+		if err != nil {
+			return ManagedClientExportResponse{}, err
+		}
+		var payload struct {
+			Endpoint naiveproxy.Endpoint `json:"endpoint"`
+		}
+		if err := json.Unmarshal([]byte(endpoint.DesiredConfig), &payload); err != nil {
+			return ManagedClientExportResponse{}, err
+		}
+		uri, err := (naiveproxy.User{ID: client.PublicIdentity, Username: client.PublicIdentity, Password: string(password), Enabled: client.Enable}).ExportURI(payload.Endpoint)
+		if err != nil {
+			return ManagedClientExportResponse{}, err
+		}
+		out.Content = uri
 		return out, nil
 	}
 	return ManagedClientExportResponse{}, fmt.Errorf("client export unavailable")
@@ -1433,6 +1494,31 @@ func nativeManagedID(id string) (int, error) {
 	return n, nil
 }
 
+func normalizeManagedMieruHost(raw string) (string, error) {
+	host := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(raw)), ".")
+	if addr, err := netip.ParseAddr(host); err == nil {
+		if !addr.Is4() {
+			return "", errors.New("mieru public host must be IPv4 or DNS name")
+		}
+		return host, nil
+	}
+	if host == "" || len(host) > 253 || strings.ContainsAny(host, ":/\\\x00\r\n\t ") {
+		return "", errors.New("invalid mieru public host")
+	}
+	for _, label := range strings.Split(host, ".") {
+		if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return "", errors.New("invalid mieru public host")
+		}
+		for _, r := range label {
+			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+				continue
+			}
+			return "", errors.New("invalid mieru public host")
+		}
+	}
+	return host, nil
+}
+
 func (req *ManagedEndpointCreateRequest) normalizeConfig() error {
 	if len(req.Config) == 0 {
 		return nil
@@ -1773,12 +1859,17 @@ func (s ManagedEndpointMutationService) buildMieruDesired(endpoint model.Managed
 		}
 		bindings = []mieru.PortBinding{{Port: endpoint.Port, Protocol: transport}}
 	}
-	cfg := mieru.ServerConfig{PortBindings: bindings, MTU: req.MTU}
+	bootstrapPassword := randomPassword()
+	cfg := mieru.ServerConfig{PortBindings: bindings, MTU: req.MTU, Users: []mieru.User{{Name: managedBootstrapIdentity(endpoint.Id), Password: bootstrapPassword}}}
 	if err := cfg.ValidateFull(); err != nil {
 		return "", nil, err
 	}
 	raw, err := json.Marshal(mieru.RedactConfig(cfg))
-	return string(raw), nil, err
+	if err != nil {
+		return "", nil, err
+	}
+	secret, err := s.encryptSecret("managed_endpoint", endpoint.Id, "bootstrap.password", []byte(bootstrapPassword))
+	return string(raw), []model.ManagedSecret{secret}, err
 }
 
 func (s ManagedEndpointMutationService) buildNaiveDesired(endpoint model.ManagedEndpoint, req *ManagedNaiveProxyConfig) (string, []model.ManagedSecret, error) {
@@ -1806,12 +1897,17 @@ func (s ManagedEndpointMutationService) buildNaiveDesired(endpoint model.Managed
 		// state without accepting arbitrary bind paths or command flags.
 		listenIP = "127.0.0.1"
 	}
-	server := naiveproxy.Server{Endpoint: naiveproxy.Endpoint{Domain: domain, ListenIP: listenIP, Port: endpoint.Port, ACMEEmail: strings.TrimSpace(req.ACMEEmail)}}
-	if err := server.Endpoint.Validate(); err != nil {
+	bootstrapPassword := randomPassword()
+	server := naiveproxy.Server{Endpoint: naiveproxy.Endpoint{Domain: domain, ListenIP: listenIP, Port: endpoint.Port, ACMEEmail: strings.TrimSpace(req.ACMEEmail)}, Users: []naiveproxy.User{{ID: managedBootstrapIdentity(endpoint.Id), Username: managedBootstrapIdentity(endpoint.Id), Password: bootstrapPassword, Enabled: true}}}
+	if err := server.Validate(); err != nil {
 		return "", nil, err
 	}
 	raw, err := json.Marshal(map[string]any{"endpoint": server.Endpoint, "users": []any{}})
-	return string(raw), nil, err
+	if err != nil {
+		return "", nil, err
+	}
+	secret, err := s.encryptSecret("managed_endpoint", endpoint.Id, "bootstrap.password", []byte(bootstrapPassword))
+	return string(raw), []model.ManagedSecret{secret}, err
 }
 
 func (s ManagedEndpointMutationService) encryptSecret(ownerType string, ownerID int, kind string, plaintext []byte) (model.ManagedSecret, error) {
@@ -1886,7 +1982,7 @@ func newestManagedSecrets(tx *gorm.DB, ownerType string, ownerID int, kinds ...s
 	for _, kind := range kinds {
 		row, ok := out[kind]
 		if !ok || len(row.Ciphertext) == 0 {
-			return nil, fmt.Errorf("managed secret %s missing for %s/%d", kind, ownerType, ownerID)
+			return nil, fmt.Errorf("%w: %s for %s/%d", ErrManagedSecretMissing, kind, ownerType, ownerID)
 		}
 	}
 	return out, nil
@@ -2092,6 +2188,13 @@ func (s ManagedEndpointMutationService) inboundFromDurable(endpoint model.Manage
 				}
 				cfg.Users = append(cfg.Users, mieru.User{Name: c.PublicIdentity, Password: password})
 			}
+			if len(rows) == 0 {
+				password, err := s.endpointBootstrapPassword(endpoint.Id)
+				if err != nil {
+					return nil, err
+				}
+				cfg.Users = append(cfg.Users, mieru.User{Name: managedBootstrapIdentity(endpoint.Id), Password: password})
+			}
 			raw, _ := json.Marshal(cfg)
 			settings = string(raw)
 		}
@@ -2114,6 +2217,14 @@ func (s ManagedEndpointMutationService) inboundFromDurable(endpoint model.Manage
 				}
 				users = append(users, naiveproxy.User{ID: c.PublicIdentity, Username: c.PublicIdentity, Password: password, Enabled: c.Enable})
 			}
+			if len(rows) == 0 {
+				password, err := s.endpointBootstrapPassword(endpoint.Id)
+				if err != nil {
+					return nil, err
+				}
+				identity := managedBootstrapIdentity(endpoint.Id)
+				users = append(users, naiveproxy.User{ID: identity, Username: identity, Password: password, Enabled: true})
+			}
 			raw, _ := json.Marshal(map[string]any{"endpoint": payload.Endpoint, "users": users})
 			settings = string(raw)
 		}
@@ -2121,6 +2232,29 @@ func (s ManagedEndpointMutationService) inboundFromDurable(endpoint model.Manage
 	default:
 		return nil, fmt.Errorf("unsupported runtime kind %q", endpoint.RuntimeKind)
 	}
+}
+
+func (s ManagedEndpointMutationService) endpointBootstrapPassword(endpointID int) (string, error) {
+	rows, err := newestManagedSecrets(database.GetDB(), "managed_endpoint", endpointID, "bootstrap.password")
+	if err != nil {
+		if !errors.Is(err, ErrManagedSecretMissing) {
+			return "", err
+		}
+		password := randomPassword()
+		secret, encErr := s.encryptSecret("managed_endpoint", endpointID, "bootstrap.password", []byte(password))
+		if encErr != nil {
+			return "", encErr
+		}
+		if encErr := upsertManagedSecrets(database.GetDB(), []model.ManagedSecret{secret}); encErr != nil {
+			return "", encErr
+		}
+		return password, nil
+	}
+	plaintext, err := s.decryptSecret(rows["bootstrap.password"])
+	if err != nil {
+		return "", err
+	}
+	return string(plaintext), nil
 }
 
 func (s ManagedEndpointMutationService) clientPassword(clientID int) (string, error) {
@@ -2313,6 +2447,10 @@ func secretRef(ownerType string, ownerID int, kind string) string {
 		return "managed-secret://" + ownerType + "/" + kind
 	}
 	return fmt.Sprintf("managed-secret://%s/%d/%s", ownerType, ownerID, kind)
+}
+
+func managedBootstrapIdentity(endpointID int) string {
+	return fmt.Sprintf("bootstrap-%d", endpointID)
 }
 
 func randomPassword() string {

@@ -37,6 +37,9 @@ func (OSFileSystem) WriteFile(path string, data []byte, perm uint32) error {
 		return fmt.Errorf("mieru config file mode must be 0600")
 	}
 	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
 	tmp, err := os.CreateTemp(dir, ".mieru-*")
 	if err != nil {
 		return err

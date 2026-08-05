@@ -432,7 +432,11 @@ func (s *SubService) managedRawLink(endpoint model.ManagedEndpoint, client model
 		if password == "" {
 			return "", fmt.Errorf("managed client password is empty")
 		}
-		links, err := mieru.SimpleLinks(mieru.ClientExport{ProfileName: endpoint.Remark, UserName: client.PublicIdentity, Password: password, Endpoints: []mieru.Endpoint{{Host: host, PortBinding: cfg.PortBindings}}, MTU: cfg.MTU})
+		publicHost := strings.TrimSpace(endpoint.Listen)
+		if publicHost == "" {
+			publicHost = host
+		}
+		links, err := mieru.SimpleLinks(mieru.ClientExport{ProfileName: endpoint.Remark, UserName: client.PublicIdentity, Password: password, Endpoints: []mieru.Endpoint{{Host: publicHost, PortBinding: cfg.PortBindings}}, MTU: cfg.MTU})
 		if err != nil || len(links) == 0 {
 			return "", err
 		}

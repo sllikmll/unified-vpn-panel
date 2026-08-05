@@ -354,6 +354,8 @@ func RenderServerConfig(server Server, clients []Client) (string, error) {
 	if server.MTU > 0 {
 		fmt.Fprintf(&b, "MTU = %d\n", server.MTU)
 	}
+	fmt.Fprintf(&b, "PostUp = sysctl -w net.ipv4.ip_forward=1; iptables -I FORWARD 1 -i %%i -j ACCEPT; iptables -I FORWARD 1 -o %%i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -A POSTROUTING -s %s -j MASQUERADE\n", server.IPv4Pool)
+	fmt.Fprintf(&b, "PostDown = iptables -D FORWARD -i %%i -j ACCEPT; iptables -D FORWARD -o %%i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -D POSTROUTING -s %s -j MASQUERADE\n", server.IPv4Pool)
 	writeObfuscation(&b, server.Obfuscation20)
 	for _, c := range clients {
 		if !c.Enable {
