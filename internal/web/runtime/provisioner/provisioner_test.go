@@ -31,7 +31,7 @@ func TestDefaultDockerPlansUseImmutableRuntimeDigests(t *testing.T) {
 		ref  string
 	}{
 		{model.RuntimeAmneziaWG, "ghcr.io/sllikmll/unified-vpn-panel-protocol-awg2@sha256:538dfb80a24f4f18e84aadbadd98472ace726452e96b36441d422fba7c5e24d8"},
-		{model.RuntimeNaiveProxy, "ghcr.io/sllikmll/unified-vpn-panel-protocol-naive-caddy@sha256:7bb3281025f69378da9e1e961e521155cd025dcd69de74e001a5c0fff36832b8"},
+		{model.RuntimeNaiveProxy, "ghcr.io/sllikmll/unified-vpn-panel-protocol-naive-caddy@sha256:1bedc66132c2e22782c9d8c58d28e5232d7757a1adfcce69fd475842796e36ff"},
 	}
 	for _, tc := range cases {
 		t.Run(string(tc.kind), func(t *testing.T) {
