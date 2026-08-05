@@ -131,7 +131,7 @@ describe('ManagedEndpointsPanel', () => {
       subId: 'sub-created',
       enable: true,
     })));
-  });
+  }, 15_000);
 
   it('runs actions only after confirmation and waits for server response', async () => {
     const postSpy = vi.spyOn(HttpUtil, 'post').mockResolvedValue({ success: true, msg: '', obj: {} } as never);

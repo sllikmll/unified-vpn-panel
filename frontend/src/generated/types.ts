@@ -764,6 +764,7 @@ export interface NodeView {
   publicIpV4: string;
   publicIpV6: string;
   remark: string;
+  runtimeCapabilities: string[];
   scheme: string;
   status: string;
   swapCurrent: number;

@@ -3359,6 +3359,12 @@
             "example": "Primary edge",
             "type": "string"
           },
+          "runtimeCapabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "scheme": {
             "example": "https",
             "type": "string"
@@ -3461,6 +3467,7 @@
           "publicIpV4",
           "publicIpV6",
           "remark",
+          "runtimeCapabilities",
           "scheme",
           "status",
           "swapCurrent",
@@ -9175,6 +9182,9 @@
                       "publicIpV4": "203.0.113.10",
                       "publicIpV6": "2001:db8::10",
                       "remark": "Primary edge",
+                      "runtimeCapabilities": [
+                        ""
+                      ],
                       "scheme": "https",
                       "status": "online",
                       "swapCurrent": 0,
@@ -9364,6 +9374,9 @@
                     "publicIpV4": "203.0.113.10",
                     "publicIpV6": "2001:db8::10",
                     "remark": "Primary edge",
+                    "runtimeCapabilities": [
+                      ""
+                    ],
                     "scheme": "https",
                     "status": "online",
                     "swapCurrent": 0,
@@ -9532,6 +9545,9 @@
                     "publicIpV4": "203.0.113.10",
                     "publicIpV6": "2001:db8::10",
                     "remark": "Primary edge",
+                    "runtimeCapabilities": [
+                      ""
+                    ],
                     "scheme": "https",
                     "status": "online",
                     "swapCurrent": 0,

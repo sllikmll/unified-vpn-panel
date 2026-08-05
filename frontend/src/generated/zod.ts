@@ -829,6 +829,7 @@ export const NodeViewSchema = z.object({
   publicIpV4: z.string(),
   publicIpV6: z.string(),
   remark: z.string(),
+  runtimeCapabilities: z.array(z.string()),
   scheme: z.string(),
   status: z.string(),
   swapCurrent: z.number().int(),

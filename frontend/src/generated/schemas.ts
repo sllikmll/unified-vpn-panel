@@ -3333,6 +3333,12 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "Primary edge",
         "type": "string"
       },
+      "runtimeCapabilities": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
       "scheme": {
         "example": "https",
         "type": "string"
@@ -3435,6 +3441,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "publicIpV4",
       "publicIpV6",
       "remark",
+      "runtimeCapabilities",
       "scheme",
       "status",
       "swapCurrent",
