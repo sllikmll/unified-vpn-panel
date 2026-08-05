@@ -26,6 +26,23 @@ interface Props {
   initialValues?: Partial<ManagedFormValues> & { config?: unknown };
 }
 
+export function buildManagedFormValues(
+  protocol: ManagedNativeProtocol,
+  initialValues?: Partial<ManagedFormValues> & { config?: unknown },
+): ManagedFormValues {
+  const defaults = buildManagedDefaults(protocol);
+  const initialConfig = initialValues?.config && typeof initialValues.config === 'object'
+    ? initialValues.config as Record<string, unknown>
+    : {};
+  return {
+    ...defaults,
+    ...initialValues,
+    protocol,
+    runtimeKind: protocol,
+    config: { ...(defaults.config as Record<string, unknown>), ...initialConfig },
+  } as ManagedFormValues;
+}
+
 const portProtocols = ['TCP', 'UDP'] as const;
 
 function validationText(error: unknown): string {
@@ -70,7 +87,7 @@ export default function ManagedInboundForm({
   initialValues,
 }: Props) {
   const { t } = useTranslation();
-  const [values, setValues] = useState<ManagedFormValues>(() => ({ ...buildManagedDefaults(protocol), ...initialValues, protocol, runtimeKind: protocol }) as ManagedFormValues);
+  const [values, setValues] = useState<ManagedFormValues>(() => buildManagedFormValues(protocol, initialValues));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const selectableNodes = useMemo(() => (availableNodes || []).filter((n) => n.enable), [availableNodes]);
@@ -78,7 +95,7 @@ export default function ManagedInboundForm({
   const blockReason = managedNodeBlockReason(selectedNode, protocol);
 
   useEffect(() => {
-    const next = { ...buildManagedDefaults(protocol), ...initialValues, protocol, runtimeKind: protocol } as ManagedFormValues;
+    const next = buildManagedFormValues(protocol, initialValues);
     setValues(next);
     setError('');
   }, [protocol, initialValues]);
@@ -154,7 +171,7 @@ export default function ManagedInboundForm({
     }
   };
 
-  const cfg = values.config as Record<string, unknown>;
+  const cfg = (values.config && typeof values.config === 'object' ? values.config : {}) as Record<string, unknown>;
   const nodeOptions = selectableNodes.map((node) => ({
     value: node.id,
     label: node.name || `#${node.id}`,

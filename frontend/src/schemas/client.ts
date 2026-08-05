@@ -214,10 +214,20 @@ export const ClientFormSchema = z.object({
   comment: z.string(),
   enable: z.boolean(),
   inboundIds: z.array(z.number()),
+  managedEndpointIds: z.array(z.string()).optional().default([]),
 });
 
-export const ClientCreateFormSchema = ClientFormSchema.extend({
-  inboundIds: z.array(z.number()).min(1, 'pages.clients.selectInbound'),
+export const ClientCreateFormSchema = ClientFormSchema.superRefine((value, ctx) => {
+  if (value.inboundIds.length === 0 && value.managedEndpointIds.length === 0) {
+    ctx.addIssue({ code: 'custom', message: 'pages.clients.selectInbound', path: ['inboundIds'] });
+  }
+  if (value.inboundIds.length > 0 && value.managedEndpointIds.length > 0) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Select either Xray inbounds or managed endpoints, not both',
+      path: ['managedEndpointIds'],
+    });
+  }
 });
 
 export const ClientBulkAdjustFormSchema = z

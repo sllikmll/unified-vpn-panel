@@ -24,6 +24,59 @@ func (s *ClientService) GetRecordByEmail(tx *gorm.DB, email string) (*model.Clie
 	return row, nil
 }
 
+// ManagedOnlyEmails returns canonical subscription identities owned exclusively
+// by native managed endpoints. Common client mutations must not touch them.
+func (s *ClientService) ManagedOnlyEmails(emails []string) ([]string, error) {
+	if len(emails) == 0 {
+		return nil, nil
+	}
+	var out []string
+	for _, batch := range chunkStrings(emails, sqlInChunk) {
+		var rows []string
+		err := database.GetDB().Table("clients AS c").
+			Select("c.email").
+			Where("c.email IN ?", batch).
+			Where("NOT EXISTS (SELECT 1 FROM client_inbounds ci WHERE ci.client_id = c.id)").
+			Where("EXISTS (SELECT 1 FROM managed_endpoint_clients mec WHERE mec.client_id = c.id AND mec.state <> ?)", model.EndpointClientDeleted).
+			Scan(&rows).Error
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, rows...)
+	}
+	return out, nil
+}
+
+// DeleteRecordIfUnattached removes a newly-created canonical identity only
+// when no legacy or managed lifecycle has claimed it.
+func (s *ClientService) DeleteRecordIfUnattached(email, subID string) error {
+	return database.GetDB().Transaction(func(tx *gorm.DB) error {
+		record, err := s.GetRecordByEmail(tx, email)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if record.SubID != subID {
+			return nil
+		}
+		var legacyCount, managedCount int64
+		if err := tx.Table("client_inbounds").Where("client_id = ?", record.Id).Count(&legacyCount).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&model.ManagedEndpointClient{}).
+			Where("client_id = ? AND state <> ?", record.Id, model.EndpointClientDeleted).
+			Count(&managedCount).Error; err != nil {
+			return err
+		}
+		if legacyCount == 0 && managedCount == 0 {
+			return tx.Delete(record).Error
+		}
+		return nil
+	})
+}
+
 // EffectiveFlow returns the client's flow from the first flow-capable inbound
 // it is attached to (lowest inbound_id with a non-empty flow_override). The
 // canonical clients.Flow column is unreliable for multi-inbound clients: a
@@ -136,7 +189,9 @@ func (s *ClientService) GetInboundIdsForRecord(id int) ([]int, error) {
 func (s *ClientService) List() ([]ClientWithAttachments, error) {
 	db := database.GetDB()
 	var rows []model.ClientRecord
-	if err := db.Order("id ASC").Find(&rows).Error; err != nil {
+	if err := db.Where(`EXISTS (SELECT 1 FROM client_inbounds ci WHERE ci.client_id = clients.id)
+		OR NOT EXISTS (SELECT 1 FROM managed_endpoint_clients mec WHERE mec.client_id = clients.id AND mec.state <> ?)`, model.EndpointClientDeleted).
+		Order("id ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	if len(rows) == 0 {

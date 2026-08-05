@@ -444,7 +444,8 @@ export default function ManagedEndpointsPanel() {
             initialValues={({
               ...editing,
               ...(detailQuery.data ?? {}),
-              config: ((detailQuery.data as unknown as { config?: unknown } | null)?.config) as never,
+              config: ((detailQuery.data as unknown as { config?: unknown } | null)?.config
+                ?? (editing as unknown as { config?: unknown }).config) as never,
             }) as never}
             onSaved={() => {
               setEditing(null);

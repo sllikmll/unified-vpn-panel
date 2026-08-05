@@ -821,10 +821,16 @@ config_after_update() {
     ${xui_folder}/x-ui setting -show true
     ${xui_folder}/x-ui migrate
 
-    # Properly detect empty cert by checking if cert: line exists and has content after it
+    # Unified VPN Panel has a stable root route. Never randomize it during updates.
     local existing_cert=$(${xui_folder}/x-ui setting -getCert true 2> /dev/null | grep 'cert:' | awk -F': ' '{print $2}' | tr -d '[:space:]')
     local existing_port=$(${xui_folder}/x-ui setting -show true | grep -Eo 'port: .+' | awk '{print $2}')
-    local existing_webBasePath=$(${xui_folder}/x-ui setting -show true | grep -Eo 'webBasePath: .+' | awk '{print $2}' | sed 's#^/##')
+    local existing_webBasePath=$(${xui_folder}/x-ui setting -show true | grep -Eo 'webBasePath: .+' | awk '{print $2}' | tr -d '[:space:]')
+    if [[ "${existing_webBasePath}" != "/" ]]; then
+        ${xui_folder}/x-ui setting -webBasePath "/"
+        existing_webBasePath="/"
+        panel_needs_restart=1
+        echo -e "${green}WebBasePath normalized to /${plain}"
+    fi
 
     # Get server IP
     local URL_lists=(
@@ -858,16 +864,6 @@ config_after_update() {
         done
     fi
 
-    # Handle missing/short webBasePath
-    if [[ ${#existing_webBasePath} -lt 4 ]]; then
-        echo -e "${yellow}WebBasePath is missing or too short. Generating a new one...${plain}"
-        local config_webBasePath=$(gen_random_string 18)
-        ${xui_folder}/x-ui setting -webBasePath "${config_webBasePath}"
-        existing_webBasePath="${config_webBasePath}"
-        panel_needs_restart=1
-        echo -e "${green}New WebBasePath: ${config_webBasePath}${plain}"
-    fi
-
     # Check and prompt for SSL if missing
     if [[ -z "$existing_cert" ]]; then
         echo ""
@@ -879,13 +875,13 @@ config_after_update() {
         echo ""
 
         # Prompt and setup SSL (domain or IP)
-        prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath}" "${server_ip}"
+        prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath#/}" "${server_ip}"
 
         echo ""
         echo -e "${green}═══════════════════════════════════════════${plain}"
         echo -e "${green}     Panel Access Information              ${plain}"
         echo -e "${green}═══════════════════════════════════════════${plain}"
-        echo -e "${green}Access URL: https://${SSL_HOST}:${existing_port}/${existing_webBasePath}${plain}"
+        echo -e "${green}Access URL: https://${SSL_HOST}:${existing_port}/${existing_webBasePath#/}${plain}"
         echo -e "${green}═══════════════════════════════════════════${plain}"
         echo -e "${yellow}⚠ SSL Certificate: Enabled and configured${plain}"
     else
@@ -896,7 +892,7 @@ config_after_update() {
         echo -e "${green}═══════════════════════════════════════════${plain}"
         echo -e "${green}     Panel Access Information              ${plain}"
         echo -e "${green}═══════════════════════════════════════════${plain}"
-        echo -e "${green}Access URL: https://${cert_domain}:${existing_port}/${existing_webBasePath}${plain}"
+        echo -e "${green}Access URL: https://${cert_domain}:${existing_port}/${existing_webBasePath#/}${plain}"
         echo -e "${green}═══════════════════════════════════════════${plain}"
     fi
 

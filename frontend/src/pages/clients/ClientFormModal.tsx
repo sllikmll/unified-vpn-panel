@@ -32,8 +32,10 @@ import { DateTimePicker, SelectAllClearButtons } from '@/components/form';
 import { FormField } from '@/components/form/rhf';
 import { TLS_FLOW_CONTROL } from '@/schemas/primitives';
 import type { ClientRecord, InboundOption, ExternalLink, ExternalLinkInput } from '@/hooks/useClients';
+import type { ManagedEndpoint } from '@/schemas/api/managed-endpoint';
 import { useFail2banStatusQuery, getLimitIpNotice } from '@/api/queries/useFail2banStatusQuery';
 import { ClientFormSchema, ClientCreateFormSchema, type ClientFormValues } from '@/schemas/client';
+import { normalizeClientTargetSelection } from './client-targets';
 
 const FLOW_OPTIONS = Object.values(TLS_FLOW_CONTROL);
 const VMESS_SECURITY_OPTIONS = ['auto', 'aes-128-gcm', 'chacha20-poly1305'] as const;
@@ -76,6 +78,7 @@ interface SaveMetaCreate {
 interface SaveCreatePayload {
   client: Record<string, unknown>;
   inboundIds: number[];
+  managedEndpointIds: string[];
 }
 
 interface ClientFormModalProps {
@@ -83,6 +86,7 @@ interface ClientFormModalProps {
   mode: Mode;
   client: ClientRecord | null;
   inbounds: InboundOption[];
+  managedEndpoints?: ManagedEndpoint[];
   attachedExternalLinks?: ExternalLink[];
   attachedIds?: number[];
   tgBotEnable?: boolean;
@@ -133,6 +137,7 @@ const EMPTY: Values = {
   wgAllowedIPs: '',
   secret: '',
   adTag: '',
+  managedEndpointIds: [],
 };
 
 function toExternalLinkRows(links: ExternalLink[] | undefined): ExternalLinkRow[] {
@@ -165,6 +170,7 @@ export default function ClientFormModal({
   mode,
   client,
   inbounds,
+  managedEndpoints = [],
   attachedExternalLinks = [],
   attachedIds = [],
   tgBotEnable = false,
@@ -176,6 +182,7 @@ export default function ClientFormModal({
   const { t } = useTranslation();
   const [messageApi, messageContextHolder] = message.useMessage();
   const isEdit = mode === 'edit';
+  const [managedEndpointIds, setManagedEndpointIds] = useState<string[]>([]);
 
   const methods = useForm<Values>({ defaultValues: EMPTY });
   const inboundIds = useWatch({ control: methods.control, name: 'inboundIds' });
@@ -217,6 +224,7 @@ export default function ClientFormModal({
     setIpsModalOpen(false);
 
     if (isEdit && client) {
+      setManagedEndpointIds([]);
       const et = Number(client.expiryTime) || 0;
       const seed: Values = {
         ...EMPTY,
@@ -258,6 +266,7 @@ export default function ClientFormModal({
       methods.reset(seed);
       void loadIps();
     } else {
+      setManagedEndpointIds([]);
       const wgKeypair = Wireguard.generateKeypair();
       methods.reset({
         ...EMPTY,
@@ -409,11 +418,40 @@ export default function ClientFormModal({
       .filter((ib) => ib.enable || (inboundIds || []).includes(ib.id))
       .map((ib) => ({
         label: formatInboundLabel(ib.tag, ib.remark),
-        value: ib.id,
+        value: `legacy:${ib.id}`,
         title: formatInboundLabel(ib.tag, ib.remark),
       })),
     [inbounds, inboundIds],
   );
+
+  const managedOptions = useMemo(
+    () => (isEdit ? [] : managedEndpoints)
+      .filter((endpoint) => endpoint.enable && ['amneziawg', 'mieru', 'naiveproxy'].includes(endpoint.protocol))
+      .map((endpoint) => ({
+        label: `${formatInboundLabel(endpoint.tag, endpoint.remark)} · ${endpoint.protocol}`,
+        value: `managed:${endpoint.id}`,
+        title: `${formatInboundLabel(endpoint.tag, endpoint.remark)} · ${endpoint.protocol}`,
+      })),
+    [isEdit, managedEndpoints],
+  );
+
+  const targetOptions = useMemo(() => [...inboundOptions, ...managedOptions], [inboundOptions, managedOptions]);
+  const hasMixedTargetFamilies = inboundOptions.length > 0 && managedOptions.length > 0;
+  const selectedTargets = useMemo(
+    () => [...(inboundIds || []).map((id) => `legacy:${id}`), ...managedEndpointIds.map((id) => `managed:${id}`)],
+    [inboundIds, managedEndpointIds],
+  );
+  const setSelectedTargets = (targets: string[]) => {
+    const normalized = normalizeClientTargetSelection(targets, selectedTargets);
+    methods.setValue('inboundIds', normalized
+      .filter((value) => value.startsWith('legacy:'))
+      .map((value) => Number(value.slice('legacy:'.length)))
+      .filter((value) => Number.isInteger(value) && value > 0));
+    setManagedEndpointIds(normalized
+      .filter((value) => value.startsWith('managed:'))
+      .map((value) => value.slice('managed:'.length))
+      .filter(Boolean));
+  };
 
   const expiryDayjs = useMemo<Dayjs | null>(
     () => (expiryDate > 0 ? dayjs(expiryDate) : null),
@@ -496,6 +534,7 @@ export default function ClientFormModal({
       comment: values.comment,
       enable: values.enable,
       inboundIds: values.inboundIds,
+      managedEndpointIds,
     });
     if (!validated.success) {
       const issue = validated.error.issues[0];
@@ -574,7 +613,7 @@ export default function ClientFormModal({
         });
       } else {
         msg = await save(
-          { client: clientPayload, inboundIds: values.inboundIds },
+          { client: clientPayload, inboundIds: values.inboundIds, managedEndpointIds },
           { isEdit: false, email: clientPayload.email as string, externalLinks },
         );
       }
@@ -769,16 +808,18 @@ export default function ClientFormModal({
                       )}
 
                       <Form.Item label={t('pages.clients.attachedInbounds')} required={!isEdit}>
-                        <SelectAllClearButtons
-                          options={inboundOptions}
-                          value={inboundIds}
-                          onChange={(v) => methods.setValue('inboundIds', v)}
-                        />
+                        {!hasMixedTargetFamilies && (
+                          <SelectAllClearButtons
+                            options={targetOptions}
+                            value={selectedTargets}
+                            onChange={setSelectedTargets}
+                          />
+                        )}
                         <Select
                           mode="multiple"
-                          value={inboundIds}
-                          onChange={(v) => methods.setValue('inboundIds', v)}
-                          options={inboundOptions}
+                          value={selectedTargets}
+                          onChange={setSelectedTargets}
+                          options={targetOptions}
                           placeholder={t('pages.clients.selectInbound')}
                           maxTagCount="responsive"
                           placement="topLeft"

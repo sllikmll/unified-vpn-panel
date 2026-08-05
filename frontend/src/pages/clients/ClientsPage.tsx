@@ -57,6 +57,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useClients } from '@/hooks/useClients';
 import { useNodesQuery } from '@/api/queries/useNodesQuery';
+import { useManagedEndpointsQuery } from '@/api/queries/useManagedEndpointsQuery';
 import { useDatepicker } from '@/hooks/useDatepicker';
 import type { ClientRecord, InboundOption, ExternalLink, ExternalLinkInput } from '@/hooks/useClients';
 import ClientTrafficCell from '@/components/clients/ClientTrafficCell';
@@ -248,6 +249,11 @@ export default function ClientsPage() {
   // Node list for the Nodes filter; the section only renders when the panel
   // actually manages nodes (#4997).
   const { nodes } = useNodesQuery();
+  const managedEndpointsQuery = useManagedEndpointsQuery();
+  const managedEndpoints = useMemo(
+    () => (managedEndpointsQuery.data ?? []).filter((endpoint) => endpoint.source === 'managed-endpoint'),
+    [managedEndpointsQuery.data],
+  );
 
   const [togglingEmail, setTogglingEmail] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -772,7 +778,7 @@ export default function ClientsPage() {
   }
 
   const onSave = useCallback(async (
-    payload: Record<string, unknown> | { client: Record<string, unknown>; inboundIds: number[] },
+    payload: Record<string, unknown> | { client: Record<string, unknown>; inboundIds: number[]; managedEndpointIds: string[] },
     meta:
       | { isEdit: false; email: string; externalLinks: ExternalLinkInput[] }
       | { isEdit: true; email: string; attach: number[]; detach: number[]; externalLinks: ExternalLinkInput[] },
@@ -1506,6 +1512,7 @@ export default function ClientsPage() {
             attachedIds={editingAttachedIds}
             attachedExternalLinks={editingExternalLinks}
             inbounds={inbounds}
+            managedEndpoints={managedEndpoints}
             tgBotEnable={tgBotEnable}
             groups={allGroups}
             save={onSave}
