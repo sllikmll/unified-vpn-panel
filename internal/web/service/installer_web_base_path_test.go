@@ -29,4 +29,11 @@ func TestInstallAndUpdateKeepRootWebBasePath(t *testing.T) {
 			t.Fatalf("%s passes root webBasePath with a leading slash to SSL setup", name)
 		}
 	}
+	smoke, err := os.ReadFile(filepath.Join(root, "deploy", "test", "smoke-noninteractive.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(smoke), `/${XUI_WEB_BASE_PATH}/`) || !strings.Contains(string(smoke), `${XUI_WEB_BASE_PATH#/}`) {
+		t.Fatal("non-interactive smoke test does not normalize root webBasePath")
+	}
 }
