@@ -23,6 +23,8 @@ ARG TARGETVARIANT
 ARG XRAY_VERSION=26.6.27
 
 RUN apk --no-cache --update add \
+  clang \
+  lld \
   curl \
   unzip \
   && xx-apk add --no-cache musl-dev gcc
