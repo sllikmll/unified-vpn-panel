@@ -97,8 +97,8 @@ func dockerContainerExists(ctx context.Context) bool {
 func runDockerCommand(ctx context.Context, cmd Command) error {
 	switch cmd.Name {
 	case FixedExecutableName:
-		if err := exec.CommandContext(ctx, "docker", "start", DockerContainerName).Run(); err != nil {
-			return errors.New("naiveproxy docker runtime start failed")
+		if err := exec.CommandContext(ctx, "docker", "restart", DockerContainerName).Run(); err != nil {
+			return errors.New("naiveproxy docker runtime restart failed")
 		}
 		argv := append([]string{"exec", DockerContainerName, "caddy"}, cmd.Argv...)
 		deadline := time.Now().Add(5 * time.Second)

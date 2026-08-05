@@ -25,10 +25,12 @@ var (
 // Endpoint is the public HTTPS endpoint served by the patched Caddy
 // forwardproxy runtime. ListenIP is intentionally IPv4-only for this phase.
 type Endpoint struct {
-	Domain    string
-	ListenIP  string
-	Port      int
-	ACMEEmail string
+	Domain          string
+	ListenIP        string
+	Port            int
+	ACMEEmail       string
+	CertificateFile string `json:"-"`
+	KeyFile         string `json:"-"`
 }
 
 // User is one protocol credential for NaiveProxy. It is not a panel admin and

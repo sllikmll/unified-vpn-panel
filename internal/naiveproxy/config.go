@@ -20,7 +20,11 @@ func GenerateCaddyfile(s Server) (string, error) {
 	b.WriteString("}\n")
 	fmt.Fprintf(&b, ":%d, %s:%d {\n", s.Endpoint.Port, canonicalDomain(s.Endpoint.Domain), s.Endpoint.Port)
 	if s.Endpoint.ACMEEmail != "" {
-		fmt.Fprintf(&b, "  tls %s\n", s.Endpoint.ACMEEmail)
+		if s.Endpoint.CertificateFile != "" && s.Endpoint.KeyFile != "" {
+			fmt.Fprintf(&b, "  tls %s %s\n", caddyQuote(s.Endpoint.CertificateFile), caddyQuote(s.Endpoint.KeyFile))
+		} else {
+			fmt.Fprintf(&b, "  tls %s\n", caddyQuote(s.Endpoint.ACMEEmail))
+		}
 	} else {
 		b.WriteString("  tls\n")
 	}

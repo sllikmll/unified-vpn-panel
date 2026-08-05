@@ -131,6 +131,9 @@ func (d *Driver) apply(ctx context.Context, inbound *model.Inbound) (driver.Endp
 		return driver.EndpointResult{}, fmt.Errorf("decode naiveproxy settings: %w", err)
 	}
 	server := core.Server{Endpoint: payload.Endpoint, Users: payload.Users}
+	if _, err := core.PrepareLocalCertificate(&server.Endpoint, "/etc/letsencrypt", core.FixedConfigDir+"/tls", 10001, 10001); err != nil {
+		return driver.EndpointResult{}, err
+	}
 	if err := d.rt.Apply(ctx, server); err != nil {
 		return driver.EndpointResult{}, err
 	}
