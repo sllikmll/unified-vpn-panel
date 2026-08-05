@@ -23,6 +23,8 @@ FROM alpine:${ALPINE_VERSION}
 ARG CADDY_VERSION
 ARG XCADDY_VERSION
 ARG FORWARDPROXY_COMMIT
+ENV XDG_CONFIG_HOME=/config \
+    XDG_DATA_HOME=/data
 LABEL org.opencontainers.image.title="unified-vpn-panel Naive Caddy runtime prerequisite" \
       org.opencontainers.image.description="Pinned Caddy NaiveProxy server runtime artifact for unified-vpn-panel protocol prerequisites" \
       org.opencontainers.image.source="https://github.com/sllikmll/unified-vpn-panel" \
@@ -47,5 +49,5 @@ RUN chmod 0644 /etc/caddy-naive/examples/Caddyfile.naiveproxy.example \
 EXPOSE 443/tcp
 VOLUME ["/data/caddy", "/config/caddy", "/etc/caddy-naive"]
 STOPSIGNAL SIGTERM
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -q --spider "http://127.0.0.1:2019/config/" || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- "http://127.0.0.1:2019/config/" >/dev/null || exit 1
 ENTRYPOINT ["/usr/local/bin/naive-caddy-entrypoint"]

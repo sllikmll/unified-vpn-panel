@@ -65,7 +65,7 @@ type Result struct {
 
 const (
 	AWG2ImageRef         = "ghcr.io/sllikmll/unified-vpn-panel-protocol-awg2@sha256:538dfb80a24f4f18e84aadbadd98472ace726452e96b36441d422fba7c5e24d8"
-	NaiveProxyImageRef   = "ghcr.io/sllikmll/unified-vpn-panel-protocol-naive-caddy@sha256:eb3dc4001186254492460fbb4013b658516db354bb57c3fd777b1f13ec962ed8"
+	NaiveProxyImageRef   = "ghcr.io/sllikmll/unified-vpn-panel-protocol-naive-caddy@sha256:7bb3281025f69378da9e1e961e521155cd025dcd69de74e001a5c0fff36832b8"
 	MieruMitaVersion     = "v3.35.0"
 	MieruManifestPath    = "runtime-images/mieru/mita-v3.35.0.manifest.json"
 	AWG2ContainerName    = "unified-vpn-awg2-runtime"
