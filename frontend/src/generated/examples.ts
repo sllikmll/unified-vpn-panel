@@ -594,6 +594,7 @@ export const EXAMPLES: Record<string, unknown> = {
   },
   "ManagedEndpointView": {
     "clientCount": 2,
+    "config": null,
     "enable": true,
     "health": {
       "checkedAt": 0,

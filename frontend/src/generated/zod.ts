@@ -611,6 +611,7 @@ export type ManagedEndpointCapability = z.infer<typeof ManagedEndpointCapability
 
 export const ManagedEndpointViewSchema = z.object({
   clientCount: z.number().int(),
+  config: z.unknown().optional(),
   enable: z.boolean(),
   health: z.lazy(() => ManagedHealthViewSchema),
   id: z.string(),

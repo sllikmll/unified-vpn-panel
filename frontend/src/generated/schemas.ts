@@ -2369,6 +2369,9 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": 2,
         "type": "integer"
       },
+      "config": {
+        "description": "Config is the editable public projection of DesiredConfig. Runtime paths,\ngenerated credentials and secret references are deliberately excluded."
+      },
       "enable": {
         "example": true,
         "type": "boolean"

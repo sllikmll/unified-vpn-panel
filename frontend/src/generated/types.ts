@@ -557,6 +557,7 @@ export interface ManagedEndpointCapability {
 
 export interface ManagedEndpointView {
   clientCount: number;
+  config?: unknown;
   enable: boolean;
   health: ManagedHealthView;
   id: string;

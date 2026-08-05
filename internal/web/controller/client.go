@@ -214,7 +214,7 @@ func (a *ClientController) create(c *gin.Context) {
 		}
 		managedCreated = append(managedCreated, endpointID)
 	}
-	var obj any = pendingNodeObj(a.inboundService.AnyNodePending(payload.InboundIds))
+	obj := pendingNodeObj(a.inboundService.AnyNodePending(payload.InboundIds))
 	if len(managedCreated) > 0 {
 		managedObj := gin.H{"managedCreated": managedCreated}
 		if a.inboundService.AnyNodePending(payload.InboundIds) {
