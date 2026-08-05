@@ -390,7 +390,7 @@ func TestManagedEndpointClientExportProducesCanonicalManagedLinks(t *testing.T) 
 		prefix  string
 		host    string
 	}{
-		{model.RuntimeMieru, "mieru-node.example.test", `{"portBindings":[{"port":32002,"protocol":"TCP"}],"mtu":1280}`, "mierus://", "@mieru-node.example.test?"},
+		{model.RuntimeMieru, "mieru-node.example.test", `{"portBindings":[{"port":32002,"protocol":"TCP"}],"mtu":1280}`, "{", `"domainName": "mieru-node.example.test"`},
 		{model.RuntimeNaiveProxy, "", `{"endpoint":{"domain":"naive-node.example.test","listenIp":"127.0.0.1","port":32003,"acmeEmail":"ops@example.test"},"users":[]}`, "naive+https://", "@naive-node.example.test:32003"},
 	}
 	for i, tc := range cases {

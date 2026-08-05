@@ -95,22 +95,34 @@ func dockerContainerExists(ctx context.Context) bool {
 }
 
 func runDockerCommand(ctx context.Context, cmd Command) error {
-	var argv []string
 	switch cmd.Name {
 	case FixedExecutableName:
 		if err := exec.CommandContext(ctx, "docker", "start", DockerContainerName).Run(); err != nil {
 			return errors.New("naiveproxy docker runtime start failed")
 		}
-		argv = append([]string{"exec", DockerContainerName, "caddy"}, cmd.Argv...)
+		argv := append([]string{"exec", DockerContainerName, "caddy"}, cmd.Argv...)
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			if err := exec.CommandContext(ctx, "docker", argv...).Run(); err == nil {
+				return nil
+			}
+			if time.Now().After(deadline) {
+				return errors.New("naiveproxy docker runtime command failed")
+			}
+			select {
+			case <-ctx.Done():
+				return errors.New("naiveproxy docker runtime command canceled")
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
 	case "systemctl":
-		argv = []string{cmd.Argv[0], DockerContainerName}
+		if err := exec.CommandContext(ctx, "docker", cmd.Argv[0], DockerContainerName).Run(); err != nil {
+			return errors.New("naiveproxy docker runtime command failed")
+		}
+		return nil
 	default:
 		return errors.New("naiveproxy docker command is not allowlisted")
 	}
-	if err := exec.CommandContext(ctx, "docker", argv...).Run(); err != nil {
-		return errors.New("naiveproxy docker runtime command failed")
-	}
-	return nil
 }
 
 type HTTPSHealthVerifier struct {
@@ -129,7 +141,7 @@ func (v HTTPSHealthVerifier) Verify(ctx context.Context, endpoint Endpoint) erro
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}
-	dialer := &net.Dialer{Timeout: timeout}
+	dialer := &net.Dialer{Timeout: 2 * time.Second}
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			ServerName: canonicalDomain(endpoint.Domain),
@@ -138,25 +150,41 @@ func (v HTTPSHealthVerifier) Verify(ctx context.Context, endpoint Endpoint) erro
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return dialer.DialContext(ctx, network, net.JoinHostPort(endpoint.ListenIP, fmt.Sprint(endpoint.Port)))
 		},
-		TLSHandshakeTimeout:   timeout,
-		ResponseHeaderTimeout: timeout,
+		TLSHandshakeTimeout:   2 * time.Second,
+		ResponseHeaderTimeout: 2 * time.Second,
 		ForceAttemptHTTP2:     true,
 	}
 	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: timeout}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+canonicalDomain(endpoint.Domain)+"/", nil)
-	if err != nil {
-		return errors.New("build naiveproxy health request failed")
+	client := &http.Client{Transport: transport}
+	deadline := time.Now().Add(timeout)
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return errors.New("naiveproxy https health check failed")
+		}
+		attemptTimeout := min(2*time.Second, remaining)
+		attemptCtx, cancel := context.WithTimeout(ctx, attemptTimeout)
+		req, err := http.NewRequestWithContext(attemptCtx, http.MethodGet, "https://"+canonicalDomain(endpoint.Domain)+"/", nil)
+		if err != nil {
+			cancel()
+			return errors.New("build naiveproxy health request failed")
+		}
+		resp, err := client.Do(req)
+		if err == nil {
+			_ = resp.Body.Close()
+			cancel()
+			if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+				return nil
+			}
+		} else {
+			cancel()
+		}
+		select {
+		case <-ctx.Done():
+			return errors.New("naiveproxy https health check canceled")
+		case <-time.After(250 * time.Millisecond):
+		}
 	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return errors.New("naiveproxy https health check failed")
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 500 {
-		return errors.New("naiveproxy https health check returned unhealthy status")
-	}
-	return nil
 }
 
 func isAllowedCommand(cmd Command) bool {

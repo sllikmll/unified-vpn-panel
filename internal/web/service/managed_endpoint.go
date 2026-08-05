@@ -1075,11 +1075,12 @@ func (s ManagedEndpointMutationService) ClientExport(userId int, endpointRef str
 		if err != nil {
 			return ManagedClientExportResponse{}, err
 		}
-		links, err := mieru.SimpleLinks(mieru.ClientExport{ProfileName: endpoint.Remark, UserName: client.PublicIdentity, Password: string(password), Endpoints: []mieru.Endpoint{{Host: host, PortBinding: cfg.PortBindings}}, MTU: cfg.MTU})
+		content, err := mieru.ClientJSON(mieru.ClientExport{ProfileName: endpoint.Remark, UserName: client.PublicIdentity, Password: string(password), Endpoints: []mieru.Endpoint{{Host: host, PortBinding: cfg.PortBindings}}, MTU: cfg.MTU})
 		if err != nil {
 			return ManagedClientExportResponse{}, err
 		}
-		out.Content = strings.Join(links, "\n")
+		out.Filename = strings.TrimSpace(endpoint.Tag) + "-" + strings.TrimSpace(client.SubID) + "-mieru.json"
+		out.Content = string(content)
 		return out, nil
 	case model.RuntimeNaiveProxy:
 		rows, err := newestManagedSecrets(database.GetDB(), "managed_endpoint_client", client.Id, "password")
