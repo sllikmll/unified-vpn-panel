@@ -57,15 +57,20 @@ func (s *ClientService) Create(inboundSvc *InboundService, payload *ClientCreate
 	if err := validateClientSubID(client.SubID); err != nil {
 		return false, err
 	}
-	if len(payload.InboundIds) == 0 {
+	if len(payload.InboundIds) == 0 && len(payload.ManagedEndpointIds) == 0 {
 		return false, common.NewError("at least one inbound is required")
+	}
+	if len(payload.InboundIds) > 0 && len(payload.ManagedEndpointIds) > 0 {
+		return false, common.NewError("legacy and managed endpoints cannot be mixed in one create request")
 	}
 
 	if client.SubID == "" {
 		client.SubID = uuid.NewString()
+		payload.Client.SubID = client.SubID
 	}
 	if !client.Enable {
 		client.Enable = true
+		payload.Client.Enable = true
 	}
 	now := time.Now().UnixMilli()
 	if client.CreatedAt == 0 {
@@ -108,6 +113,15 @@ func (s *ClientService) Create(inboundSvc *InboundService, payload *ClientCreate
 		}
 		if subTaken > 0 {
 			return false, common.NewError("subId already in use:", client.SubID)
+		}
+	}
+
+	// Native managed endpoints reference the canonical client record by subId.
+	// When no legacy Xray inbound is selected there is no addInboundClient call
+	// to create that record, so persist the identity explicitly.
+	if len(payload.InboundIds) == 0 && !emailTaken {
+		if err := database.GetDB().Create(client.ToRecord()).Error; err != nil {
+			return false, err
 		}
 	}
 

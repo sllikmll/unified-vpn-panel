@@ -167,7 +167,9 @@ func newClientQuery(db *gorm.DB, nowMs, expireDiffMs, trafficDiffBytes int64) cl
 }
 
 func (q clientQuery) from() *gorm.DB {
-	tx := q.db.Table("clients AS c")
+	tx := q.db.Table("clients AS c").
+		Where(`EXISTS (SELECT 1 FROM client_inbounds ci WHERE ci.client_id = c.id)
+			OR NOT EXISTS (SELECT 1 FROM managed_endpoint_clients mec WHERE mec.client_id = c.id AND mec.state <> ?)`, model.EndpointClientDeleted)
 	for _, j := range q.joins {
 		tx = tx.Joins(j.sql, j.args...)
 	}
@@ -360,7 +362,7 @@ func (s *ClientService) ListPaged(inboundSvc *InboundService, settingSvc *Settin
 	q := newClientQuery(db, time.Now().UnixMilli(), expireDiffMs, trafficDiffBytes)
 
 	var total int64
-	if err := db.Model(&model.ClientRecord{}).Count(&total).Error; err != nil {
+	if err := q.from().Count(&total).Error; err != nil {
 		return nil, err
 	}
 

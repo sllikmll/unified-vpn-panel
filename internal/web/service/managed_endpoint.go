@@ -79,6 +79,9 @@ type ManagedEndpointView struct {
 	Health        ManagedHealthView     `json:"health"`
 	SecretSummary ManagedSecretSummary  `json:"secretSummary"`
 	NodeName      string                `json:"nodeName,omitempty"`
+	// Config is the editable public projection of DesiredConfig. Runtime paths,
+	// generated credentials and secret references are deliberately excluded.
+	Config any `json:"config,omitempty"`
 }
 
 type ManagedEndpointCapability struct {
@@ -266,7 +269,7 @@ type ManagedMieruPortBinding struct {
 type ManagedNaiveProxyConfig struct {
 	Domain    string `json:"domain,omitempty"`
 	SNI       string `json:"sni,omitempty"`
-	ListenIP  string `json:"listenIp,omitempty"`
+	ListenIP  string `json:"listenIP,omitempty"`
 	Port      int    `json:"port,omitempty"`
 	TLSMode   string `json:"tlsMode,omitempty"`
 	ACMEEmail string `json:"acmeEmail,omitempty"`
@@ -1434,6 +1437,51 @@ func nativeEndpointView(endpoint model.ManagedEndpoint, clientCount int, traffic
 			HasSecrets: len(secretKinds) > 0,
 			Fields:     secretKinds,
 		},
+		Config: publicManagedEndpointConfig(endpoint),
+	}
+}
+
+func publicManagedEndpointConfig(endpoint model.ManagedEndpoint) any {
+	switch endpoint.RuntimeKind {
+	case model.RuntimeAmneziaWG:
+		var desired awg.DesiredConfig
+		if json.Unmarshal([]byte(endpoint.DesiredConfig), &desired) != nil {
+			return map[string]any{}
+		}
+		o := desired.Server.Obfuscation20
+		return ManagedAWGConfig{
+			Endpoint: desired.Server.Endpoint, InterfaceName: desired.Server.InterfaceName,
+			ListenPort: desired.Server.ListenPort, IPv4Address: desired.Server.IPv4Address,
+			IPv4Pool: desired.Server.IPv4Pool, DNS: desired.Server.DNS, MTU: desired.Server.MTU,
+			ClientAllowedIPs:    desired.ClientDefaults.AllowedIPs,
+			PersistentKeepalive: desired.ClientDefaults.PersistentKeepalive,
+			Jc:                  o.Jc, Jmin: o.Jmin, Jmax: o.Jmax, S1: o.S1, S2: o.S2, S3: o.S3, S4: o.S4,
+			H1: o.H1, H2: o.H2, H3: o.H3, H4: o.H4,
+		}
+	case model.RuntimeMieru:
+		var desired mieru.ServerConfig
+		if json.Unmarshal([]byte(endpoint.DesiredConfig), &desired) != nil {
+			return map[string]any{}
+		}
+		bindings := make([]ManagedMieruPortBinding, 0, len(desired.PortBindings))
+		for _, b := range desired.PortBindings {
+			bindings = append(bindings, ManagedMieruPortBinding{Port: b.Port, Protocol: string(b.Protocol), PortRange: b.PortRange})
+		}
+		return ManagedMieruConfig{MTU: desired.MTU, PortBindings: bindings}
+	case model.RuntimeNaiveProxy:
+		var desired struct {
+			Endpoint naiveproxy.Endpoint `json:"endpoint"`
+		}
+		if json.Unmarshal([]byte(endpoint.DesiredConfig), &desired) != nil {
+			return map[string]any{}
+		}
+		return ManagedNaiveProxyConfig{
+			Domain: desired.Endpoint.Domain, SNI: desired.Endpoint.Domain,
+			ListenIP: desired.Endpoint.ListenIP, Port: desired.Endpoint.Port,
+			TLSMode: "acme", ACMEEmail: desired.Endpoint.ACMEEmail,
+		}
+	default:
+		return nil
 	}
 }
 

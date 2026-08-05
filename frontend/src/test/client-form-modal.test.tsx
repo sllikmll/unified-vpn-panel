@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import ClientFormModal from '@/pages/clients/ClientFormModal';
@@ -67,5 +67,36 @@ describe('ClientFormModal credential tooltips', () => {
         'Credential used only by Hysteria clients. Trojan and Shadowsocks use the Password field instead.',
       );
     });
+  });
+});
+
+describe('ClientFormModal managed endpoint targets', () => {
+  it('shows managed endpoints in the common add dialog and submits managedEndpointIds', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const save = vi.fn().mockResolvedValue({ success: true });
+    renderWithProviders(
+      <QueryClientProvider client={queryClient}>
+        <ClientFormModal
+          open
+          mode="add"
+          client={null}
+          inbounds={[]}
+          managedEndpoints={[{
+            id: 'managed-9', source: 'managed-endpoint', enable: true,
+            protocol: 'amneziawg', tag: 'AWG remote', remark: 'native',
+          } as never]}
+          save={save}
+          onOpenChange={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /select all/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ inboundIds: [], managedEndpointIds: ['managed-9'] }),
+      expect.objectContaining({ isEdit: false }),
+    ));
   });
 });

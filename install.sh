@@ -1019,7 +1019,9 @@ prompt_and_setup_ssl() {
 
 config_after_install() {
     local existing_hasDefaultCredential=$(${xui_folder}/x-ui setting -show true | grep -Eo 'hasDefaultCredential: .+' | awk '{print $2}')
-    local existing_webBasePath=$(${xui_folder}/x-ui setting -show true | grep -Eo 'webBasePath: .+' | awk '{print $2}' | sed 's#^/##')
+    # Product contract: the panel is always served from the root path.
+    ${xui_folder}/x-ui setting -webBasePath "/" > /dev/null
+    local existing_webBasePath="/"
     local existing_port=$(${xui_folder}/x-ui setting -show true | grep -Eo 'port: .+' | awk '{print $2}')
     # Properly detect empty cert by checking if cert: line exists and has content after it
     local existing_cert=$(${xui_folder}/x-ui setting -getCert true | grep 'cert:' | awk -F': ' '{print $2}' | tr -d '[:space:]')
@@ -1060,9 +1062,8 @@ config_after_install() {
         fi
     fi
 
-    if [[ ${#existing_webBasePath} -lt 4 ]]; then
-        if [[ "$existing_hasDefaultCredential" == "true" ]]; then
-            local config_webBasePath="${XUI_WEB_BASE_PATH:-$(gen_random_string 18)}"
+    if [[ "$existing_hasDefaultCredential" == "true" ]]; then
+            local config_webBasePath="/"
             local config_username="${XUI_USERNAME:-$(gen_random_string 10)}"
             local config_password="${XUI_PASSWORD:-$(gen_random_string 10)}"
             local config_port=""
@@ -1225,7 +1226,7 @@ EOF
             echo -e "${yellow}Let's Encrypt now supports both domains and IP addresses!${plain}"
             echo ""
 
-            prompt_and_setup_ssl "${config_port}" "${config_webBasePath}" "${server_ip}"
+            prompt_and_setup_ssl "${config_port}" "${config_webBasePath#/}" "${server_ip}"
 
             # Retrieve the API token for display
             local config_apiToken=$(${xui_folder}/x-ui setting -getApiToken true | grep -Eo 'apiToken: .+' | awk '{print $2}')
@@ -1240,7 +1241,7 @@ EOF
             echo -e "${green}Port:        ${config_port}${plain}"
             echo -e "${green}WebBasePath: ${config_webBasePath}${plain}"
             echo -e "${green}Database:    ${db_label}${plain}"
-            echo -e "${green}Access URL:  ${SSL_SCHEME}://${SSL_HOST}:${config_port}/${config_webBasePath}${plain}"
+            echo -e "${green}Access URL:  ${SSL_SCHEME}://${SSL_HOST}:${config_port}/${config_webBasePath#/}${plain}"
             echo -e "${green}API Token:   ${config_apiToken}${plain}"
             echo -e "${green}═══════════════════════════════════════════${plain}"
             echo -e "${yellow}⚠ IMPORTANT: Save these credentials securely!${plain}"
@@ -1253,7 +1254,7 @@ EOF
             if [[ "$db_choice" == "2" ]]; then
                 echo ""
                 echo -e "${green}PostgreSQL backup & restore is built into the panel:${plain}"
-                echo -e "  ${blue}${SSL_SCHEME}://${SSL_HOST}:${config_port}/${config_webBasePath}${plain} → Backup & Restore"
+                echo -e "  ${blue}${SSL_SCHEME}://${SSL_HOST}:${config_port}/${config_webBasePath#/}${plain} → Backup & Restore"
                 echo -e "${yellow}  Back Up downloads a pg_dump .dump file; Restore reloads it via pg_restore.${plain}"
             fi
 
@@ -1286,50 +1287,8 @@ EOF
             [[ "$db_choice" == "2" ]] && db_type_out="postgres"
             write_install_result "${config_username}" "${config_password}" "${config_port}" \
                 "${config_webBasePath}" "${SSL_SCHEME}" "${SSL_HOST}" "${config_apiToken}" "${db_type_out}"
-        else
-            local config_webBasePath=$(gen_random_string 18)
-            echo -e "${yellow}WebBasePath is missing or too short. Generating a new one...${plain}"
-            ${xui_folder}/x-ui setting -webBasePath "${config_webBasePath}"
-            echo -e "${green}New WebBasePath: ${config_webBasePath}${plain}"
-
-            # If the panel is already installed but no certificate is configured, prompt for SSL now
-            if [[ -z "${existing_cert}" ]]; then
-                echo ""
-                echo -e "${green}═══════════════════════════════════════════${plain}"
-                echo -e "${green}     SSL Certificate Setup (RECOMMENDED)   ${plain}"
-                echo -e "${green}═══════════════════════════════════════════${plain}"
-                echo -e "${yellow}Let's Encrypt now supports both domains and IP addresses!${plain}"
-                echo ""
-                prompt_and_setup_ssl "${existing_port}" "${config_webBasePath}" "${server_ip}"
-                echo -e "${green}Access URL:  ${SSL_SCHEME}://${SSL_HOST}:${existing_port}/${config_webBasePath}${plain}"
-            else
-                # If a cert already exists, just show the access URL
-                echo -e "${green}Access URL: https://${server_ip}:${existing_port}/${config_webBasePath}${plain}"
-            fi
-        fi
     else
-        if [[ "$existing_hasDefaultCredential" == "true" ]]; then
-            local config_username="${XUI_USERNAME:-$(gen_random_string 10)}"
-            local config_password="${XUI_PASSWORD:-$(gen_random_string 10)}"
-
-            echo -e "${yellow}Default credentials detected. Security update required...${plain}"
-            ${xui_folder}/x-ui setting -username "${config_username}" -password "${config_password}"
-            echo -e "Generated new random login credentials:"
-            echo -e "###############################################"
-            echo -e "${green}Username: ${config_username}${plain}"
-            echo -e "${green}Password: ${config_password}${plain}"
-            echo -e "###############################################"
-
-            # Persist a machine-parseable credentials file for cloud-init / MOTD.
-            local config_apiToken
-            config_apiToken=$(${xui_folder}/x-ui setting -getApiToken true | grep -Eo 'apiToken: .+' | awk '{print $2}')
-            : "${SSL_SCHEME:=https}"
-            : "${SSL_HOST:=${server_ip}}"
-            write_install_result "${config_username}" "${config_password}" "${existing_port}" \
-                "${existing_webBasePath}" "${SSL_SCHEME}" "${SSL_HOST}" "${config_apiToken}" "${XUI_DB_TYPE:-sqlite}"
-        else
-            echo -e "${green}Username, Password, and WebBasePath are properly set.${plain}"
-        fi
+        echo -e "${green}Username, Password, and WebBasePath are properly set.${plain}"
 
         # Existing install: if no cert configured, prompt user for SSL setup
         # Properly detect empty cert by checking if cert: line exists and has content after it
@@ -1341,8 +1300,8 @@ EOF
             echo -e "${green}═══════════════════════════════════════════${plain}"
             echo -e "${yellow}Let's Encrypt now supports both domains and IP addresses!${plain}"
             echo ""
-            prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath}" "${server_ip}"
-            echo -e "${green}Access URL:  ${SSL_SCHEME}://${SSL_HOST}:${existing_port}/${existing_webBasePath}${plain}"
+            prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath#/}" "${server_ip}"
+            echo -e "${green}Access URL:  ${SSL_SCHEME}://${SSL_HOST}:${existing_port}/${existing_webBasePath#/}${plain}"
         else
             echo -e "${green}SSL certificate already configured. No action needed.${plain}"
         fi

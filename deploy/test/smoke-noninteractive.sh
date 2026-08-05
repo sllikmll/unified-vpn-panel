@@ -74,9 +74,12 @@ docker run --rm \
         cd /usr/local/x-ui
         ./x-ui > /tmp/xui.log 2>&1 &
         xpid=$!
+        base_path="${XUI_WEB_BASE_PATH#/}"
+        panel_url="http://127.0.0.1:${XUI_PANEL_PORT}/"
+        [ -n "$base_path" ] && panel_url="${panel_url}${base_path}/"
         for _ in $(seq 1 15); do
             code=$(curl -s -o /dev/null -w "%{http_code}" \
-                "http://127.0.0.1:${XUI_PANEL_PORT}/${XUI_WEB_BASE_PATH}/" 2>/dev/null || true)
+                "$panel_url" 2>/dev/null || true)
             case "$code" in 200|301|302|307|308) break ;; esac
             sleep 1
         done

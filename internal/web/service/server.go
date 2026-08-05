@@ -146,23 +146,10 @@ type ServerService struct {
 	lastStatusMu sync.RWMutex
 	lastStatus   *Status
 
-	versionsCacheMu sync.Mutex
-	versionsCache   *cachedXrayVersions
-
 	fail2banMu        sync.Mutex
 	fail2banInstalled bool
 	fail2banCheckedAt time.Time
 }
-
-type cachedXrayVersions struct {
-	versions  []string
-	fetchedAt time.Time
-}
-
-// xrayVersionsCacheTTL bounds how often /getXrayVersion hits GitHub. The list
-// is purely informational (rendered in the "switch Xray version" picker) so a
-// quarter-hour staleness window is fine and saves the API budget.
-const xrayVersionsCacheTTL = 15 * time.Minute
 
 // allowedHistoryBuckets is the bucket-second whitelist for time-series
 // aggregation endpoints (server + node metrics). Restricting it prevents
@@ -258,29 +245,10 @@ func (s *ServerService) RefreshStatus() *Status {
 	return next
 }
 
-// GetXrayVersionsCached wraps GetXrayVersions with a TTL cache. On fetch
-// failure we serve the last successful list (if any) so the UI doesn't go
-// blank during a GitHub API hiccup; if there's no cache at all the underlying
-// error is surfaced.
+// GetXrayVersionsCached returns only the product compatibility baseline. The
+// install endpoint enforces the same allowlist independently in UpdateXray.
 func (s *ServerService) GetXrayVersionsCached() ([]string, error) {
-	s.versionsCacheMu.Lock()
-	cache := s.versionsCache
-	s.versionsCacheMu.Unlock()
-	if cache != nil && time.Since(cache.fetchedAt) <= xrayVersionsCacheTTL {
-		return cache.versions, nil
-	}
-	versions, err := s.GetXrayVersions()
-	if err != nil {
-		if cache != nil {
-			logger.Warning("GetXrayVersionsCached: serving stale list:", err)
-			return cache.versions, nil
-		}
-		return nil, err
-	}
-	s.versionsCacheMu.Lock()
-	s.versionsCache = &cachedXrayVersions{versions: versions, fetchedAt: time.Now()}
-	s.versionsCacheMu.Unlock()
-	return versions, nil
+	return []string{PinnedXrayVersion}, nil
 }
 
 // GetDefaultLogOutboundTags scans the default Xray config for freedom and
@@ -769,6 +737,9 @@ func (s *ServerService) sampleCPUUtilization() (float64, error) {
 const (
 	maxXrayArchiveBytes = 200 << 20
 	maxXrayBinaryBytes  = 200 << 20
+	// PinnedXrayVersion is the Mihomo/Reality compatibility baseline. Newer
+	// versions require an isolated Reality E2E before this value may change.
+	PinnedXrayVersion = "v26.6.27"
 	// maxXrayDigestBytes caps the .dgst checksum sidecar read; it is a few
 	// hundred bytes in practice.
 	maxXrayDigestBytes = 64 << 10
@@ -987,6 +958,9 @@ func parseXrayDigestSHA256(dgst []byte) (string, error) {
 }
 
 func (s *ServerService) UpdateXray(version string) error {
+	if version != PinnedXrayVersion {
+		return fmt.Errorf("xray version %q is not allowed; this deployment is pinned to %s for Reality compatibility", version, PinnedXrayVersion)
+	}
 	versions, err := s.GetXrayVersions()
 	if err != nil {
 		return err

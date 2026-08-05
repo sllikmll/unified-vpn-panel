@@ -2,14 +2,18 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/session"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/websocket"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func notifyClientsChanged() {
@@ -177,20 +181,72 @@ func (a *ClientController) create(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
+	recordExisted := true
+	if len(payload.ManagedEndpointIds) > 0 {
+		_, lookupErr := a.clientService.GetRecordByEmail(nil, payload.Client.Email)
+		recordExisted = lookupErr == nil
+		if lookupErr != nil && !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+			jsonMsg(c, I18nWeb(c, "somethingWentWrong"), lookupErr)
+			return
+		}
+	}
 	needRestart, err := a.clientService.Create(&a.inboundService, &payload)
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	jsonMsgObj(c, I18nWeb(c, "pages.inbounds.toasts.inboundClientAddSuccess"), pendingNodeObj(a.inboundService.AnyNodePending(payload.InboundIds)), nil)
+	user := session.GetLoginUser(c)
+	managedCreated := make([]string, 0, len(payload.ManagedEndpointIds))
+	for _, endpointID := range payload.ManagedEndpointIds {
+		req := service.ManagedEndpointClientCreateRequest{
+			SubID:          payload.Client.SubID,
+			Enable:         &payload.Client.Enable,
+			IdempotencyKey: fmt.Sprintf("global-client-create:%s:%s", payload.Client.SubID, endpointID),
+		}
+		if _, createErr := managedEndpointMutations().CreateClient(c.Request.Context(), user.Id, endpointID, req); createErr != nil {
+			if !recordExisted && len(managedCreated) == 0 {
+				if cleanupErr := a.clientService.DeleteRecordIfUnattached(payload.Client.Email, payload.Client.SubID); cleanupErr != nil {
+					createErr = errors.Join(createErr, fmt.Errorf("cleanup unattached client record: %w", cleanupErr))
+				}
+			}
+			jsonMsgObj(c, I18nWeb(c, "somethingWentWrong"), gin.H{"managedCreated": managedCreated, "managedFailed": endpointID}, createErr)
+			return
+		}
+		managedCreated = append(managedCreated, endpointID)
+	}
+	obj := pendingNodeObj(a.inboundService.AnyNodePending(payload.InboundIds))
+	if len(managedCreated) > 0 {
+		managedObj := gin.H{"managedCreated": managedCreated}
+		if a.inboundService.AnyNodePending(payload.InboundIds) {
+			managedObj["nodePending"] = true
+		}
+		obj = managedObj
+	}
+	jsonMsgObj(c, I18nWeb(c, "pages.inbounds.toasts.inboundClientAddSuccess"), obj, nil)
 	if needRestart {
 		a.xrayService.SetToNeedRestart()
 	}
 	notifyClientsChanged()
 }
 
+func (a *ClientController) rejectManagedOnlyMutation(c *gin.Context, emails []string) bool {
+	managedOnly, err := a.clientService.ManagedOnlyEmails(emails)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return true
+	}
+	if len(managedOnly) > 0 {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), fmt.Errorf("managed-only clients must be changed from their managed endpoint: %s", strings.Join(managedOnly, ", ")))
+		return true
+	}
+	return false
+}
+
 func (a *ClientController) update(c *gin.Context) {
 	email := c.Param("email")
+	if a.rejectManagedOnlyMutation(c, []string{email}) {
+		return
+	}
 	var updated model.Client
 	if err := c.ShouldBindJSON(&updated); err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
@@ -211,6 +267,9 @@ func (a *ClientController) update(c *gin.Context) {
 
 func (a *ClientController) delete(c *gin.Context) {
 	email := c.Param("email")
+	if a.rejectManagedOnlyMutation(c, []string{email}) {
+		return
+	}
 	keepTraffic := c.Query("keepTraffic") == "1"
 	needRestart, err := a.clientService.DeleteByEmail(&a.inboundService, email, keepTraffic)
 	if err != nil {
@@ -361,6 +420,9 @@ func (a *ClientController) bulkDelete(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
+	if a.rejectManagedOnlyMutation(c, req.Emails) {
+		return
+	}
 	result, needRestart, err := a.clientService.BulkDelete(&a.inboundService, req.Emails, req.KeepTraffic)
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
@@ -389,6 +451,9 @@ func (a *ClientController) bulkSetEnable(c *gin.Context, enable bool) {
 	var req bulkEnableRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	if a.rejectManagedOnlyMutation(c, req.Emails) {
 		return
 	}
 	result, needRestart, err := a.clientService.BulkSetEnable(&a.inboundService, req.Emails, enable)
