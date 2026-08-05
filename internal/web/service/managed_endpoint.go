@@ -368,17 +368,29 @@ func (s ManagedEndpointMutationService) Create(ctx context.Context, userId int, 
 				return tx.First(&endpoint, "id = ? AND user_id = ?", existing.EndpointId, userId).Error
 			}
 		}
+		tag := strings.TrimSpace(req.Tag)
+		var tombstone model.ManagedEndpoint
+		revive := false
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ? AND tag = ? AND status = ?", userId, tag, model.EndpointDeleted).Order("id DESC").First(&tombstone).Error; err == nil {
+			revive = true
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
 		endpoint = model.ManagedEndpoint{
 			UserId:      userId,
 			NodeID:      req.NodeID,
 			RuntimeKind: req.RuntimeKind,
 			Protocol:    model.ManagedProtocol(req.Protocol),
-			Tag:         strings.TrimSpace(req.Tag),
+			Tag:         tag,
 			Remark:      strings.TrimSpace(req.Remark),
 			Listen:      strings.TrimSpace(req.Listen),
 			Port:        req.Port,
 			Enable:      enable,
 			Status:      model.EndpointApplying,
+		}
+		if revive {
+			endpoint.Id = tombstone.Id
+			endpoint.CreatedAt = tombstone.CreatedAt
 		}
 		if _, err := s.resolveDriver(endpoint); err != nil {
 			return err
@@ -386,7 +398,14 @@ func (s ManagedEndpointMutationService) Create(ctx context.Context, userId int, 
 		if err := ensureSingletonManagedEndpoint(tx, endpoint); err != nil {
 			return err
 		}
-		if err := tx.Create(&endpoint).Error; err != nil {
+		if revive {
+			if err := resetManagedEndpointTombstone(tx, endpoint.Id); err != nil {
+				return err
+			}
+			if err := tx.Save(&endpoint).Error; err != nil {
+				return err
+			}
+		} else if err := tx.Create(&endpoint).Error; err != nil {
 			return err
 		}
 		desired, secrets, err := s.buildDesiredAndSecrets(endpoint, req.AWG, req.Mieru, req.NaiveProxy)
@@ -412,6 +431,25 @@ func (s ManagedEndpointMutationService) Create(ctx context.Context, userId int, 
 		return nil, err
 	}
 	return ManagedEndpointService{}.Get(userId, fmt.Sprintf("managed-%d", endpoint.Id))
+}
+
+func resetManagedEndpointTombstone(tx *gorm.DB, endpointID int) error {
+	var clientIDs []int
+	if err := tx.Model(&model.ManagedEndpointClient{}).Where("endpoint_id = ?", endpointID).Pluck("id", &clientIDs).Error; err != nil {
+		return err
+	}
+	if len(clientIDs) > 0 {
+		if err := tx.Where("owner_type = ? AND owner_id IN ?", "managed_endpoint_client", clientIDs).Delete(&model.ManagedSecret{}).Error; err != nil {
+			return err
+		}
+	}
+	if err := tx.Where("endpoint_id = ?", endpointID).Delete(&model.ManagedEndpointClient{}).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("endpoint_id = ?", endpointID).Delete(&model.ManagedEndpointClientTraffic{}).Error; err != nil {
+		return err
+	}
+	return tx.Where("owner_type = ? AND owner_id = ?", "managed_endpoint", endpointID).Delete(&model.ManagedSecret{}).Error
 }
 
 func (s ManagedEndpointMutationService) Update(ctx context.Context, userId int, id string, req ManagedEndpointUpdateRequest) (*ManagedEndpointView, error) {

@@ -843,6 +843,51 @@ func TestManagedEndpointDeleteTombstonesNeverAppliedFailureWithoutDriver(t *test
 	}
 }
 
+func TestManagedEndpointCreateRevivesDeletedTagAndClearsOwnedState(t *testing.T) {
+	initManagedEndpointServiceDB(t)
+	tombstone := model.ManagedEndpoint{UserId: 1, RuntimeKind: model.RuntimeMieru, Protocol: "mieru", Tag: "reuse-me", Port: 2999, Status: model.EndpointDeleted, LastAppliedHash: "old", LastObservedHash: "old", LastError: "old"}
+	if err := database.GetDB().Create(&tombstone).Error; err != nil {
+		t.Fatal(err)
+	}
+	client := model.ManagedEndpointClient{EndpointId: tombstone.Id, Email: "old@example.test", Enable: true, State: model.EndpointClientApplied}
+	if err := database.GetDB().Create(&client).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range []model.ManagedSecret{{OwnerType: "managed_endpoint", OwnerId: tombstone.Id, SecretKind: "old"}, {OwnerType: "managed_endpoint_client", OwnerId: client.Id, SecretKind: "old"}} {
+		if err := database.GetDB().Create(&secret).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := database.GetDB().Create(&model.ManagedEndpointClientTraffic{EndpointId: tombstone.Id, Email: client.Email, NodeGuid: "old"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.GetDB().Create(&model.ManagedEndpointApplyLog{IdempotencyKey: "old-delete", EndpointId: tombstone.Id, Action: "delete", Status: string(model.EndpointDeleted)}).Error; err != nil {
+		t.Fatal(err)
+	}
+	mutations := ManagedEndpointMutationService{Drivers: managedTestProvider{driver: managedTestDriver{kind: model.RuntimeMieru}}}
+	view, err := mutations.Create(context.Background(), 1, ManagedEndpointCreateRequest{RuntimeKind: model.RuntimeMieru, Protocol: "mieru", Tag: tombstone.Tag, Port: 32002, IdempotencyKey: "revived-create", Mieru: &ManagedMieruConfig{}})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if view.Id != fmt.Sprintf("managed-%d", tombstone.Id) || view.Status != model.EndpointActive {
+		t.Fatalf("view=%+v, want revived active endpoint with id %d", view, tombstone.Id)
+	}
+	for name, query := range map[string]*gorm.DB{
+		"clients": database.GetDB().Model(&model.ManagedEndpointClient{}).Where("endpoint_id = ?", tombstone.Id),
+		"traffic": database.GetDB().Model(&model.ManagedEndpointClientTraffic{}).Where("endpoint_id = ?", tombstone.Id),
+		"secrets": database.GetDB().Model(&model.ManagedSecret{}).Where("(owner_type = ? AND owner_id = ?) OR (owner_type = ? AND owner_id = ?)", "managed_endpoint", tombstone.Id, "managed_endpoint_client", client.Id),
+	} {
+		var count int64
+		if err := query.Count(&count).Error; err != nil || count != 0 {
+			t.Fatalf("%s count=%d err=%v, want zero", name, count, err)
+		}
+	}
+	var oldLogCount int64
+	if err := database.GetDB().Model(&model.ManagedEndpointApplyLog{}).Where("idempotency_key = ?", "old-delete").Count(&oldLogCount).Error; err != nil || oldLogCount != 1 {
+		t.Fatalf("old apply log count=%d err=%v, want preserved audit row", oldLogCount, err)
+	}
+}
+
 func TestManagedEndpointServiceProjectsLegacyAndNativeRowsRedacted(t *testing.T) {
 	initManagedEndpointServiceDB(t)
 	db := database.GetDB()
