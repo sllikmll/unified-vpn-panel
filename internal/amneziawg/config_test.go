@@ -94,7 +94,7 @@ func TestRenderConfigsIPv4OnlyAndRedaction(t *testing.T) {
 	if strings.Contains(cfg, "::") || strings.Contains(clientCfg, "::") {
 		t.Fatalf("rendered IPv6 content despite IPv6 out of scope:\n%s\n%s", cfg, clientCfg)
 	}
-	for _, want := range []string{"PostUp = sysctl -w net.ipv4.ip_forward=1", "iptables -t nat -A POSTROUTING -s 10.66.66.0/24 -j MASQUERADE", "PostDown = iptables -D FORWARD", "Jc = ", "S3 = ", "S4 = ", "H1 = ", "I1 = ", "Endpoint = vpn.example.test:51820"} {
+	for _, want := range []string{"PostUp = iptables -C FORWARD", "iptables -t nat -A POSTROUTING -s 10.66.66.0/24 -j MASQUERADE", "PostDown = iptables -D FORWARD", "|| true", "Jc = ", "S3 = ", "S4 = ", "H1 = ", "I1 = ", "Endpoint = vpn.example.test:51820"} {
 		if !strings.Contains(cfg+"\n"+clientCfg, want) {
 			t.Fatalf("missing %q in rendered config", want)
 		}

@@ -80,6 +80,7 @@ const (
 	NaiveGuestConfig     = naiveproxy.FixedConfigPath
 	DefaultMitaPath      = "/usr/local/bin/mita"
 	MaxMieruArchiveBytes = 64 << 20
+	AWGIPv4SysctlPath    = "/etc/sysctl.d/99-unified-vpn-panel-awg.conf"
 )
 
 var (
@@ -94,6 +95,10 @@ type Runner interface {
 
 type ContainerInspector interface {
 	ContainerExists(ctx context.Context, name string) (bool, error)
+}
+
+type IPv4ForwardingPreparer interface {
+	PrepareIPv4Forwarding(ctx context.Context) error
 }
 
 type OSRunner struct{}
@@ -119,6 +124,13 @@ func (OSRunner) ContainerExists(ctx context.Context, name string) (bool, error) 
 		return false, nil
 	}
 	return false, err
+}
+
+func (OSRunner) PrepareIPv4Forwarding(ctx context.Context) error {
+	if err := exec.CommandContext(ctx, "sysctl", "-w", "net.ipv4.ip_forward=1").Run(); err != nil {
+		return errors.New("prepare IPv4 forwarding failed")
+	}
+	return nil
 }
 
 type FileSystem interface {
@@ -301,6 +313,9 @@ func (p *LocalProvisioner) beginInstallOrUpdate(ctx context.Context, kind model.
 	}
 	switch kind {
 	case model.RuntimeAmneziaWG:
+		if err := p.prepareAWGHostNetworking(ctx); err != nil {
+			return nil, err
+		}
 		if err := prepareAtomicConfigMount(p.cfg.FS, AWG2HostConfigDir, AWG2HostConfigPath, 0o700); err != nil {
 			return nil, err
 		}
@@ -315,6 +330,21 @@ func (p *LocalProvisioner) beginInstallOrUpdate(ctx context.Context, kind model.
 	default:
 		return nil, fmt.Errorf("%w: unsupported managed runtime", ErrArtifactBlocked)
 	}
+}
+
+func (p *LocalProvisioner) prepareAWGHostNetworking(ctx context.Context) error {
+	tmp := AWGIPv4SysctlPath + ".tmp"
+	defer func() { _ = p.cfg.FS.Remove(tmp) }()
+	if err := p.cfg.FS.WriteFile(tmp, []byte("net.ipv4.ip_forward=1\n"), 0o644); err != nil {
+		return fmt.Errorf("write IPv4 forwarding policy: %w", err)
+	}
+	if err := p.cfg.FS.Rename(tmp, AWGIPv4SysctlPath); err != nil {
+		return fmt.Errorf("commit IPv4 forwarding policy: %w", err)
+	}
+	if preparer, ok := p.cfg.Runner.(IPv4ForwardingPreparer); ok {
+		return preparer.PrepareIPv4Forwarding(ctx)
+	}
+	return nil
 }
 
 func prepareAtomicConfigMount(fs FileSystem, dir, configPath string, perm os.FileMode) error {
@@ -459,11 +489,12 @@ func (p *LocalProvisioner) removeIfExists(ctx context.Context, name string) erro
 }
 
 func awg2DockerArgs(image string) []string {
-	return []string{"--network", "host", "--cap-add", "NET_ADMIN", "--device", "/dev/net/tun", "-v", AWG2HostConfigDir + ":" + AWG2GuestConfigDir + ":ro", image}
+	return []string{"--restart", "unless-stopped", "--network", "host", "--cap-add", "NET_ADMIN", "--device", "/dev/net/tun", "-v", AWG2HostConfigDir + ":" + AWG2GuestConfigDir + ":ro", image}
 }
 
 func naiveDockerArgs(image string) []string {
 	return []string{
+		"--restart", "unless-stopped",
 		"--network", "host",
 		"-v", NaiveHostConfigDir + ":" + NaiveGuestConfigDir + ":ro",
 		"-v", naiveproxy.DockerDataVolume + ":/data",

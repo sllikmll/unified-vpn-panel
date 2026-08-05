@@ -56,10 +56,16 @@ type call struct {
 }
 
 type fakeRunner struct {
-	calls       []call
-	fail        map[string]bool
-	inspectFail map[string]error
-	exists      map[string]bool
+	calls        []call
+	fail         map[string]bool
+	inspectFail  map[string]error
+	exists       map[string]bool
+	forwardCalls int
+}
+
+func (r *fakeRunner) PrepareIPv4Forwarding(context.Context) error {
+	r.forwardCalls++
+	return nil
 }
 
 func (r *fakeRunner) Run(_ context.Context, name string, args ...string) error {
@@ -222,6 +228,21 @@ func TestDockerUninstallMissingContainerIsNoop(t *testing.T) {
 	}
 }
 
+func TestPrepareAWGHostNetworkingPersistsPolicyAndCallsTypedPreparer(t *testing.T) {
+	fs := &memFS{files: map[string][]byte{}, modes: map[string]os.FileMode{}}
+	runner := &fakeRunner{}
+	p := NewLocal(Config{FS: fs, Runner: runner})
+	if err := p.prepareAWGHostNetworking(context.Background()); err != nil {
+		t.Fatalf("prepareAWGHostNetworking: %v", err)
+	}
+	if got := string(fs.files[AWGIPv4SysctlPath]); got != "net.ipv4.ip_forward=1\n" || fs.modes[AWGIPv4SysctlPath] != 0o644 {
+		t.Fatalf("persisted sysctl=%q mode=%o", got, fs.modes[AWGIPv4SysctlPath])
+	}
+	if runner.forwardCalls != 1 {
+		t.Fatalf("typed forwarding calls=%d, want 1", runner.forwardCalls)
+	}
+}
+
 func TestPrepareAtomicConfigMountRemovesOnlyEmptyMalformedDirectory(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "runtime")
@@ -262,6 +283,9 @@ func TestNaiveDockerMountUsesOwnedDirectoryForAtomicConfigReplacement(t *testing
 		t.Fatalf("naive bind source must be a directory, got %q", mount)
 	}
 	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "--restart unless-stopped") {
+		t.Fatalf("naive create args missing restart policy: %q", joined)
+	}
 	for _, want := range []string{naiveproxy.DockerDataVolume + ":/data", naiveproxy.DockerConfigVolume + ":/config"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("naive create args missing persistent volume %q: %q", want, joined)
@@ -278,6 +302,9 @@ func TestAWG2DockerMountUsesOwnedDirectoryForAtomicConfigReplacement(t *testing.
 	}
 	if strings.Contains(mount, "awg0.conf") {
 		t.Fatalf("awg2 bind source must be a directory, got %q", mount)
+	}
+	if joined := strings.Join(args, " "); !strings.Contains(joined, "--restart unless-stopped") {
+		t.Fatalf("awg2 create args missing restart policy: %q", joined)
 	}
 }
 
