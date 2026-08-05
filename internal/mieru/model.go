@@ -14,7 +14,7 @@ import (
 
 const (
 	BinaryName          = "mita"
-	DefaultConfigPath   = "/etc/mita/server.conf.pb"
+	DefaultConfigPath   = "/etc/mita/server.json"
 	DefaultDownloadHost = "github.com"
 )
 

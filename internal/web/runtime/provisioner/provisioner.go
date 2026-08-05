@@ -13,14 +13,17 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	awg "github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	coremieru "github.com/mhsanaei/3x-ui/v3/internal/mieru"
 	"github.com/mhsanaei/3x-ui/v3/internal/naiveproxy"
 )
 
@@ -81,6 +84,7 @@ const (
 	DefaultMitaPath      = "/usr/local/bin/mita"
 	MaxMieruArchiveBytes = 64 << 20
 	AWGIPv4SysctlPath    = "/etc/sysctl.d/99-unified-vpn-panel-awg.conf"
+	MieruServiceUnitPath = "/etc/systemd/system/unified-vpn-mita.service"
 )
 
 var (
@@ -99,6 +103,12 @@ type ContainerInspector interface {
 
 type IPv4ForwardingPreparer interface {
 	PrepareIPv4Forwarding(ctx context.Context) error
+}
+
+type MieruServiceManager interface {
+	EnsureMieruService(ctx context.Context) error
+	RemoveMieruService(ctx context.Context) error
+	ReloadMieruServices(ctx context.Context) error
 }
 
 type OSRunner struct{}
@@ -129,6 +139,81 @@ func (OSRunner) ContainerExists(ctx context.Context, name string) (bool, error) 
 func (OSRunner) PrepareIPv4Forwarding(ctx context.Context) error {
 	if err := exec.CommandContext(ctx, "sysctl", "-w", "net.ipv4.ip_forward=1").Run(); err != nil {
 		return errors.New("prepare IPv4 forwarding failed")
+	}
+	return nil
+}
+
+func (OSRunner) EnsureMieruService(ctx context.Context) error {
+	account, err := user.Lookup("mita")
+	if err != nil {
+		var unknown user.UnknownUserError
+		if !errors.As(err, &unknown) {
+			return errors.New("lookup Mieru service user failed")
+		}
+		if err := exec.CommandContext(ctx, "useradd", "--system", "--home-dir", "/var/lib/mita", "--shell", "/usr/sbin/nologin", "--user-group", "mita").Run(); err != nil {
+			return errors.New("create Mieru service user failed")
+		}
+		account, err = user.Lookup("mita")
+		if err != nil {
+			return errors.New("reload Mieru service user failed")
+		}
+	}
+	uid, uidErr := strconv.Atoi(account.Uid)
+	gid, gidErr := strconv.Atoi(account.Gid)
+	if uidErr != nil || gidErr != nil {
+		return errors.New("parse Mieru service user failed")
+	}
+	configDir := filepath.Dir(coremieru.DefaultConfigPath)
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
+		return errors.New("prepare Mieru config directory failed")
+	}
+	if err := os.Chown(configDir, uid, gid); err != nil {
+		return errors.New("prepare Mieru config directory ownership failed")
+	}
+	if err := os.Chmod(configDir, 0o700); err != nil {
+		return errors.New("prepare Mieru config directory mode failed")
+	}
+	if _, err := os.Stat(coremieru.DefaultConfigPath); err == nil {
+		if err := os.Chown(coremieru.DefaultConfigPath, uid, gid); err != nil {
+			return errors.New("prepare Mieru config ownership failed")
+		}
+	} else if errors.Is(err, os.ErrNotExist) {
+		if err := os.WriteFile(coremieru.DefaultConfigPath, []byte("{}\n"), 0o600); err != nil {
+			return errors.New("initialize Mieru JSON config failed")
+		}
+		if err := os.Chown(coremieru.DefaultConfigPath, uid, gid); err != nil {
+			return errors.New("initialize Mieru config ownership failed")
+		}
+	} else {
+		return errors.New("inspect Mieru config failed")
+	}
+	for _, args := range [][]string{{"daemon-reload"}, {"enable", "unified-vpn-mita.service"}, {"restart", "unified-vpn-mita.service"}} {
+		if err := exec.CommandContext(ctx, "systemctl", args...).Run(); err != nil {
+			return errors.New("prepare Mieru service failed")
+		}
+	}
+	for i := 0; i < 50; i++ {
+		if exec.CommandContext(ctx, DefaultMitaPath, "status").Run() == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	return errors.New("Mieru service did not become ready")
+}
+
+func (OSRunner) RemoveMieruService(ctx context.Context) error {
+	_ = exec.CommandContext(ctx, "systemctl", "stop", "unified-vpn-mita.service").Run()
+	_ = exec.CommandContext(ctx, "systemctl", "disable", "unified-vpn-mita.service").Run()
+	return nil
+}
+
+func (OSRunner) ReloadMieruServices(ctx context.Context) error {
+	if err := exec.CommandContext(ctx, "systemctl", "daemon-reload").Run(); err != nil {
+		return errors.New("remove Mieru service failed")
 	}
 	return nil
 }
@@ -288,7 +373,19 @@ func (p *LocalProvisioner) Uninstall(ctx context.Context, kind model.RuntimeKind
 	case model.RuntimeNaiveProxy:
 		return p.dockerUninstall(ctx, kind, NaiveContainerName)
 	case model.RuntimeMieru:
-		if err := p.cfg.FS.Remove(p.cfg.MitaPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		manager, ok := p.cfg.Runner.(MieruServiceManager)
+		if !ok {
+			return Result{}, errors.New("Mieru service manager is unavailable")
+		}
+		if err := manager.RemoveMieruService(ctx); err != nil {
+			return Result{}, err
+		}
+		for _, path := range []string{MieruServiceUnitPath, p.cfg.MitaPath} {
+			if err := p.cfg.FS.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return Result{}, err
+			}
+		}
+		if err := manager.ReloadMieruServices(ctx); err != nil {
 			return Result{}, err
 		}
 		return Result{RuntimeKind: kind, Version: MieruMitaVersion, State: "removed", SummaryCode: "uninstalled"}, nil
@@ -625,11 +722,12 @@ var embeddedMieruArtifacts = []mieruArtifact{
 }
 
 type mieruTx struct {
-	p       *LocalProvisioner
-	res     Result
-	target  string
-	backup  string
-	hadPrev bool
+	p          *LocalProvisioner
+	res        Result
+	target     string
+	backup     string
+	hadPrev    bool
+	hadService bool
 }
 
 func (t *mieruTx) Result() Result { return t.res }
@@ -645,12 +743,23 @@ func (t *mieruTx) Commit(context.Context) error {
 	return nil
 }
 
-func (t *mieruTx) Rollback(context.Context) (Result, error) {
-	err := rollbackMita(t.p.cfg.FS, t.target, t.backup, t.hadPrev)
+func (t *mieruTx) Rollback(ctx context.Context) (Result, error) {
+	var errs []error
+	errs = append(errs, rollbackMita(t.p.cfg.FS, t.target, t.backup, t.hadPrev))
+	manager, ok := t.p.cfg.Runner.(MieruServiceManager)
+	if ok && t.hadService {
+		errs = append(errs, manager.EnsureMieruService(ctx))
+	} else if ok {
+		errs = append(errs, manager.RemoveMieruService(ctx))
+		if err := t.p.cfg.FS.Remove(MieruServiceUnitPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			errs = append(errs, err)
+		}
+		errs = append(errs, manager.ReloadMieruServices(ctx))
+	}
 	t.res.State = "rolled_back"
 	t.res.RolledBack = true
 	t.res.SummaryCode = "rollback"
-	return t.res, err
+	return t.res, errors.Join(errs...)
 }
 
 func (p *LocalProvisioner) beginMieru(ctx context.Context, plan Plan) (Transaction, error) {
@@ -722,7 +831,70 @@ func (p *LocalProvisioner) beginMieru(ctx context.Context, plan Plan) (Transacti
 		_ = rollbackMita(p.cfg.FS, target, backup, hadPrev)
 		return nil, err
 	}
-	return &mieruTx{p: p, res: Result{RuntimeKind: model.RuntimeMieru, ArtifactRef: plan.ArtifactRef, Version: MieruMitaVersion, State: "installed", SummaryCode: "installed"}, target: target, backup: backup, hadPrev: hadPrev}, nil
+	hadService, err := p.installMieruService(ctx)
+	if err != nil {
+		_ = rollbackMita(p.cfg.FS, target, backup, hadPrev)
+		return nil, err
+	}
+	return &mieruTx{p: p, res: Result{RuntimeKind: model.RuntimeMieru, ArtifactRef: plan.ArtifactRef, Version: MieruMitaVersion, State: "installed", SummaryCode: "installed"}, target: target, backup: backup, hadPrev: hadPrev, hadService: hadService}, nil
+}
+
+func (p *LocalProvisioner) installMieruService(ctx context.Context) (bool, error) {
+	manager, ok := p.cfg.Runner.(MieruServiceManager)
+	if !ok {
+		return false, errors.New("Mieru service manager is unavailable")
+	}
+	mitaPath := filepath.Clean(p.cfg.MitaPath)
+	if !filepath.IsAbs(mitaPath) || filepath.Base(mitaPath) != coremieru.BinaryName || strings.ContainsAny(mitaPath, "\x00\r\n\t ") {
+		return false, errors.New("invalid Mieru service binary path")
+	}
+	hadService := false
+	if _, err := p.cfg.FS.Stat(MieruServiceUnitPath); err == nil {
+		hadService = true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false, err
+	}
+	unit := fmt.Sprintf(`[Unit]
+Description=Unified VPN Panel managed Mieru server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=mita
+Group=mita
+StateDirectory=mita
+RuntimeDirectory=mita
+RuntimeDirectoryMode=0775
+Environment=HOME=/var/lib/mita
+Environment=XDG_CONFIG_HOME=/var/lib/mita
+Environment=MITA_CONFIG_JSON_FILE=/etc/mita/server.json
+Environment=MITA_LOG_NO_TIMESTAMP=true
+ExecStart=%s run
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+`, mitaPath)
+	tmp := MieruServiceUnitPath + ".tmp"
+	defer func() { _ = p.cfg.FS.Remove(tmp) }()
+	if err := p.cfg.FS.WriteFile(tmp, []byte(unit), 0o644); err != nil {
+		return false, err
+	}
+	if err := p.cfg.FS.Rename(tmp, MieruServiceUnitPath); err != nil {
+		return false, err
+	}
+	if err := manager.EnsureMieruService(ctx); err != nil {
+		if !hadService {
+			_ = p.cfg.FS.Remove(MieruServiceUnitPath)
+		}
+		return hadService, err
+	}
+	return hadService, nil
 }
 
 func rollbackMita(fs FileSystem, target, backup string, hadPrev bool) error {

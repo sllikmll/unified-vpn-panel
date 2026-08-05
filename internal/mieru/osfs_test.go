@@ -21,4 +21,12 @@ func TestOSFileSystemWriteFileCreatesManagedConfigDirectory(t *testing.T) {
 	if data, err := os.ReadFile(path); err != nil || string(data) != "config" {
 		t.Fatalf("content=%q err=%v", data, err)
 	}
+	tempDir := filepath.Join(t.TempDir(), "missing-temp")
+	tempPath, err := (OSFileSystem{}).TempFile(tempDir, "server-*.json")
+	if err != nil {
+		t.Fatalf("TempFile: %v", err)
+	}
+	if filepath.Dir(tempPath) != tempDir {
+		t.Fatalf("TempFile path=%q, want dir %q", tempPath, tempDir)
+	}
 }

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
+	"strconv"
 )
 
 type OSRunner struct{}
@@ -50,6 +52,27 @@ func (OSFileSystem) WriteFile(path string, data []byte, perm uint32) error {
 		_ = tmp.Close()
 		return err
 	}
+	if filepath.Clean(dir) == filepath.Clean(filepath.Dir(DefaultConfigPath)) {
+		account, err := user.Lookup("mita")
+		if err != nil {
+			_ = tmp.Close()
+			return err
+		}
+		uid, err := strconv.Atoi(account.Uid)
+		if err != nil {
+			_ = tmp.Close()
+			return err
+		}
+		gid, err := strconv.Atoi(account.Gid)
+		if err != nil {
+			_ = tmp.Close()
+			return err
+		}
+		if err := tmp.Chown(uid, gid); err != nil {
+			_ = tmp.Close()
+			return err
+		}
+	}
 	if _, err := tmp.Write(data); err != nil {
 		_ = tmp.Close()
 		return err
@@ -78,6 +101,9 @@ func (OSFileSystem) Exists(path string) bool {
 }
 
 func (OSFileSystem) TempFile(dir, pattern string) (string, error) {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
 	f, err := os.CreateTemp(dir, pattern)
 	if err != nil {
 		return "", err

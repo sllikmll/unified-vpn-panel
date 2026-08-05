@@ -56,15 +56,33 @@ type call struct {
 }
 
 type fakeRunner struct {
-	calls        []call
-	fail         map[string]bool
-	inspectFail  map[string]error
-	exists       map[string]bool
-	forwardCalls int
+	calls         []call
+	fail          map[string]bool
+	inspectFail   map[string]error
+	exists        map[string]bool
+	forwardCalls  int
+	serviceEnsure int
+	serviceRemove int
+	serviceReload int
 }
 
 func (r *fakeRunner) PrepareIPv4Forwarding(context.Context) error {
 	r.forwardCalls++
+	return nil
+}
+
+func (r *fakeRunner) EnsureMieruService(context.Context) error {
+	r.serviceEnsure++
+	return nil
+}
+
+func (r *fakeRunner) RemoveMieruService(context.Context) error {
+	r.serviceRemove++
+	return nil
+}
+
+func (r *fakeRunner) ReloadMieruServices(context.Context) error {
+	r.serviceReload++
 	return nil
 }
 
@@ -418,7 +436,8 @@ func TestMieruHappyPathInstallsAtomically0755(t *testing.T) {
 			{OS: "linux", Arch: "arm64", Kind: "tar.gz", URL: "https://github.com/enfein/mieru/releases/download/v3.35.0/mita_3.35.0_linux_arm64.tar.gz", SHA256: "808849223d34ccd9ad86afc0eedef4d6c827133258e96dc3f3794bd17e7d54de"},
 		}
 	})
-	p := NewLocal(Config{MitaPath: "/usr/local/bin/mita", FS: fs, HTTPClient: fakeHTTP{body: archive}, GOOS: "linux", GOARCH: "amd64"})
+	runner := &fakeRunner{}
+	p := NewLocal(Config{MitaPath: "/usr/local/bin/mita", FS: fs, Runner: runner, HTTPClient: fakeHTTP{body: archive}, GOOS: "linux", GOARCH: "amd64"})
 	if _, err := p.Install(context.Background(), model.RuntimeMieru); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
@@ -427,6 +446,15 @@ func TestMieruHappyPathInstallsAtomically0755(t *testing.T) {
 	}
 	if fs.modes["/usr/local/bin/mita.tmp"] != 0o755 && fs.modes["/usr/local/bin/mita"] != 0o755 {
 		t.Fatalf("mode = %#o, want 0755", fs.modes["/usr/local/bin/mita"])
+	}
+	unit := string(fs.files[MieruServiceUnitPath])
+	for _, want := range []string{"User=mita", "Group=mita", "ExecStart=/usr/local/bin/mita run", "MITA_CONFIG_JSON_FILE=/etc/mita/server.json", "StateDirectory=mita", "NoNewPrivileges=true", "Restart=on-failure"} {
+		if !strings.Contains(unit, want) {
+			t.Fatalf("managed Mieru unit missing %q: %s", want, unit)
+		}
+	}
+	if runner.serviceEnsure != 1 {
+		t.Fatalf("service ensure calls=%d, want 1", runner.serviceEnsure)
 	}
 }
 
@@ -437,7 +465,7 @@ func TestMieruTransactionKeepsPreviousUntilCommitAndRollbackRestores(t *testing.
 	t.Cleanup(func() { embeddedMieruArtifacts = origArtifacts })
 
 	fs := &memFS{files: map[string][]byte{"/usr/local/bin/mita": []byte("old-mita")}, modes: map[string]os.FileMode{}}
-	p := NewLocal(Config{MitaPath: "/usr/local/bin/mita", FS: fs, HTTPClient: fakeHTTP{body: archive}, GOOS: "linux", GOARCH: "amd64"})
+	p := NewLocal(Config{MitaPath: "/usr/local/bin/mita", FS: fs, Runner: &fakeRunner{}, HTTPClient: fakeHTTP{body: archive}, GOOS: "linux", GOARCH: "amd64"})
 	tx, err := p.BeginUpdate(context.Background(), model.RuntimeMieru)
 	if err != nil {
 		t.Fatalf("BeginUpdate: %v", err)
@@ -475,7 +503,7 @@ func TestMieruStalePreviousFailsClosed(t *testing.T) {
 	t.Cleanup(func() { embeddedMieruArtifacts = origArtifacts })
 
 	fs := &memFS{files: map[string][]byte{"/usr/local/bin/mita": []byte("current"), "/usr/local/bin/mita.previous": []byte("previous")}, modes: map[string]os.FileMode{}}
-	p := NewLocal(Config{MitaPath: "/usr/local/bin/mita", FS: fs, HTTPClient: fakeHTTP{body: archive}, GOOS: "linux", GOARCH: "amd64"})
+	p := NewLocal(Config{MitaPath: "/usr/local/bin/mita", FS: fs, Runner: &fakeRunner{}, HTTPClient: fakeHTTP{body: archive}, GOOS: "linux", GOARCH: "amd64"})
 	if _, err := p.BeginUpdate(context.Background(), model.RuntimeMieru); err == nil {
 		t.Fatal("BeginUpdate succeeded with stale .previous backup")
 	}
