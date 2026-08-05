@@ -1444,8 +1444,11 @@ install_x-ui() {
             tag_version_numeric=${tag_version#v}
             min_version="2.3.5"
 
-            if [[ "$(printf '%s\n' "$min_version" "$tag_version_numeric" | sort -V | head -n1)" != "$min_version" ]]; then
-                echo -e "${red}Please use a newer version (at least v2.3.5). Exiting installation.${plain}"
+            # Unified VPN Panel starts its independent release line at 0.x.
+            # Keep rejecting historical upstream 1.x / pre-2.3.5 tags, but do
+            # not apply the upstream version floor to this project's 0.x line.
+            if [[ "$tag_version_numeric" != 0.* ]] && [[ "$(printf '%s\n' "$min_version" "$tag_version_numeric" | sort -V | head -n1)" != "$min_version" ]]; then
+                echo -e "${red}Unsupported legacy version. Use Unified VPN Panel v0.x or upstream v2.3.5+. Exiting installation.${plain}"
                 exit 1
             fi
         fi
