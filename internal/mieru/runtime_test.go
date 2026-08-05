@@ -124,11 +124,11 @@ func TestAtomicRollbackOnVerifyFailure(t *testing.T) {
 	}
 	wantCalls := []command{
 		{name: "mita", args: []string{"apply", "config", configPath}},
-		{name: "mita", args: []string{"stop"}},
+		{name: "mita", args: []string{"status"}},
 		{name: "mita", args: []string{"start"}},
 		{name: "mita", args: []string{"describe", "config"}},
 		{name: "mita", args: []string{"apply", "config", configPath}},
-		{name: "mita", args: []string{"stop"}},
+		{name: "mita", args: []string{"status"}},
 		{name: "mita", args: []string{"start"}},
 		{name: "mita", args: []string{"describe", "config"}},
 	}
@@ -157,7 +157,7 @@ func TestRollbackStopsAttemptedRuntimeWhenNoPriorConfig(t *testing.T) {
 	}
 	wantCalls := []command{
 		{name: "mita", args: []string{"apply", "config", configPath}},
-		{name: "mita", args: []string{"stop"}},
+		{name: "mita", args: []string{"status"}},
 		{name: "mita", args: []string{"start"}},
 		{name: "mita", args: []string{"describe", "config"}},
 		{name: "mita", args: []string{"stop"}},
@@ -167,6 +167,23 @@ func TestRollbackStopsAttemptedRuntimeWhenNoPriorConfig(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "secret") || strings.Contains(err.Error(), "new@example.com") {
 		t.Fatalf("rollback error leaked command or config material: %v", err)
+	}
+}
+
+func TestRestartAndVerifyStopsRunningProxy(t *testing.T) {
+	runner := &fakeRunner{results: map[string]RunnerResult{"mita status": {Output: `mita server status is "RUNNING"`}}}
+	rt := NewTrustedLocalRuntime(runner, newFakeFS(), TrustedConfigPath(DefaultConfigPath))
+	if err := rt.restartAndVerify(context.Background()); err != nil {
+		t.Fatalf("restartAndVerify: %v", err)
+	}
+	want := []command{
+		{name: "mita", args: []string{"status"}},
+		{name: "mita", args: []string{"stop"}},
+		{name: "mita", args: []string{"start"}},
+		{name: "mita", args: []string{"describe", "config"}},
+	}
+	if !reflect.DeepEqual(runner.calls, want) {
+		t.Fatalf("commands mismatch\nwant %+v\ngot  %+v", want, runner.calls)
 	}
 }
 

@@ -301,8 +301,14 @@ func (r Runtime) atomicApply(ctx context.Context, body []byte) error {
 }
 
 func (r Runtime) restartAndVerify(ctx context.Context) error {
-	if _, err := r.run(ctx, "stop"); err != nil {
+	status, err := r.Observe(ctx)
+	if err != nil {
 		return err
+	}
+	if status.State == StatusRunning || status.State == StatusStarting {
+		if _, err := r.run(ctx, "stop"); err != nil {
+			return err
+		}
 	}
 	if _, err := r.run(ctx, "start"); err != nil {
 		return err
