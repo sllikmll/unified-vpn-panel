@@ -27,6 +27,7 @@ func newSPAFallbackTestEngineWithBasePath(t *testing.T, basePath string) *gin.En
 	oldDistFS := distFS
 	SetDistFS(fstest.MapFS{
 		"dist/index.html": {Data: []byte(`<!doctype html><html><head></head><body>spa shell</body></html>`)},
+		"dist/login.html": {Data: []byte(`<!doctype html><html><head></head><body>spa shell login</body></html>`)},
 	})
 	t.Cleanup(func() { SetDistFS(oldDistFS) })
 
@@ -41,6 +42,7 @@ func newSPAFallbackTestEngineWithBasePath(t *testing.T, basePath string) *gin.En
 		c.Next()
 	})
 
+	NewIndexController(engine.Group(basePath))
 	ctrl := NewXUIController(engine.Group(basePath))
 	engine.NoRoute(func(c *gin.Context) {
 		if ctrl.HandleNoRoutePanelSPA(c) {
@@ -49,6 +51,16 @@ func newSPAFallbackTestEngineWithBasePath(t *testing.T, basePath string) *gin.En
 		c.AbortWithStatus(http.StatusNotFound)
 	})
 	return engine
+}
+
+func TestLoginAliasServesSPAShell(t *testing.T) {
+	engine := newSPAFallbackTestEngineWithBasePath(t, "/")
+	req := httptest.NewRequest(http.MethodGet, "/login", nil)
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "spa shell") {
+		t.Fatalf("GET /login status=%d body=%q", res.Code, res.Body.String())
+	}
 }
 
 func TestPanelSPAFallbackServesRootBasePath(t *testing.T) {
