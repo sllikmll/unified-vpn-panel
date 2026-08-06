@@ -253,6 +253,55 @@ func TestParseSubscriptionBody_Base64(t *testing.T) {
 	}
 }
 
+func TestParseMieruAndNaiveProxyLinks(t *testing.T) {
+	mieru, err := ParseLink("mierus://user:pass@example.com:32002?protocol=tcp#Mieru")
+	if err != nil {
+		t.Fatalf("parse mieru: %v", err)
+	}
+	if mieru.Outbound["protocol"] != "mieru" {
+		t.Fatalf("mieru protocol = %v", mieru.Outbound["protocol"])
+	}
+	ms := mieru.Outbound["settings"].(map[string]any)
+	if ms["address"] != "example.com" || ms["port"] != 32002 || ms["portRange"] != "32002-32002" || ms["transport"] != "TCP" {
+		t.Fatalf("bad mieru settings: %#v", ms)
+	}
+	if ms["username"] != "user" || ms["password"] != "pass" {
+		t.Fatalf("mieru credentials lost: %#v", ms)
+	}
+
+	naive, err := ParseLink("naive+https://user:pass@example.com:32003?sni=yandex.ru#Naive")
+	if err != nil {
+		t.Fatalf("parse naive: %v", err)
+	}
+	if naive.Outbound["protocol"] != "naiveproxy" {
+		t.Fatalf("naive protocol = %v", naive.Outbound["protocol"])
+	}
+	ns := naive.Outbound["settings"].(map[string]any)
+	if ns["address"] != "example.com" || ns["port"] != 32003 || ns["username"] != "user" || ns["password"] != "pass" {
+		t.Fatalf("bad naive settings: %#v", ns)
+	}
+	stream := naive.Outbound["streamSettings"].(map[string]any)
+	tls := stream["tlsSettings"].(map[string]any)
+	if tls["serverName"] != "yandex.ru" {
+		t.Fatalf("naive sni = %v", tls["serverName"])
+	}
+}
+
+func TestParseWireGuardLinkWithAmneziaOptions(t *testing.T) {
+	res, err := ParseLink("wireguard://CLIENT_PRIVATE@example.com:32001?publickey=SERVER_PUBLIC&presharedkey=PSK&address=10.90.50.10%2F32&allowedips=0.0.0.0%2F0&keepalive=25&mtu=1420&jc=7&jmin=40&jmax=120&h1=100000-150000#AWG2")
+	if err != nil {
+		t.Fatalf("parse awg2: %v", err)
+	}
+	settings := res.Outbound["settings"].(map[string]any)
+	opts := settings["amneziaWGOptions"].(map[string]any)
+	if opts["jc"] != 7 || opts["jmin"] != 40 || opts["h1"] != "100000-150000" {
+		t.Fatalf("bad amnezia opts: %#v", opts)
+	}
+	if settings["mtu"] != 1420 {
+		t.Fatalf("mtu = %#v", settings["mtu"])
+	}
+}
+
 func TestSlugAndSuggest(t *testing.T) {
 	if SlugRemark("Hello World!") != "hello-world" {
 		t.Errorf("slug failed")

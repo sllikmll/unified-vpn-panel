@@ -108,21 +108,28 @@ func splitLines(s string) []string {
 //   - ss:// (modern and legacy)
 //   - hysteria2:// (also hy2://)
 //   - wireguard:// (also wg://)
+//   - mieru:// / mierus://
+//   - naive:// / naive+https:// / naiveproxy://
 func ParseLink(link string) (*ParseResult, error) {
 	link = strings.TrimSpace(link)
+	low := strings.ToLower(link)
 	switch {
-	case strings.HasPrefix(link, "vmess://"):
+	case strings.HasPrefix(low, "vmess://"):
 		return parseVmess(link)
-	case strings.HasPrefix(link, "vless://"):
+	case strings.HasPrefix(low, "vless://"):
 		return parseVless(link)
-	case strings.HasPrefix(link, "trojan://"):
+	case strings.HasPrefix(low, "trojan://"):
 		return parseTrojan(link)
-	case strings.HasPrefix(link, "ss://"):
+	case strings.HasPrefix(low, "ss://"):
 		return parseShadowsocks(link)
-	case strings.HasPrefix(link, "hysteria2://"), strings.HasPrefix(link, "hy2://"):
+	case strings.HasPrefix(low, "hysteria2://"), strings.HasPrefix(low, "hy2://"):
 		return parseHysteria2(link)
-	case strings.HasPrefix(link, "wireguard://"), strings.HasPrefix(link, "wg://"):
+	case strings.HasPrefix(low, "wireguard://"), strings.HasPrefix(low, "wg://"):
 		return parseWireguard(link)
+	case strings.HasPrefix(low, "mieru://"), strings.HasPrefix(low, "mierus://"):
+		return parseMieru(link)
+	case strings.HasPrefix(low, "naive://"), strings.HasPrefix(low, "naive+https://"), strings.HasPrefix(low, "naiveproxy://"):
+		return parseNaiveProxy(link)
 	default:
 		return nil, fmt.Errorf("unsupported link scheme")
 	}
@@ -331,6 +338,102 @@ func parseTrojan(link string) (*ParseResult, error) {
 	return &ParseResult{Outbound: ob, Identity: identity}, nil
 }
 
+// --- Mieru / NaiveProxy ---
+
+func parseMieru(link string) (*ParseResult, error) {
+	u, err := url.Parse(link)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme != "mieru" && u.Scheme != "mierus" {
+		return nil, fmt.Errorf("not mieru")
+	}
+	host := u.Hostname()
+	params := u.Query()
+	port := defaultPort(firstNonEmpty(u.Port(), params.Get("port")), 443)
+	if host == "" || port <= 0 {
+		return nil, fmt.Errorf("mieru missing host/port")
+	}
+	username := u.User.Username()
+	password, _ := u.User.Password()
+	if username == "" {
+		username = params.Get("username")
+	}
+	if password == "" {
+		password = params.Get("password")
+	}
+	transport := strings.ToUpper(firstNonEmpty(params.Get("protocol"), params.Get("transport")))
+	if transport == "" {
+		transport = "TCP"
+	}
+	portRange := params.Get("port-range")
+	if portRange == "" {
+		portRange = params.Get("portRange")
+	}
+	if portRange == "" {
+		portRange = strconv.Itoa(port) + "-" + strconv.Itoa(port)
+	}
+	ob := Outbound{
+		"protocol": "mieru",
+		"tag":      decodeHash(u.Fragment),
+		"settings": map[string]any{
+			"address":   host,
+			"port":      port,
+			"portRange": portRange,
+			"transport": transport,
+			"username":  username,
+			"password":  password,
+		},
+	}
+	identity := "mieru:" + host + ":" + strconv.Itoa(port) + "?" + canonicalQuery(params)
+	return &ParseResult{Outbound: ob, Identity: identity}, nil
+}
+
+func parseNaiveProxy(link string) (*ParseResult, error) {
+	normalized := link
+	if strings.HasPrefix(strings.ToLower(normalized), "naive+https://") {
+		normalized = "https://" + normalized[len("naive+https://"):]
+	} else if strings.HasPrefix(strings.ToLower(normalized), "naiveproxy://") {
+		normalized = "https://" + normalized[len("naiveproxy://"):]
+	} else if strings.HasPrefix(strings.ToLower(normalized), "naive://") {
+		normalized = "https://" + normalized[len("naive://"):]
+	}
+	u, err := url.Parse(normalized)
+	if err != nil {
+		return nil, err
+	}
+	host := u.Hostname()
+	port := defaultPort(u.Port(), 443)
+	if host == "" || port <= 0 {
+		return nil, fmt.Errorf("naiveproxy missing host/port")
+	}
+	username := u.User.Username()
+	password, _ := u.User.Password()
+	params := u.Query()
+	sni := firstNonEmpty(params.Get("sni"), params.Get("servername"))
+	if sni == "" {
+		sni = host
+	}
+	ob := Outbound{
+		"protocol": "naiveproxy",
+		"tag":      decodeHash(u.Fragment),
+		"settings": map[string]any{
+			"address":  host,
+			"port":     port,
+			"username": username,
+			"password": password,
+		},
+		"streamSettings": map[string]any{
+			"security": "tls",
+			"tlsSettings": map[string]any{
+				"serverName": sni,
+			},
+		},
+	}
+	identity := "naiveproxy:" + host + ":" + strconv.Itoa(port) + "?" + canonicalQuery(params)
+	return &ParseResult{Outbound: ob, Identity: identity}, nil
+}
+
 // --- shadowsocks ---
 
 func parseShadowsocks(link string) (*ParseResult, error) {
@@ -534,6 +637,19 @@ func parseWireguard(link string) (*ParseResult, error) {
 		if len(iv) > 0 {
 			settings["reserved"] = iv
 		}
+	}
+	amz := map[string]any{}
+	for _, key := range []string{"jc", "jmin", "jmax", "s1", "s2", "s3", "s4", "h1", "h2", "h3", "h4", "i1", "i2", "i3", "i4", "i5", "j1", "j2", "j3", "itime"} {
+		if v := firstParam(params, key); v != "" {
+			if n, err := strconv.Atoi(v); err == nil {
+				amz[key] = n
+			} else {
+				amz[key] = v
+			}
+		}
+	}
+	if len(amz) > 0 {
+		settings["amneziaWGOptions"] = amz
 	}
 
 	identity := "wireguard:" + secret + "@" + endpoint + "?" + canonicalQuery(params)

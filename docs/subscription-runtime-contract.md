@@ -12,7 +12,8 @@
 | VLESS Reality | raw subscription + Mihomo YAML + Xray runtime | `security=reality`, SNI `yandex.ru`, корректный public/private key, shortId, реальный HTTP 204 через tunnel |
 | Trojan TLS | raw subscription + Mihomo YAML | TLS-запись присутствует и проходит health/delay |
 | Shadowsocks 2022 | raw subscription + Mihomo YAML | метод/пароль не теряются, health/delay проходит |
-| WireGuard / AWG2 | raw subscription + Mihomo YAML | peer/server параметры присутствуют; `alive=false` в Mihomo не считать финальным без datapath-проверки |
+| WireGuard | raw subscription + Mihomo YAML | отдельный обычный WireGuard node без Amnezia obfuscation options; peer/server параметры присутствуют |
+| AWG 2.0 | raw subscription + Mihomo YAML | отдельный node, не совмещённый с WireGuard; Amnezia options `jc`, `jmin`, `jmax`, `s1`, `s2`, `h1` сохранены в Mihomo YAML |
 | Hysteria2 | raw subscription + Mihomo YAML | UDP/runtime listener жив, health/delay проходит |
 | Mieru | raw subscription + Mihomo YAML/static exception | не заменять Telegram action; отдельная запись Mieru обязательна |
 | NaiveProxy | raw subscription + Mihomo YAML/static exception | отдельная HTTPS/HTTP proxy запись обязательна |
@@ -86,6 +87,7 @@ invalid character '\x00' looking for beginning of value
    - `/usr/local/x-ui/bin/config.json`;
    - все device subscription URL;
    - VLESS Reality independent datapath smoke;
-   - полный protocol matrix, включая AWG2, Mieru и NaiveProxy.
+   - полный protocol matrix, включая два разных соединения WireGuard и AWG 2.0, плюс Mieru и NaiveProxy.
 
 Если Mieru/NaiveProxy отсутствуют в raw или Mihomo YAML — rollout не PASS, даже если VMess/VLESS/Trojan/SS/WG/HY2 зелёные.
+Если WireGuard и AWG 2.0 представлены одним общим `WireGuard/AWG2` node — rollout тоже не PASS: это два разных протокола/соединения.

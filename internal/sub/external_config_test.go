@@ -150,3 +150,48 @@ func TestClashProxyFromExternalTrojanReality(t *testing.T) {
 		t.Fatalf("expected reality→tls true, got %v", proxy["tls"])
 	}
 }
+
+func TestExternalMieruAndNaiveBecomeMihomoProxies(t *testing.T) {
+	svc := NewSubClashService(false, "", NewSubService(""))
+
+	mieru := svc.clashProxyFromExternal("mierus://user:pass@example.com:32002?protocol=tcp#Mieru", "Mieru")
+	if mieru == nil {
+		t.Fatal("expected mieru proxy, got nil")
+	}
+	if mieru["type"] != "mieru" || mieru["server"] != "example.com" || mieru["port-range"] != "32002-32002" {
+		t.Fatalf("bad mieru proxy: %#v", mieru)
+	}
+	if mieru["username"] != "user" || mieru["password"] != "pass" {
+		t.Fatalf("mieru credentials lost: %#v", mieru)
+	}
+
+	naive := svc.clashProxyFromExternal("naive+https://user:pass@example.com:32003?sni=yandex.ru#Naive", "Naive")
+	if naive == nil {
+		t.Fatal("expected naive proxy, got nil")
+	}
+	if naive["type"] != "http" || naive["server"] != "example.com" || naive["port"] != 32003 || naive["tls"] != true {
+		t.Fatalf("bad naive proxy: %#v", naive)
+	}
+	if naive["username"] != "user" || naive["password"] != "pass" || naive["sni"] != "yandex.ru" {
+		t.Fatalf("naive credentials/sni lost: %#v", naive)
+	}
+}
+
+func TestExternalAmneziaWG2KeepsObfuscationOptions(t *testing.T) {
+	svc := NewSubClashService(false, "", NewSubService(""))
+	link := "wireguard://CLIENT_PRIVATE@example.com:32001?publickey=SERVER_PUBLIC&presharedkey=PSK&address=10.90.50.10%2F32&allowedips=0.0.0.0%2F0&keepalive=25&mtu=1420&jc=7&jmin=40&jmax=120&s1=80&s2=149&s3=24&s4=12&h1=100000-150000&h2=250000-300000&h3=400000-450000&h4=550000-600000#AWG2"
+	proxy := svc.clashProxyFromExternal(link, "AWG2")
+	if proxy == nil {
+		t.Fatal("expected awg2 proxy, got nil")
+	}
+	if proxy["type"] != "wireguard" || proxy["name"] != "AWG2" {
+		t.Fatalf("bad awg2 proxy identity: %#v", proxy)
+	}
+	opts, _ := proxy["amnezia-wg-option"].(map[string]any)
+	if len(opts) == 0 {
+		t.Fatalf("amnezia-wg-option missing: %#v", proxy)
+	}
+	if opts["jc"] != 7 || opts["jmin"] != 40 || opts["h1"] != "100000-150000" {
+		t.Fatalf("bad amnezia options: %#v", opts)
+	}
+}
