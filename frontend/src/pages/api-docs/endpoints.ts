@@ -1039,6 +1039,15 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'POST',
+        path: '/panel/api/nodes/provision-full-stack/:id',
+        summary: 'Build the canonical full-stack production protocol plan for one node: managed AWG2/Mieru/NaiveProxy plus VMess, VLESS Reality, Trojan, Shadowsocks 2022, WireGuard and Hysteria2. WireGuard and AWG2 are separate; Telegram MTProxy remains external-only. The response contains no plaintext secrets and requires no manual SQL.',
+        params: [
+          { name: 'id', in: 'path', type: 'number', desc: 'Node ID.' },
+        ],
+        body: '{\n  "basePort": 32000,\n  "clientEmails": ["pavel-1-keenetic", "pavel-2-openwrt"]\n}',
+      },
+      {
+        method: 'POST',
         path: '/panel/api/nodes/updatePanel',
         summary: 'Trigger the official panel self-updater on each given node (downloads the latest release and restarts). Only enabled, online nodes are updated; offline/disabled ones are reported as skipped. Set "dev": true to move the nodes to the rolling per-commit dev channel instead of the latest stable release. Returns a per-node result list.',
         body: '{\n  "ids": [1, 2, 3],\n  "dev": false\n}',

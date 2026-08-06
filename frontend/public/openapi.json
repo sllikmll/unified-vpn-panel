@@ -10046,6 +10046,64 @@
         }
       }
     },
+    "/panel/api/nodes/provision-full-stack/{id}": {
+      "post": {
+        "tags": [
+          "Nodes"
+        ],
+        "summary": "Build the canonical full-stack production protocol plan for one node: managed AWG2/Mieru/NaiveProxy plus VMess, VLESS Reality, Trojan, Shadowsocks 2022, WireGuard and Hysteria2. WireGuard and AWG2 are separate; Telegram MTProxy remains external-only. The response contains no plaintext secrets and requires no manual SQL.",
+        "operationId": "post_panel_api_nodes_provision_full_stack_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Node ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "basePort": 32000,
+                "clientEmails": [
+                  "pavel-1-keenetic",
+                  "pavel-2-openwrt"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/panel/api/nodes/updatePanel": {
       "post": {
         "tags": [

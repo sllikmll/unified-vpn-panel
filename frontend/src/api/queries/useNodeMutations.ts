@@ -23,6 +23,15 @@ export interface RemoteInboundOption {
   port?: number;
 }
 
+export interface NodeFullStackProvisionPlan {
+  nodeName: string;
+  basePort: number;
+  protocols: Array<{ protocol: string; tag: string; remark: string; port: number; managed: boolean; subscription: boolean }>;
+  hasSeparateWireGuardAndAWG2: boolean;
+  mtProxyExternalOnly: boolean;
+  manualSqlRequired: boolean;
+}
+
 export function useNodeMutations() {
   const queryClient = useQueryClient();
   const invalidate = () => {
@@ -76,6 +85,8 @@ export function useNodeMutations() {
     remove: (id: number) => removeMut.mutateAsync(id),
     setEnable: (id: number, enable: boolean) => setEnableMut.mutateAsync({ id, enable }),
     probe: (id: number) => probeMut.mutateAsync(id),
+    provisionFullStack: (id: number, payload?: { basePort?: number; clientEmails?: string[] }): Promise<Msg<NodeFullStackProvisionPlan>> =>
+      HttpUtil.post<NodeFullStackProvisionPlan>(`/panel/api/nodes/provision-full-stack/${id}`, payload ?? {}),
     updatePanels: (ids: number[], dev: boolean): Promise<Msg<NodeUpdateResult[]>> => updatePanelsMut.mutateAsync({ ids, dev }),
     testConnection: async (payload: Partial<NodeRecord>): Promise<Msg<ProbeResult>> => {
       const raw = await HttpUtil.post('/panel/api/nodes/test', payload);

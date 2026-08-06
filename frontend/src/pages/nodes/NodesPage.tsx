@@ -57,7 +57,7 @@ export default function NodesPage() {
   useEffect(() => { setMessageInstance(messageApi); }, [messageApi]);
 
   const { nodes, loading, fetched, fetchError, refetch, totals } = useNodesQuery();
-  const { create, update, remove, setEnable, testConnection, fetchFingerprint, fetchInbounds, preflight, probe, updatePanels } = useNodeMutations();
+  const { create, update, remove, setEnable, testConnection, fetchFingerprint, fetchInbounds, preflight, probe, provisionFullStack, updatePanels } = useNodeMutations();
 
   const { data: latestVersion = '' } = useQuery({
     queryKey: ['server', 'panelUpdateInfo'],
@@ -158,6 +158,33 @@ export default function NodesPage() {
     // Refresh the list so the new xrayState / xrayError (if any) appears immediately in the row.
     refetch();
   }, [probe, t, messageApi, refetch]);
+
+  const onProvisionFullStack = useCallback(async (node: NodeRecord) => {
+    const msg = await provisionFullStack(node.id, {});
+    if (!msg?.success || !msg.obj) {
+      messageApi.error(msg?.msg || t('somethingWentWrong'));
+      return;
+    }
+    const plan = msg.obj;
+    modal.info({
+      title: t('pages.nodes.provisionFullStack', { defaultValue: 'Full stack plan' }),
+      width: 720,
+      content: (
+        <div>
+          <Typography.Paragraph type="secondary">
+            {plan.nodeName} · basePort {plan.basePort} · manual SQL: {String(plan.manualSqlRequired)}
+          </Typography.Paragraph>
+          <ul style={{ paddingInlineStart: 18 }}>
+            {plan.protocols.map((p) => (
+              <li key={p.tag}>
+                <Typography.Text code>{p.protocol}</Typography.Text> {p.remark} — {p.port}{p.managed ? ' · managed' : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ),
+    });
+  }, [provisionFullStack, modal, messageApi, t]);
 
   const onToggleEnable = useCallback(async (node: NodeRecord, next: boolean) => {
     await setEnable(node.id, next);
@@ -289,6 +316,7 @@ export default function NodesPage() {
                       onEdit={onEdit}
                       onDelete={onDelete}
                       onProbe={onProbe}
+                      onProvisionFullStack={onProvisionFullStack}
                       onToggleEnable={onToggleEnable}
                       onUpdateNode={onUpdateNode}
                       onUpdateSelected={onUpdateSelected}
