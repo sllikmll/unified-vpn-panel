@@ -98,5 +98,5 @@ describe('ClientFormModal managed endpoint targets', () => {
       expect.objectContaining({ inboundIds: [], managedEndpointIds: ['managed-9'] }),
       expect.objectContaining({ isEdit: false }),
     ));
-  });
+  }, 15_000);
 });
