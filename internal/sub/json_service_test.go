@@ -272,21 +272,21 @@ func realitySpiderXFromStream(t *testing.T, svc *SubJsonService, clientKey strin
 		t.Fatal("streamData dropped realitySettings")
 	}
 	spx, _ := rlty["spiderX"].(string)
-	if len(spx) != 16 || spx[0] != '/' {
-		t.Fatalf("spiderX = %q, want a 16-char /-prefixed value", spx)
+	if spx != "/seed" {
+		t.Fatalf("spiderX = %q, want server literal /seed", spx)
 	}
 	return spx
 }
 
-func TestSubJsonServiceRealityDataDerivesPerClientSpiderX(t *testing.T) {
+func TestSubJsonServiceRealityDataUsesServerSpiderX(t *testing.T) {
 	svc := NewSubJsonService("", "", "", nil)
 
 	alice := realitySpiderXFromStream(t, svc, "subAlice")
 	if again := realitySpiderXFromStream(t, svc, "subAlice"); again != alice {
 		t.Fatalf("spiderX not stable for the same client: %q vs %q", alice, again)
 	}
-	if bob := realitySpiderXFromStream(t, svc, "subBob"); bob == alice {
-		t.Fatalf("spiderX identical across clients (fingerprintable): %q", alice)
+	if bob := realitySpiderXFromStream(t, svc, "subBob"); bob != alice {
+		t.Fatalf("spiderX must stay server-owned across clients: %q vs %q", alice, bob)
 	}
 }
 
@@ -329,8 +329,8 @@ func TestSubJsonServiceRealityDataSpiderXFallsBackWhenNoClientKey(t *testing.T) 
 		t.Fatal("streamData dropped realitySettings")
 	}
 	spx, _ := rlty["spiderX"].(string)
-	if len(spx) != 16 || spx[0] != '/' {
-		t.Fatalf("spiderX fallback = %q, want random 16-char /-prefixed value", spx)
+	if spx != "/" {
+		t.Fatalf("spiderX fallback = %q, want /", spx)
 	}
 }
 

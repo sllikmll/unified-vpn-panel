@@ -289,15 +289,20 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 			var stream map[string]any
 			_ = json.Unmarshal([]byte(inbound.StreamSettings), &stream)
 
-			// Remove the "settings" field under "tlsSettings" and "realitySettings"
-			tlsSettings, ok1 := stream["tlsSettings"].(map[string]any)
-			realitySettings, ok2 := stream["realitySettings"].(map[string]any)
-			if ok1 || ok2 {
-				if ok1 {
-					delete(tlsSettings, "settings")
-				} else if ok2 {
-					delete(realitySettings, "settings")
+			// Remove UI-only nested "settings" objects before emitting Xray runtime
+			// config. REALITY is special: 3x-ui stores keys under
+			// realitySettings.settings, while Xray runtime expects privateKey at the
+			// realitySettings top level. Preserve it before dropping the nested map.
+			if tlsSettings, ok := stream["tlsSettings"].(map[string]any); ok {
+				delete(tlsSettings, "settings")
+			}
+			if realitySettings, ok := stream["realitySettings"].(map[string]any); ok {
+				if nested, ok := realitySettings["settings"].(map[string]any); ok {
+					if privateKey, ok := nested["privateKey"].(string); ok && privateKey != "" {
+						realitySettings["privateKey"] = privateKey
+					}
 				}
+				delete(realitySettings, "settings")
 			}
 
 			delete(stream, "externalProxy")

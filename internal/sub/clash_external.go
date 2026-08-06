@@ -10,7 +10,7 @@ import (
 // mihomo/Clash proxy entry named `name`. Returns nil for links Clash can't
 // represent (the entry is then skipped, mirroring how getProxies drops
 // unsupported inbound protocols). vmess/vless/trojan reuse the existing
-// applyTransport/applySecurity helpers; ss/hysteria2/wireguard map directly.
+// applyTransport/applySecurity helpers; ss/hysteria2/wireguard/mieru/naive map directly.
 func (s *SubClashService) clashProxyFromExternal(rawLink, name string) map[string]any {
 	ob := parseExternalLink(rawLink)
 	if ob == nil {
@@ -86,6 +86,10 @@ func (s *SubClashService) clashProxyFromExternal(rawLink, name string) map[strin
 		return clashHysteriaFromExternal(settings, stream, name)
 	case "wireguard":
 		return clashWireguardFromExternal(settings, name)
+	case "mieru":
+		return clashMieruFromExternal(settings, name)
+	case "naiveproxy":
+		return clashNaiveProxyFromExternal(settings, stream, name)
 	default:
 		return nil
 	}
@@ -176,6 +180,81 @@ func clashWireguardFromExternal(settings map[string]any, name string) map[string
 			proxy["ipv6"] = ip
 		} else {
 			proxy["ip"] = ip
+		}
+	}
+	if mtu := clashInt(settings["mtu"]); mtu > 0 {
+		proxy["mtu"] = mtu
+	}
+	if keepAlive := clashInt(peer["keepAlive"]); keepAlive > 0 {
+		proxy["persistent-keepalive"] = keepAlive
+	}
+	if allowed := clashStringList(peer["allowedIPs"]); len(allowed) > 0 {
+		proxy["allowed-ips"] = allowed
+	}
+	if opts, _ := settings["amneziaWGOptions"].(map[string]any); len(opts) > 0 {
+		proxy["amnezia-wg-option"] = opts
+	}
+	return proxy
+}
+
+func clashMieruFromExternal(settings map[string]any, name string) map[string]any {
+	host, _ := settings["address"].(string)
+	if host == "" {
+		return nil
+	}
+	portRange, _ := settings["portRange"].(string)
+	if portRange == "" {
+		if port := clashInt(settings["port"]); port > 0 {
+			portRange = fmt.Sprintf("%d-%d", port, port)
+		}
+	}
+	if portRange == "" {
+		return nil
+	}
+	transport, _ := settings["transport"].(string)
+	if transport == "" {
+		transport = "TCP"
+	}
+	proxy := map[string]any{
+		"name":       name,
+		"type":       "mieru",
+		"server":     host,
+		"port-range": portRange,
+		"transport":  strings.ToUpper(transport),
+		"udp":        true,
+	}
+	if username, _ := settings["username"].(string); username != "" {
+		proxy["username"] = username
+	}
+	if password, _ := settings["password"].(string); password != "" {
+		proxy["password"] = password
+	}
+	return proxy
+}
+
+func clashNaiveProxyFromExternal(settings, stream map[string]any, name string) map[string]any {
+	host, _ := settings["address"].(string)
+	port := clashInt(settings["port"])
+	if host == "" || port <= 0 {
+		return nil
+	}
+	proxy := map[string]any{
+		"name":   name,
+		"type":   "http",
+		"server": host,
+		"port":   port,
+		"tls":    true,
+		"udp":    true,
+	}
+	if username, _ := settings["username"].(string); username != "" {
+		proxy["username"] = username
+	}
+	if password, _ := settings["password"].(string); password != "" {
+		proxy["password"] = password
+	}
+	if tls, _ := stream["tlsSettings"].(map[string]any); tls != nil {
+		if sni, _ := tls["serverName"].(string); sni != "" {
+			proxy["sni"] = sni
 		}
 	}
 	return proxy

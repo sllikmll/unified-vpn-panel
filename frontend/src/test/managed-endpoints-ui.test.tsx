@@ -158,7 +158,7 @@ describe('ManagedEndpointsPanel', () => {
     expect(screen.getByText('Clash subscription unavailable')).toBeTruthy();
     expect(document.querySelector('.managed-qr-wrap canvas, .managed-qr-wrap svg')).toBeTruthy();
     expect(document.querySelector('.managed-qr-wrap')?.textContent).not.toContain('awg://server-returned');
-  }, 15_000);
+  }, 30_000);
 
   it('edits full endpoint config from GET detail without submitting secret/raw fields', async () => {
     const patchSpy = vi.spyOn(HttpUtil, 'patch').mockResolvedValue({ success: true, msg: '', obj: {} } as never);

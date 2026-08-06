@@ -7,21 +7,18 @@ import { deriveSpiderX } from '@/lib/xray/spider-x';
 // panel links from this module, and the two must agree byte-for-byte.
 describe('deriveSpiderX', () => {
   it('matches the Go deriveSpiderX vectors', () => {
-    expect(deriveSpiderX('/seed', 'subAlice')).toBe('/c252fbc3ecd3e3c');
-    expect(deriveSpiderX('/', '')).toBe('/d08ed99bd9afc60');
+    expect(deriveSpiderX('/seed', 'subAlice')).toBe('/seed');
+    expect(deriveSpiderX('/', '')).toBe('/');
+    expect(deriveSpiderX('', 'subAlice')).toBe('/');
   });
 
-  it('is stable per client, distinct across clients, and rotates with the seed', () => {
-    expect(deriveSpiderX('/seed', 'subAlice')).toBe(deriveSpiderX('/seed', 'subAlice'));
-    expect(deriveSpiderX('/seed', 'subAlice')).not.toBe(deriveSpiderX('/seed', 'subBob'));
-    expect(deriveSpiderX('/seedA', 'subAlice')).not.toBe(deriveSpiderX('/seedB', 'subAlice'));
+  it('returns the literal server-side spiderX for every client', () => {
+    expect(deriveSpiderX('/seed', 'subAlice')).toBe(deriveSpiderX('/seed', 'subBob'));
+    expect(deriveSpiderX('/seedA', 'subAlice')).toBe('/seedA');
+    expect(deriveSpiderX('/seedB', 'subAlice')).toBe('/seedB');
   });
 
-  it('returns empty when there is nothing to derive from', () => {
-    expect(deriveSpiderX('', '')).toBe('');
-  });
-
-  it('emits a /-prefixed 15-hex-char path', () => {
-    expect(deriveSpiderX('/some-seed', 'client@example.com')).toMatch(/^\/[0-9a-f]{15}$/);
+  it('falls back to / when spiderX is empty', () => {
+    expect(deriveSpiderX('', '')).toBe('/');
   });
 });

@@ -66,6 +66,19 @@ Managed-секреты защищены AES-256-GCM с contextual AAD. Master ke
 
 Проект не считает функцию готовой, пока она не проверена реальным запуском.
 
+## Production subscription/runtime contract
+
+Для managed-подписок и Xray runtime действует отдельный контракт: [`docs/subscription-runtime-contract.md`](docs/subscription-runtime-contract.md).
+
+Коротко:
+
+- VLESS Reality для инфраструктуры `sllikmll` использует SNI/serverName `yandex.ru`.
+- `spiderX` экспортируется буквально из server runtime; per-client `spx` запрещён.
+- Generated Xray config обязан сохранять Reality `privateKey`.
+- `dest` и `target` Reality не должны расходиться.
+- Подписка не считается готовой без полного protocol matrix: VMess, VLESS Reality, Trojan, Shadowsocks 2022, WireGuard/AWG2, Hysteria2, Mieru и NaiveProxy.
+- Telegram MTProxy (`tg://`) — external action, а не замена Mieru/NaiveProxy.
+
 ## Лицензирование
 
 Основной код сохраняет лицензию исходного проекта. Компоненты, перенесенные из Remnawave, сохраняют AGPL-3.0-only и attribution. Детали — в `UPSTREAMS.md` и исходных LICENSE/LICENCE файлах.

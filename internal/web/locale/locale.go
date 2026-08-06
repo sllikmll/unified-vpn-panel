@@ -174,7 +174,7 @@ func parseTranslationFiles(i18nFS embed.FS, i18nBundle *i18n.Bundle) error {
 				return err
 			}
 
-			if d.IsDir() {
+			if d.IsDir() || strings.HasPrefix(d.Name(), ".") {
 				return nil
 			}
 
