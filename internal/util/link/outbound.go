@@ -582,7 +582,9 @@ func parseWireguard(link string) (*ParseResult, error) {
 	if u.Scheme != "wireguard" && u.Scheme != "wg" {
 		return nil, fmt.Errorf("not wireguard")
 	}
-	secret := u.User.Username()
+	// WireGuard private keys are carried in URI userinfo, not query values.
+	// Preserve literal '+' in base64 keys; QueryUnescape would turn it into a space.
+	secret, _ := url.PathUnescape(u.User.Username())
 	params := u.Query()
 	host := u.Hostname()
 	portStr := u.Port()

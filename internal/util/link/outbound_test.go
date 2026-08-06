@@ -288,11 +288,15 @@ func TestParseMieruAndNaiveProxyLinks(t *testing.T) {
 }
 
 func TestParseWireGuardLinkWithAmneziaOptions(t *testing.T) {
-	res, err := ParseLink("wireguard://CLIENT_PRIVATE@example.com:32001?publickey=SERVER_PUBLIC&presharedkey=PSK&address=10.90.50.10%2F32&allowedips=0.0.0.0%2F0&keepalive=25&mtu=1420&jc=7&jmin=40&jmax=120&h1=100000-150000#AWG2")
+	privateKey := "YctPZ6U7xPPcU+gp3u+0tx/tRizJN9K8y+uKlW2qjlI="
+	res, err := ParseLink("wireguard://" + url.PathEscape(privateKey) + "@example.com:32001?publickey=SERVER_PUBLIC&presharedkey=PSK&address=10.90.50.10%2F32&allowedips=0.0.0.0%2F0&keepalive=25&mtu=1420&jc=7&jmin=40&jmax=120&h1=100000-150000#AWG2")
 	if err != nil {
 		t.Fatalf("parse awg2: %v", err)
 	}
 	settings := res.Outbound["settings"].(map[string]any)
+	if settings["secretKey"] != privateKey {
+		t.Fatalf("private key corrupted: %#v", settings["secretKey"])
+	}
 	opts := settings["amneziaWGOptions"].(map[string]any)
 	if opts["jc"] != 7 || opts["jmin"] != 40 || opts["h1"] != "100000-150000" {
 		t.Fatalf("bad amnezia opts: %#v", opts)
