@@ -26,8 +26,8 @@ func TestGetPanelVersion(t *testing.T) {
 }
 
 func TestGetBaseVersionIsProductVersion(t *testing.T) {
-	if got := GetBaseVersion(); got != "3.0.0" {
-		t.Fatalf("GetBaseVersion = %q, want 3.0.0", got)
+	if got := GetBaseVersion(); got != "3.0.1" {
+		t.Fatalf("GetBaseVersion = %q, want 3.0.1", got)
 	}
 }
 
