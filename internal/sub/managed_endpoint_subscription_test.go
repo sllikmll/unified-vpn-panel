@@ -46,6 +46,7 @@ func TestGetSubsIncludesBoundManagedClientsAndPreservesLegacyOnlyOutput(t *testi
 	beforeBody := strings.Join(before, "\n")
 
 	createManagedEndpointForSub(t, model.RuntimeAmneziaWG, rec.SubID, "awg-sub")
+	createManagedEndpointForSub(t, model.RuntimeAmneziaWG, rec.SubID, "awg-sub-remote")
 	createManagedEndpointForSub(t, model.RuntimeMieru, rec.SubID, "mieru-sub")
 	createManagedEndpointForSub(t, model.RuntimeNaiveProxy, rec.SubID, "naive-sub")
 
@@ -100,13 +101,15 @@ func TestGetSubsIncludesBoundManagedClientsAndPreservesLegacyOnlyOutput(t *testi
 	if err != nil {
 		t.Fatalf("GetClash: %v", err)
 	}
-	for _, want := range []string{"type: vless", "type: wireguard", "amnezia-wg-option:", "type: http", "username: user-naive-sub", "password: password-naive-sub"} {
+	for _, want := range []string{"type: vless", "type: wireguard", "amnezia-wg-option:", "name: awg-sub", "name: awg-sub-remote", "type: mieru", "name: mieru-sub", "username: user-mieru-sub", "type: http", "name: naive-sub", "username: user-naive-sub", "password: password-naive-sub"} {
 		if !strings.Contains(clash, want) {
 			t.Fatalf("Clash output missing %q:\n%s", want, clash)
 		}
 	}
-	if strings.Contains(clash, "mieru") || strings.Contains(clash, "mierus://") {
-		t.Fatalf("Clash output included unsupported Mieru:\n%s", clash)
+	for _, bad := range []string{"name: alice@example.test", "name: alice@example.test-2"} {
+		if strings.Contains(clash, bad) {
+			t.Fatalf("Clash output used client email instead of managed endpoint name %q:\n%s", bad, clash)
+		}
 	}
 
 	other, _, _, _, err := svc.GetSubs("other-sub", "sub.example.test")

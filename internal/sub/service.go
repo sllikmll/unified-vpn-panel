@@ -440,7 +440,7 @@ func (s *SubService) managedRawLink(endpoint model.ManagedEndpoint, client model
 		if err != nil || len(links) == 0 {
 			return "", err
 		}
-		return links[0], nil
+		return appendManagedRemarkFragment(links[0], endpoint.Remark), nil
 	case model.RuntimeNaiveProxy:
 		var payload struct {
 			Endpoint naiveproxy.Endpoint `json:"endpoint"`
@@ -459,10 +459,26 @@ func (s *SubService) managedRawLink(endpoint model.ManagedEndpoint, client model
 		if host != "" {
 			e.Domain = host
 		}
-		return (naiveproxy.User{ID: client.PublicIdentity, Username: client.PublicIdentity, Password: password, Enabled: true}).ExportURI(e)
+		uri, err := (naiveproxy.User{ID: client.PublicIdentity, Username: client.PublicIdentity, Password: password, Enabled: true}).ExportURI(e)
+		if err != nil {
+			return "", err
+		}
+		return appendManagedRemarkFragment(uri, endpoint.Remark), nil
 	default:
 		return "", fmt.Errorf("unsupported managed subscription runtime %q", endpoint.RuntimeKind)
 	}
+}
+
+func appendManagedRemarkFragment(rawLink, remark string) string {
+	remark = strings.TrimSpace(remark)
+	if remark == "" {
+		return rawLink
+	}
+	base := rawLink
+	if idx := strings.Index(base, "#"); idx >= 0 {
+		base = base[:idx]
+	}
+	return base + "#" + url.QueryEscape(remark)
 }
 
 func (s *SubService) resolveManagedEndpointAddress(endpoint model.ManagedEndpoint) string {

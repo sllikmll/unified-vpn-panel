@@ -3,6 +3,7 @@ package sub
 import (
 	"fmt"
 	"maps"
+	"net/url"
 	"strings"
 
 	"github.com/goccy/go-json"
@@ -72,12 +73,14 @@ func (s *SubClashService) GetClash(subId string, host string) (string, string, e
 		}
 	}
 	for i, link := range managedLinks {
-		name := fmt.Sprintf("managed-%d", i+1)
+		name := managedLinkDisplayName(link, fmt.Sprintf("managed-%d", i+1))
 		if i < len(managedEmails) && managedEmails[i] != "" {
 			seenEmails[managedEmails[i]] = struct{}{}
-			name = managedEmails[i]
+			if name == "" {
+				name = managedEmails[i]
+			}
 		}
-		if proxy := managedClashProxyFromRaw(link, name); proxy != nil {
+		if proxy := s.managedClashProxyFromRaw(link, name); proxy != nil {
 			proxies = append(proxies, proxy)
 		}
 	}
@@ -127,16 +130,34 @@ func (s *SubClashService) GetClash(subId string, host string) (string, string, e
 	return string(finalYAML), header, nil
 }
 
-func managedClashProxyFromRaw(rawLink, name string) map[string]any {
+func (s *SubClashService) managedClashProxyFromRaw(rawLink, name string) map[string]any {
 	conn, err := protocolconnections.ParseConnection("", rawLink, name)
-	if err != nil || strings.TrimSpace(conn.MihomoJSON) == "" {
-		return nil
+	if err == nil && strings.TrimSpace(conn.MihomoJSON) != "" {
+		var proxy map[string]any
+		if err := json.Unmarshal([]byte(conn.MihomoJSON), &proxy); err == nil {
+			if strings.TrimSpace(name) != "" {
+				proxy["name"] = name
+			}
+			return proxy
+		}
 	}
-	var proxy map[string]any
-	if err := json.Unmarshal([]byte(conn.MihomoJSON), &proxy); err != nil {
-		return nil
+	if proxy := s.clashProxyFromExternal(rawLink, name); proxy != nil {
+		if strings.TrimSpace(name) != "" {
+			proxy["name"] = name
+		}
+		return proxy
 	}
-	return proxy
+	return nil
+}
+
+func managedLinkDisplayName(rawLink, fallback string) string {
+	idx := strings.LastIndex(rawLink, "#")
+	if idx >= 0 && idx+1 < len(rawLink) {
+		if name, err := url.QueryUnescape(rawLink[idx+1:]); err == nil && strings.TrimSpace(name) != "" {
+			return strings.TrimSpace(name)
+		}
+	}
+	return strings.TrimSpace(fallback)
 }
 
 // ensureUniqueProxyNames keeps every proxy "name" non-empty and unique:
