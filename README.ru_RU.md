@@ -31,6 +31,7 @@
 - **Управление по каждому клиенту** — квоты трафика, даты истечения, лимиты IP, статус «онлайн» в реальном времени, а также ссылки для общего доступа, QR-коды и подписки в один клик.
 - **Статистика трафика** — по каждому входящему, по каждому клиенту и по каждому исходящему, с возможностью сброса.
 - **Поддержка нескольких узлов** — управление и масштабирование на несколько серверов из одной панели.
+- **One-click full-stack provisioning для нод** — штатный flow/plan для новой ноды создаёт полный production protocol pack и привязывает выбранные subscription-клиенты без ручного SQL-бубна.
 - **Безопасное управление нодами** — стабильный GUID, authenticated typed-команды без произвольного shell API и fail-closed capability negotiation.
 - **Защита секретов** — AES-256-GCM, contextual AAD, внешний master key и отсутствие plaintext credentials в SQLite/API/logs.
 - **Исходящие подключения и маршрутизация** — WARP, NordVPN, пользовательские правила маршрутизации, балансировщики нагрузки и цепочки исходящих прокси.
@@ -89,6 +90,41 @@ bash <(curl -Ls https://raw.githubusercontent.com/sllikmll/unified-vpn-panel/mai
 Во время установки генерируются случайные имя пользователя, пароль и путь доступа. После установки выполните `x-ui`, чтобы открыть меню управления, где можно запускать/останавливать сервис, просматривать или сбрасывать учётные данные для входа, управлять SSL-сертификатами и многое другое.
 
 Полную документацию смотрите в [вики проекта](https://github.com/sllikmll/unified-vpn-panel/wiki).
+
+### One-click provisioning новой ноды
+
+Панель содержит штатный full-stack provisioning flow для подключения новой ноды без ручного редактирования SQLite. API:
+
+```http
+POST /panel/api/nodes/provision-full-stack/:id
+```
+
+Тело запроса:
+
+```json
+{
+  "basePort": 32000,
+  "clientEmails": ["pavel-1-keenetic", "pavel-2-openwrt"]
+}
+```
+
+Каноничный production protocol pack на каждую ноду:
+
+| Протокол | Порт от `basePort` | Тип |
+| --- | ---: | --- |
+| AmneziaWG 2.0 | `+1` | managed runtime, отдельный от WireGuard |
+| Mieru | `+2` | managed runtime |
+| NaiveProxy | `+3` | managed runtime |
+| VMess | `+11` | Xray inbound |
+| VLESS Reality | `+12` | Xray inbound, `serverName=yandex.ru`, `target=yandex.ru:443`, `spiderX=/`, `fp=firefox` |
+| Trojan TLS | `+13` | Xray inbound |
+| Shadowsocks 2022 | `+14` | Xray inbound, TCP+UDP |
+| WireGuard | `+15` | Xray inbound, отдельный от AWG2 |
+| Hysteria2 | `+16` | Xray inbound |
+
+Telegram MTProxy остаётся external action и не добавляется как Mihomo proxy node.
+
+Текущая production matrix: `msknew` и `amstnew` имеют отдельные AWG2 managed endpoints, каждый привязан к 7 subscription-клиентам; в raw subscriptions для клиентов присутствуют обе AWG2-ноды.
 
 ### Автоматическая установка
 

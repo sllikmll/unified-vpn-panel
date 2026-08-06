@@ -27,6 +27,7 @@ AmneziaWG 2.0, Mieru и NaiveProxy — не шаблоны для импорта
 - create, update, start, stop, repair, rollback и uninstall;
 - client CRUD, encrypted credentials, health и traffic state;
 - raw/JSON/QR export и включение клиентов в общую подписку, когда формат поддерживает протокол;
+- one-click full-stack provisioning plan для новой ноды: managed AWG2/Mieru/NaiveProxy плюс Xray VMess/VLESS Reality/Trojan/SS2022/WireGuard/Hysteria2 без ручного SQL;
 - явный статус `unsupported` вместо повреждённых ссылок для несовместимых форматов.
 
 Managed-секреты защищены AES-256-GCM с contextual AAD. Master key хранится вне SQLite и доступен только сервисному аккаунту панели.
@@ -69,6 +70,32 @@ Managed-секреты защищены AES-256-GCM с contextual AAD. Master ke
 ## Production subscription/runtime contract
 
 Для managed-подписок и Xray runtime действует отдельный контракт: [`docs/subscription-runtime-contract.md`](docs/subscription-runtime-contract.md).
+
+## One-click node full-stack provisioning
+
+Для новой GUID-node штатный API flow начинается с:
+
+```http
+POST /panel/api/nodes/provision-full-stack/:id
+```
+
+Запрос принимает `basePort` и список `clientEmails`, возвращает каноничный production plan без plaintext secrets и без прямого доступа к SQLite. Protocol pack на каждую ноду:
+
+| Протокол | Порт от `basePort` | Контракт |
+| --- | ---: | --- |
+| AmneziaWG 2.0 | `+1` | managed runtime, отдельный от WireGuard |
+| Mieru | `+2` | managed runtime |
+| NaiveProxy | `+3` | managed runtime |
+| VMess | `+11` | Xray inbound |
+| VLESS Reality | `+12` | `serverName=yandex.ru`, `target=yandex.ru:443`, `spiderX=/`, `fp=firefox` |
+| Trojan TLS | `+13` | Xray inbound |
+| Shadowsocks 2022 | `+14` | TCP+UDP |
+| WireGuard | `+15` | обычный WG, не AWG2 |
+| Hysteria2 | `+16` | UDP |
+
+Telegram MTProxy остаётся external action, не Mihomo proxy node.
+
+Текущий production статус: `msknew` и `amstnew` имеют отдельные AWG2 managed endpoints; оба endpoint включены в production subscriptions.
 
 Коротко:
 

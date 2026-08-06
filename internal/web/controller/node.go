@@ -41,6 +41,7 @@ func (a *NodeController) initRouter(g *gin.RouterGroup) {
 	g.POST("/certFingerprint", a.certFingerprint)
 	g.POST("/inbounds", a.inbounds)
 	g.POST("/probe/:id", a.probe)
+	g.POST("/provision-full-stack/:id", a.provisionFullStack)
 	g.POST("/updatePanel", a.updatePanel)
 	g.GET("/history/:id/:metric/:bucket", a.history)
 	g.POST("/mtls/ca", a.mtlsCa)
@@ -98,6 +99,31 @@ func (a *NodeController) get(c *gin.Context) {
 		return
 	}
 	jsonObj(c, n, nil)
+}
+
+func (a *NodeController) provisionFullStack(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "get"), err)
+		return
+	}
+	n, err := a.nodeService.GetById(id)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.nodes.toasts.obtain"), err)
+		return
+	}
+	var req service.NodeFullStackProvisionRequest
+	_ = c.ShouldBindJSON(&req)
+	if req.NodeName == "" {
+		req.NodeName = n.Name
+	}
+	if req.BasePort == 0 {
+		if parsed, parseErr := strconv.Atoi(c.Query("basePort")); parseErr == nil {
+			req.BasePort = parsed
+		}
+	}
+	plan := service.BuildNodeFullStackProvisionPlan(req)
+	jsonObj(c, plan, nil)
 }
 
 // webCert returns the node's own web TLS certificate/key file paths so the

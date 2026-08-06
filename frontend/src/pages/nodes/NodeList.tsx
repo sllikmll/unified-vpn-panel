@@ -50,6 +50,7 @@ interface NodeListProps {
   onEdit: (node: NodeRecord) => void;
   onDelete: (node: NodeRecord) => void;
   onProbe: (node: NodeRecord) => void;
+  onProvisionFullStack: (node: NodeRecord) => void;
   onToggleEnable: (node: NodeRecord, next: boolean) => void;
   onUpdateNode: (node: NodeRecord) => void;
   onUpdateSelected: () => void;
@@ -171,6 +172,7 @@ export default function NodeList({
   onEdit,
   onDelete,
   onProbe,
+  onProvisionFullStack,
   onToggleEnable,
   onUpdateNode,
   onUpdateSelected,
@@ -247,6 +249,9 @@ export default function NodeList({
         <Space>
           <Tooltip title={t('pages.nodes.probe')}>
             <Button type="text" size="small" style={{ fontSize: 16 }} icon={<ThunderboltOutlined />} aria-label={t('pages.nodes.probe')} onClick={() => onProbe(record)} />
+          </Tooltip>
+          <Tooltip title={t('pages.nodes.provisionFullStack', { defaultValue: 'Full stack plan' })}>
+            <Button type="text" size="small" style={{ fontSize: 16 }} icon={<ClusterOutlined />} aria-label={t('pages.nodes.provisionFullStack', { defaultValue: 'Full stack plan' })} onClick={() => onProvisionFullStack(record)} />
           </Tooltip>
           {isUpdateEligible(record) && (
             <Tooltip title={t('pages.nodes.updatePanel')}>
@@ -428,7 +433,7 @@ export default function NodeList({
       width: 120,
       render: (_value, record) => relativeTime(record.lastHeartbeat),
     },
-  ], [t, showAddress, relativeTime, latestVersion, onToggleEnable, onProbe, onEdit, onDelete, onUpdateNode, nameByGuid]);
+  ], [t, showAddress, relativeTime, latestVersion, onToggleEnable, onProbe, onProvisionFullStack, onEdit, onDelete, onUpdateNode, nameByGuid]);
 
   return (
     <Card size="small" hoverable>
