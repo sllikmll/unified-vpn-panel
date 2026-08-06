@@ -32,6 +32,28 @@ func TestNormalizeBasePath(t *testing.T) {
 	}
 }
 
+func TestNodeAPIPathAvoidsDoubleSlashForRootBasePath(t *testing.T) {
+	cases := []struct {
+		base   string
+		suffix string
+		want   string
+	}{
+		{"", "panel/api/server/status", "/panel/api/server/status"},
+		{"/", "panel/api/server/status", "/panel/api/server/status"},
+		{"/", "/panel/api/server/status", "/panel/api/server/status"},
+		{"/xui", "panel/api/server/status", "/xui/panel/api/server/status"},
+		{"xui/", "/panel/api/server/status", "/xui/panel/api/server/status"},
+	}
+	for _, c := range cases {
+		t.Run(c.base+"|"+c.suffix, func(t *testing.T) {
+			got := nodeAPIPath(c.base, c.suffix)
+			if got != c.want {
+				t.Fatalf("nodeAPIPath(%q, %q) = %q, want %q", c.base, c.suffix, got, c.want)
+			}
+		})
+	}
+}
+
 func TestNodeMetricKey(t *testing.T) {
 	cases := []struct {
 		id     int
