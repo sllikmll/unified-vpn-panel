@@ -18,6 +18,30 @@
 - SQLite и PostgreSQL;
 - современный React UI, REST/OpenAPI, WebSocket и API-токены.
 
+
+## Установка и настройка панели
+
+Рекомендуемый путь установки — официальный shell-установщик из выбранного релиза. Для стабильной установки используйте тег релиза, для тестирования свежих изменений — dev-канал.
+
+После установки панель создаёт системный сервис `x-ui`, базовую директорию `/etc/x-ui` и случайные первичные учётные данные. Управление сервисом и первичными настройками выполняется через CLI-команду `x-ui`.
+
+Минимальная последовательность настройки:
+
+1. установить панель на поддерживаемый Linux-сервер;
+2. открыть CLI-меню `x-ui`;
+3. проверить или сменить web base path, пользователя и пароль администратора;
+4. настроить TLS-сертификат для панели и сервера подписок;
+5. выбрать хранилище: SQLite для одиночной панели или PostgreSQL для более крупной установки;
+6. создать пользователей и subscription-клиентов;
+7. добавить локальные или удалённые ноды;
+8. включить нужные Xray inbounds и managed runtimes;
+9. проверить raw/Clash/Mihomo subscriptions реальным импортом в клиент;
+10. включить мониторинг, backups и ограничения доступа к панели.
+
+Для удалённых нод используйте встроенный node lifecycle: регистрация ноды, проверка API-доступа, provisioning protocol pack, health-check и синхронизация runtime. Не редактируйте SQLite вручную для штатной установки: это аварийный путь, а не нормальная эксплуатация.
+
+Перед публикацией панели в интернет обязательно задайте уникальный web base path, включите TLS, смените первичные учётные данные и ограничьте доступ к административному интерфейсу.
+
 ## Managed-протоколы
 
 AmneziaWG 2.0, Mieru и NaiveProxy — не шаблоны для импорта. Панель управляет полным серверным lifecycle локально или на удалённой GUID-node:
@@ -63,7 +87,7 @@ Managed-секреты защищены AES-256-GCM с contextual AAD. Master ke
 4. frontend typecheck/lint/test/build;
 5. Go test/build;
 6. Docker build;
-7. deploy и smoke/e2e на production master `msknew` и удалённой GUID-node `amstnew`.
+7. deploy и smoke/e2e на тестовом или production-стенде перед публикацией релиза.
 
 Проект не считает функцию готовой, пока она не проверена реальным запуском.
 
@@ -87,7 +111,7 @@ POST /panel/api/nodes/provision-full-stack/:id
 | Mieru | `+2` | managed runtime |
 | NaiveProxy | `+3` | managed runtime |
 | VMess | `+11` | Xray inbound |
-| VLESS Reality | `+12` | `serverName=yandex.ru`, `target=yandex.ru:443`, `spiderX=/`, `fp=firefox` |
+| VLESS Reality | `+12` | Reality settings берутся из runtime-конфигурации ноды и должны совпадать с экспортом подписки |
 | Trojan TLS | `+13` | Xray inbound |
 | Shadowsocks 2022 | `+14` | TCP+UDP |
 | WireGuard | `+15` | обычный WG, не AWG2 |
@@ -95,14 +119,12 @@ POST /panel/api/nodes/provision-full-stack/:id
 
 Telegram MTProxy остаётся external action, не Mihomo proxy node.
 
-Текущий production статус: `msknew` и `amstnew` имеют отдельные AWG2 managed endpoints; оба endpoint включены в production subscriptions.
-
 Коротко:
 
-- VLESS Reality для инфраструктуры `sllikmll` использует SNI/serverName `yandex.ru`.
+- VLESS Reality должен использовать согласованные `serverName`, `target`, ключи Reality и параметры клиента, соответствующие runtime-конфигурации сервера.
 - `spiderX` экспортируется буквально из server runtime; per-client `spx` запрещён.
 - Generated Xray config обязан сохранять Reality `privateKey`.
-- `dest` и `target` Reality не должны расходиться.
+- `dest` и `target` Reality не должны расходиться между серверной конфигурацией и подпиской.
 - Подписка не считается готовой без полного protocol matrix: VMess, VLESS Reality, Trojan, Shadowsocks 2022, WireGuard/AWG2, Hysteria2, Mieru и NaiveProxy.
 - Telegram MTProxy (`tg://`) — external action, а не замена Mieru/NaiveProxy.
 

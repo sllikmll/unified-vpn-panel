@@ -75,56 +75,34 @@
 bash <(curl -Ls https://raw.githubusercontent.com/sllikmll/unified-vpn-panel/main/install.sh)
 ```
 
-Чтобы установить конкретную версию, добавьте её тег (например, `v0.0.1`):
-
-```bash
-bash <(curl -Ls https://raw.githubusercontent.com/sllikmll/unified-vpn-panel/main/install.sh) v0.0.1
-```
+Чтобы установить конкретную версию, передайте тег нужного релиза установщику.
 
 Чтобы установить скользящую **dev**-сборку (новейший предварительный релиз по каждому коммиту из ветки `main`, а не стабильный релиз), передайте `dev-latest`:
 
-```bash
-bash <(curl -Ls https://raw.githubusercontent.com/sllikmll/unified-vpn-panel/main/install.sh) dev-latest
-```
+Передавайте `dev-latest` только для тестирования свежей предварительной сборки, а не для стабильной эксплуатации.
 
 Во время установки генерируются случайные имя пользователя, пароль и путь доступа. После установки выполните `x-ui`, чтобы открыть меню управления, где можно запускать/останавливать сервис, просматривать или сбрасывать учётные данные для входа, управлять SSL-сертификатами и многое другое.
 
 Полную документацию смотрите в [вики проекта](https://github.com/sllikmll/unified-vpn-panel/wiki).
 
-### One-click provisioning новой ноды
+### Настройка панели после установки
 
-Панель содержит штатный full-stack provisioning flow для подключения новой ноды без ручного редактирования SQLite. API:
+После установки выполните первичную настройку через CLI-меню `x-ui` и веб-интерфейс панели:
 
-```http
-POST /panel/api/nodes/provision-full-stack/:id
-```
+1. проверьте статус systemd-сервиса;
+2. смените первичные учётные данные администратора;
+3. задайте уникальный web base path;
+4. настройте TLS для панели и сервера подписок;
+5. выберите backend базы данных;
+6. создайте пользователей и subscription-клиентов;
+7. добавьте локальные или удалённые ноды;
+8. включите нужные inbounds и managed runtimes;
+9. проверьте raw/Clash/Mihomo subscriptions в реальном клиенте;
+10. настройте backups, мониторинг и ограничения доступа к административному интерфейсу.
 
-Тело запроса:
+Для удалённых нод используйте встроенный lifecycle панели: регистрация, проверка API-доступа, provisioning protocol pack, health-check и runtime-синхронизация. Ручное редактирование SQLite не требуется для штатной установки.
 
-```json
-{
-  "basePort": 32000,
-  "clientEmails": ["pavel-1-keenetic", "pavel-2-openwrt"]
-}
-```
-
-Каноничный production protocol pack на каждую ноду:
-
-| Протокол | Порт от `basePort` | Тип |
-| --- | ---: | --- |
-| AmneziaWG 2.0 | `+1` | managed runtime, отдельный от WireGuard |
-| Mieru | `+2` | managed runtime |
-| NaiveProxy | `+3` | managed runtime |
-| VMess | `+11` | Xray inbound |
-| VLESS Reality | `+12` | Xray inbound, `serverName=yandex.ru`, `target=yandex.ru:443`, `spiderX=/`, `fp=firefox` |
-| Trojan TLS | `+13` | Xray inbound |
-| Shadowsocks 2022 | `+14` | Xray inbound, TCP+UDP |
-| WireGuard | `+15` | Xray inbound, отдельный от AWG2 |
-| Hysteria2 | `+16` | Xray inbound |
-
-Telegram MTProxy остаётся external action и не добавляется как Mihomo proxy node.
-
-Текущая production matrix: `msknew` и `amstnew` имеют отдельные AWG2 managed endpoints, каждый привязан к 7 subscription-клиентам; в raw subscriptions для клиентов присутствуют обе AWG2-ноды.
+Каноничный protocol pack может включать Xray-протоколы, обычный WireGuard, AmneziaWG 2.0, Mieru и NaiveProxy. Telegram MTProxy остаётся external action и не добавляется как Mihomo proxy node.
 
 ### Автоматическая установка
 
