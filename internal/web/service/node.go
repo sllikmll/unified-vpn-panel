@@ -96,7 +96,7 @@ func (s *NodeService) FetchCertFingerprint(ctx context.Context, n *model.Node) (
 	probeURL := &url.URL{
 		Scheme: scheme,
 		Host:   net.JoinHostPort(addr, strconv.Itoa(n.Port)),
-		Path:   normalizeBasePath(n.BasePath) + "panel/api/server/status",
+		Path:   nodeAPIPath(n.BasePath, "panel/api/server/status"),
 	}
 	req, err := http.NewRequestWithContext(
 		netsafe.ContextWithAllowPrivate(ctx, n.AllowPrivateAddress),
@@ -392,6 +392,22 @@ func normalizeBasePath(p string) string {
 		p = p + "/"
 	}
 	return p
+}
+
+func nodeAPIPath(basePath, suffix string) string {
+	base := normalizeBasePath(basePath)
+	base = strings.TrimRight(base, "/")
+	if base == "" {
+		base = "/"
+	}
+	suffix = strings.TrimLeft(strings.TrimSpace(suffix), "/")
+	if suffix == "" {
+		return base
+	}
+	if base == "/" {
+		return "/" + suffix
+	}
+	return base + "/" + suffix
 }
 
 func (s *NodeService) normalize(n *model.Node) error {
@@ -1167,7 +1183,7 @@ func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string)
 	probeURL := &url.URL{
 		Scheme: scheme,
 		Host:   net.JoinHostPort(addr, strconv.Itoa(n.Port)),
-		Path:   normalizeBasePath(n.BasePath) + "panel/api/server/status",
+		Path:   nodeAPIPath(n.BasePath, "panel/api/server/status"),
 	}
 
 	req, err := http.NewRequestWithContext(

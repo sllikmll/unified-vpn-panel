@@ -364,6 +364,9 @@ func (s *SubClashService) buildHysteriaProxy(subReq *SubService, inbound *model.
 	// TLS details — hysteria always uses TLS.
 	if tlsSettings, ok := rawStream["tlsSettings"].(map[string]any); ok {
 		if serverName, ok := tlsSettings["serverName"].(string); ok && serverName != "" {
+			if server, _ := proxy["server"].(string); server != "" && serverName == "3xmsknew.dogonin.ru" && server != serverName {
+				serverName = server
+			}
 			proxy["sni"] = serverName
 		}
 		if alpnList, ok := tlsSettings["alpn"].([]any); ok && len(alpnList) > 0 {
@@ -713,6 +716,9 @@ func (s *SubClashService) applySecurity(proxy map[string]any, security string, s
 		tlsSettings, _ := stream["tlsSettings"].(map[string]any)
 		if tlsSettings != nil {
 			if serverName, ok := tlsSettings["serverName"].(string); ok && serverName != "" {
+				if server, _ := proxy["server"].(string); server != "" && serverName == "3xmsknew.dogonin.ru" && server != serverName {
+					serverName = server
+				}
 				proxy["servername"] = serverName
 				switch proxy["type"] {
 				case "trojan":
@@ -806,10 +812,17 @@ func (s *SubClashService) tlsData(tData map[string]any) map[string]any {
 func (s *SubClashService) realityData(rData map[string]any) map[string]any {
 	rDataOut := make(map[string]any, 1)
 	realityClientSettings, _ := rData["settings"].(map[string]any)
-	if publicKey, ok := realityClientSettings["publicKey"].(string); ok {
+	// Prefer the top-level publicKey when present. Remote-node provisioning may
+	// derive and store the correct server public key there while legacy
+	// settings.publicKey can remain stale from the origin/central inbound.
+	if publicKey, ok := rData["publicKey"].(string); ok && publicKey != "" {
+		rDataOut["publicKey"] = publicKey
+	} else if publicKey, ok := realityClientSettings["publicKey"].(string); ok {
 		rDataOut["publicKey"] = publicKey
 	}
-	if fingerprint, ok := realityClientSettings["fingerprint"].(string); ok {
+	if fingerprint, ok := rData["fingerprint"].(string); ok && fingerprint != "" {
+		rDataOut["fingerprint"] = fingerprint
+	} else if fingerprint, ok := realityClientSettings["fingerprint"].(string); ok {
 		rDataOut["fingerprint"] = fingerprint
 	}
 	if serverNames, ok := rData["serverNames"].([]any); ok && len(serverNames) > 0 {
