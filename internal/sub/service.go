@@ -1307,7 +1307,7 @@ func (s *SubService) genHysteriaLink(inbound *model.Inbound, email string) strin
 				continue
 			}
 			epParams := cloneStringMap(params)
-			applyExternalProxyHysteriaParams(ep, epParams)
+			applyExternalProxyHysteriaParams(ep, epParams, dest)
 
 			link := fmt.Sprintf("%s://%s@%s", protocol, auth, joinHostPort(dest, int(portF)))
 			links = append(links, buildLinkWithParams(link, epParams, s.endpointRemark(inbound, email, ep, "quic")))
@@ -1317,10 +1317,14 @@ func (s *SubService) genHysteriaLink(inbound *model.Inbound, email string) strin
 
 	// No external proxy configured — use the inbound's resolved address so
 	// node-managed inbounds get the node's host instead of the central panel's.
+	addr := s.resolveInboundAddress(inbound)
+	if addr != "" {
+		params["sni"] = addr
+	}
 	if hopPorts := hysteriaHopPorts(stream); hopPorts != "" {
 		params["mport"] = hopPorts
 	}
-	link := fmt.Sprintf("%s://%s@%s", protocol, auth, joinHostPort(s.resolveInboundAddress(inbound), inbound.Port))
+	link := fmt.Sprintf("%s://%s@%s", protocol, auth, joinHostPort(addr, inbound.Port))
 	return buildLinkWithParams(link, params, s.genRemark(inbound, email, "", "quic"))
 }
 
@@ -1700,7 +1704,12 @@ func applyShareRealityParams(stream map[string]any, params map[string]string, cl
 				params["sni"], _ = sNames[random.Num(len(sNames))].(string)
 			}
 		}
-		if pbkValue, ok := searchKey(realitySettings, "publicKey"); ok {
+		// Prefer top-level realitySettings.publicKey. Managed remote nodes store the
+		// derived per-node server public key there, while legacy
+		// realitySettings.settings.publicKey can remain stale from the origin inbound.
+		if pbk, ok := realitySetting["publicKey"].(string); ok && pbk != "" {
+			params["pbk"] = pbk
+		} else if pbkValue, ok := searchKey(realitySettings, "publicKey"); ok {
 			params["pbk"], _ = pbkValue.(string)
 		}
 		if sidValue, ok := searchKey(realitySetting, "shortIds"); ok {
@@ -1812,10 +1821,15 @@ func applyExternalProxyTLSParams(ep map[string]any, params map[string]string, se
 // applyExternalProxyHysteriaParams overrides the cert pin for a single
 // external-proxy entry on a Hysteria link. Hysteria carries the pin as a hex
 // `pinSHA256` (not the `pcs` the URL-param protocols use), so each entry is
-// coerced through hysteriaPinHex like the main pin. sni/fp/alpn are left as
-// the inbound's own — Hysteria external proxies are typically alternate
-// endpoints (port-hop / CDN) fronting the same certificate.
-func applyExternalProxyHysteriaParams(ep map[string]any, params map[string]string) {
+// coerced through hysteriaPinHex like the main pin. For managed remote nodes,
+// the exported endpoint hostname is also the certificate/SNI name; keeping the
+// origin inbound SNI (for example 3xmsknew...) makes mobile clients fail TLS.
+func applyExternalProxyHysteriaParams(ep map[string]any, params map[string]string, dest string) {
+	if sni, ok := externalProxySNI(ep); ok {
+		params["sni"] = sni
+	} else if forceTLS, _ := ep["forceTls"].(string); forceTLS != "same" && strings.TrimSpace(dest) != "" {
+		params["sni"] = strings.TrimSpace(dest)
+	}
 	if pins, ok := externalProxyPins(ep["pinnedPeerCertSha256"]); ok {
 		hexPins := make([]string, 0, len(pins))
 		for _, p := range pins {

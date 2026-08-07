@@ -880,7 +880,7 @@ func TestApplyExternalProxyHysteriaParams_PinIsHexNormalized(t *testing.T) {
 		"pinnedPeerCertSha256": []any{"yEfdI5XQl4wHgLggHEsomosoFZfUfCdfLXfT+W2N6cQ="},
 	}
 
-	applyExternalProxyHysteriaParams(ep, params)
+	applyExternalProxyHysteriaParams(ep, params, "edge.example.com")
 
 	if params["pinSHA256"] != "c847dd2395d0978c0780b8201c4b289a8b281597d47c275f2d77d3f96d8de9c4" {
 		t.Fatalf("pinSHA256 = %q, want hex-normalized pin", params["pinSHA256"])
@@ -888,8 +888,8 @@ func TestApplyExternalProxyHysteriaParams_PinIsHexNormalized(t *testing.T) {
 	if _, ok := params["pcs"]; ok {
 		t.Fatalf("pcs must not be set for Hysteria, got %v", params)
 	}
-	if params["sni"] != "server.example.com" {
-		t.Fatalf("sni = %q, want inbound sni preserved (no override for Hysteria)", params["sni"])
+	if params["sni"] != "edge.example.com" {
+		t.Fatalf("sni = %q, want external proxy hostname", params["sni"])
 	}
 }
 
@@ -897,7 +897,7 @@ func TestApplyExternalProxyHysteriaParams_NoPinLeavesMainPin(t *testing.T) {
 	params := map[string]string{"security": "tls", "pinSHA256": "deadbeef"}
 	ep := map[string]any{"dest": "edge.example.com"}
 
-	applyExternalProxyHysteriaParams(ep, params)
+	applyExternalProxyHysteriaParams(ep, params, "edge.example.com")
 
 	if params["pinSHA256"] != "deadbeef" {
 		t.Fatalf("pinSHA256 = %q, want main pin preserved when proxy has none", params["pinSHA256"])
