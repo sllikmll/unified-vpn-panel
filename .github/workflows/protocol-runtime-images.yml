@@ -134,7 +134,7 @@ jobs:
     needs: build-runtime-images
     steps:
       - name: Download digest artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           pattern: protocol-runtime-*-digest
           path: digests
