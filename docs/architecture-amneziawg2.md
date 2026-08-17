@@ -62,6 +62,8 @@ awg2-reconcile down
 
 It reads only `/opt/amnezia/awg/awg0.conf`, strips userspace-only interface fields into a `0600` setconf file, applies AWG parameters with official `awg`, configures address/MTU/routes/NAT, and verifies `awg show awg0`. Imported keys and obfuscation fields are passed through unchanged.
 
+The rendered server config carries `# IPv4Pool = <CIDR>` as non-secret interface metadata. `awg` treats it as a comment, while the fixed reconciler uses it as the NAT source. This preserves valid deployments where the interface address is a `/32` but the routed client pool is a wider subnet. Legacy configs without the metadata fall back to `Address`.
+
 The Docker backend uses host networking, `NET_ADMIN`, and `/dev/net/tun`, with the host state directory mounted read-only into the runtime. The provisioner sets `--restart unless-stopped` and uses transactional `next`/`previous` containers for image updates.
 
 ## Reconcile and rollback
@@ -72,7 +74,7 @@ For an already-running endpoint, apply uses:
 docker exec unified-vpn-awg2-runtime awg2-reconcile apply
 ```
 
-The container is not restarted for each client mutation. If it is stopped, the panel writes the new atomic config first, starts the owned container, then reconciles and verifies it. This makes `disable -> enable` deterministic.
+The container is not restarted for each client mutation. If it is stopped, the panel writes the new atomic config first, starts the owned container, waits for `awg2-reconcile verify`, then reconciles and verifies it again. This readiness barrier prevents `docker exec` from racing foreground interface creation and makes `disable -> enable` deterministic.
 
 Failure is never reported as success. A failed reconcile or verify restores the previous config and reapplies it. With no previous state, the failed desired config is not retained as an applied state.
 
@@ -88,6 +90,8 @@ The runtime is singleton per node (`awg0`) but supports multiple clients. Client
 - receive and transmit byte counters.
 
 No keys, PSKs, raw configs, or command output are returned by node-command responses.
+
+Peers that exist only in runtime drift and cannot be mapped to a durable panel client ID are omitted from the remote typed traffic response. One unmapped/manual peer therefore cannot invalidate health and accounting for all managed peers.
 
 The managed AWG traffic job runs every ten seconds through the same local/remote driver contract. Server RX is client upload; server TX is client download. Monotonic deltas survive normal polling, and a runtime counter reset starts a new baseline instead of producing negative traffic. Aggregated traffic and latest handshake are exposed in the managed client UI.
 

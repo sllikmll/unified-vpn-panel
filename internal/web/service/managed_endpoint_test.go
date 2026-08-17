@@ -1080,7 +1080,7 @@ func TestManagedEndpointInstallPlansUseExactPinnedDockerRefs(t *testing.T) {
 		kind model.RuntimeKind
 		ref  string
 	}{
-		{model.RuntimeAmneziaWG, "ghcr.io/sllikmll/unified-vpn-panel-protocol-awg2@sha256:1eb1c76cdbcd0acb24becb1926540b38a8f41d00dd41991c3b338c43aedaa407"},
+		{model.RuntimeAmneziaWG, "ghcr.io/sllikmll/unified-vpn-panel-protocol-awg2@sha256:465febe1b4156b240b0b929b5f180a2696a2501f8bb787b24406034e0d96c059"},
 		{model.RuntimeNaiveProxy, "ghcr.io/sllikmll/unified-vpn-panel-protocol-naive-caddy@sha256:1bedc66132c2e22782c9d8c58d28e5232d7757a1adfcce69fd475842796e36ff"},
 	}
 	for _, tc := range cases {
