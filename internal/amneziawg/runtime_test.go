@@ -136,6 +136,38 @@ func TestCommandBackendUpWaitsForAWGReadiness(t *testing.T) {
 	}
 }
 
+func TestCommandBackendRollbackRestartsStoppedContainer(t *testing.T) {
+	started := false
+	verified := false
+	applied := false
+	be := &CommandBackend{
+		Run: func(_ context.Context, name string, args ...string) error {
+			call := name + " " + strings.Join(args, " ")
+			switch {
+			case strings.Contains(call, "docker start"):
+				started = true
+			case strings.Contains(call, "awg2-reconcile verify"):
+				verified = true
+			case strings.Contains(call, "awg2-reconcile apply"):
+				applied = true
+			}
+			return nil
+		},
+		Output: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			if strings.Contains(strings.Join(args, " "), ".State.Running") {
+				return []byte("false\n"), nil
+			}
+			return []byte(`[{"Source":"/opt/amnezia/state/amnezia-awg2","Destination":"/opt/amnezia/awg"}]`), nil
+		},
+	}
+	if err := be.Rollback(context.Background(), "awg0", "restored"); err != nil {
+		t.Fatalf("Rollback: %v", err)
+	}
+	if !started || !verified || applied {
+		t.Fatalf("rollback lifecycle started=%v verified=%v applied=%v", started, verified, applied)
+	}
+}
+
 func TestCommandBackendRejectsDockerMountMismatch(t *testing.T) {
 	profile := DockerBackendProfile()
 	profile.HostConfigDir = t.TempDir()

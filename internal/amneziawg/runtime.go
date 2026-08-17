@@ -171,6 +171,13 @@ func (b *CommandBackend) Status(ctx context.Context, iface string) (SafeStatus, 
 }
 
 func (b *CommandBackend) Rollback(ctx context.Context, iface string, _ string) error {
+	st, err := b.Detect(ctx)
+	if err != nil {
+		return err
+	}
+	if st.Backend == BackendDocker && st.State != StateRunning {
+		return b.Up(ctx, iface)
+	}
 	return b.Apply(ctx, iface, "rollback")
 }
 
