@@ -173,7 +173,7 @@ func (d remoteManagedDriver) Disable(ctx context.Context, inbound *model.Inbound
 }
 
 func (d remoteManagedDriver) Restart(ctx context.Context) error {
-	_, err := d.send(ctx, nodecommand.OperationEndpointRestart, nil, nil, 1)
+	_, err := d.send(ctx, nodecommand.OperationEndpointRestart, nil, nil, 0)
 	return err
 }
 
@@ -182,7 +182,7 @@ func (d remoteManagedDriver) Status(ctx context.Context, inbound *model.Inbound)
 	if inbound != nil && strings.TrimSpace(inbound.Settings) != "" {
 		material = []byte(inbound.Settings)
 	}
-	resp, err := d.send(ctx, nodecommand.OperationEndpointStatus, inbound, material, 1)
+	resp, err := d.send(ctx, nodecommand.OperationEndpointStatus, inbound, material, 0)
 	if err != nil {
 		return driver.StatusResult{}, err
 	}
@@ -194,7 +194,7 @@ func (d remoteManagedDriver) Status(ctx context.Context, inbound *model.Inbound)
 }
 
 func (d remoteManagedDriver) Detect(ctx context.Context) (driver.DetectResult, error) {
-	resp, err := d.send(ctx, nodecommand.OperationEndpointDetect, nil, nil, 1)
+	resp, err := d.send(ctx, nodecommand.OperationEndpointDetect, nil, nil, 0)
 	return driver.DetectResult{RuntimeKind: d.kind, Available: err == nil && resp.Status == nodecommand.StatusSucceeded}, err
 }
 
@@ -211,7 +211,7 @@ func (d remoteManagedDriver) PeerStatuses(ctx context.Context, inbound *model.In
 	if inbound != nil && strings.TrimSpace(inbound.Settings) != "" {
 		material = []byte(inbound.Settings)
 	}
-	resp, err := d.send(ctx, nodecommand.OperationEndpointStatus, inbound, material, 1)
+	resp, err := d.send(ctx, nodecommand.OperationEndpointStatus, inbound, material, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -235,6 +235,8 @@ func (d remoteManagedDriver) apply(ctx context.Context, op nodecommand.Operation
 		if generation == 0 {
 			generation = 1
 		}
+	} else if op == nodecommand.OperationEndpointDelete {
+		generation = time.Now().UnixNano()
 	}
 	resp, err := d.send(ctx, op, inbound, material, generation)
 	if err != nil {
