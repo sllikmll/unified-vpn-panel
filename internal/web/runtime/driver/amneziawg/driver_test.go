@@ -54,6 +54,25 @@ func TestDriverCapabilities(t *testing.T) {
 	}
 }
 
+func TestPeerStatusesDropUnmappedRuntimeDrift(t *testing.T) {
+	be := &awg.FakeBackend{DockerAvailable: true, Peers: []awg.PeerStatus{
+		{PublicKey: "CLIENT_PUBLIC", Enabled: true, RxBytes: 10, TxBytes: 20},
+		{PublicKey: "UNMAPPED_PUBLIC", Enabled: true, RxBytes: 30, TxBytes: 40},
+	}}
+	d := New(awg.NewRuntime(be, awg.MemoryStore{}))
+	in := inboundFixture()
+	if _, err := d.Create(context.Background(), in); err != nil {
+		t.Fatal(err)
+	}
+	peers, err := d.PeerStatuses(context.Background(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(peers) != 1 || peers[0].ClientID != "client-1" || peers[0].RxBytes != 10 || peers[0].TxBytes != 20 {
+		t.Fatalf("peer statuses = %+v", peers)
+	}
+}
+
 func TestClientCRUDPropagatesRuntimeFailure(t *testing.T) {
 	be := &awg.FakeBackend{DockerAvailable: true, VerifyErr: errors.New("runtime verify failed")}
 	d := New(awg.NewRuntime(be, awg.MemoryStore{}))

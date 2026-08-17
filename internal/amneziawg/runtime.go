@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -79,7 +80,24 @@ func (b *CommandBackend) Up(ctx context.Context, iface string) error {
 	}
 	switch st.Backend {
 	case BackendDocker:
-		return b.run(ctx, "docker", "start", b.dockerProfile().ContainerName)
+		container := b.dockerProfile().ContainerName
+		if err := b.run(ctx, "docker", "start", container); err != nil {
+			return err
+		}
+		var lastErr error
+		for attempt := 0; attempt < 50; attempt++ {
+			if err := b.run(ctx, "docker", "exec", container, "awg2-reconcile", "verify"); err == nil {
+				return nil
+			} else {
+				lastErr = err
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+		return fmt.Errorf("amneziawg runtime did not become ready: %w", lastErr)
 	default:
 		return ErrBackendUnavailable
 	}
@@ -517,6 +535,7 @@ type FakeBackend struct {
 	RolledBack      bool
 	Stopped         bool
 	LastConfig      string
+	Peers           []PeerStatus
 }
 
 func (b *FakeBackend) Detect(context.Context) (SafeStatus, error) {
@@ -542,7 +561,9 @@ func (b *FakeBackend) Down(context.Context, string) error {
 }
 func (b *FakeBackend) Delete(context.Context, string) error { return nil }
 func (b *FakeBackend) Status(context.Context, string) (SafeStatus, error) {
-	return b.Detect(context.Background())
+	status, err := b.Detect(context.Background())
+	status.Peers = append([]PeerStatus(nil), b.Peers...)
+	return status, err
 }
 
 func (b *FakeBackend) Rollback(context.Context, string, string) error {

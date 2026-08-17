@@ -120,6 +120,9 @@ func (d *Driver) PeerStatuses(ctx context.Context, inbound *model.Inbound) ([]dr
 	}
 	out := make([]driver.PeerStatusResult, 0, len(st.Peers))
 	for _, peer := range st.Peers {
+		if peer.ClientID == "" {
+			continue
+		}
 		out = append(out, driver.PeerStatusResult{ClientID: peer.ClientID, Enabled: peer.Enabled, LastHandshakeUnix: peer.LastHandshakeUnix, RxBytes: peer.RxBytes, TxBytes: peer.TxBytes})
 	}
 	return out, nil

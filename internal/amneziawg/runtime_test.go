@@ -108,6 +108,34 @@ func TestCommandBackendUsesFixedArgvAndDoesNotPassConfigAsArg(t *testing.T) {
 	}
 }
 
+func TestCommandBackendUpWaitsForAWGReadiness(t *testing.T) {
+	verifyAttempts := 0
+	be := &CommandBackend{
+		Run: func(_ context.Context, name string, args ...string) error {
+			call := name + " " + strings.Join(args, " ")
+			if strings.Contains(call, "docker exec") && strings.Contains(call, "awg2-reconcile verify") {
+				verifyAttempts++
+				if verifyAttempts < 3 {
+					return errors.New("interface not ready")
+				}
+			}
+			return nil
+		},
+		Output: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			if strings.Contains(strings.Join(args, " "), ".State.Running") {
+				return []byte("false\n"), nil
+			}
+			return []byte(`[{"Source":"/opt/amnezia/state/amnezia-awg2","Destination":"/opt/amnezia/awg"}]`), nil
+		},
+	}
+	if err := be.Up(context.Background(), "awg0"); err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+	if verifyAttempts != 3 {
+		t.Fatalf("verify attempts = %d, want 3", verifyAttempts)
+	}
+}
+
 func TestCommandBackendRejectsDockerMountMismatch(t *testing.T) {
 	profile := DockerBackendProfile()
 	profile.HostConfigDir = t.TempDir()
