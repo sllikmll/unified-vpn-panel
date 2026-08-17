@@ -157,8 +157,8 @@ apply_config() {
       }
     }
   ' "$config")
-  ensure_firewall "$source"
   printf '%s\n' "$source" > "$state_nat_source"
+  ensure_firewall "$source"
   awg show "$iface" >/dev/null
 }
 
