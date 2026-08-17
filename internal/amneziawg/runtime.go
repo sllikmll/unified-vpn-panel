@@ -203,11 +203,6 @@ func parsePeerDump(raw []byte) []PeerStatus {
 	return out
 }
 
-func (b *CommandBackend) has(name string) bool {
-	_, err := b.LookPath(name)
-	return err == nil
-}
-
 func (b *CommandBackend) run(ctx context.Context, name string, args ...string) error {
 	if b.Run == nil {
 		return fmt.Errorf("runner is nil")
@@ -568,6 +563,7 @@ func (b *FakeBackend) Up(context.Context, string) error {
 	b.Stopped = false
 	return nil
 }
+
 func (b *FakeBackend) Apply(_ context.Context, _ string, config string) error {
 	b.LastConfig = config
 	return nil
