@@ -31,7 +31,7 @@ func TestDefaultDockerPlansUseImmutableRuntimeDigests(t *testing.T) {
 		kind model.RuntimeKind
 		ref  string
 	}{
-		{model.RuntimeAmneziaWG, "ghcr.io/sllikmll/unified-vpn-panel-protocol-awg2@sha256:538dfb80a24f4f18e84aadbadd98472ace726452e96b36441d422fba7c5e24d8"},
+		{model.RuntimeAmneziaWG, "ghcr.io/sllikmll/unified-vpn-panel-protocol-awg2@sha256:1eb1c76cdbcd0acb24becb1926540b38a8f41d00dd41991c3b338c43aedaa407"},
 		{model.RuntimeNaiveProxy, "ghcr.io/sllikmll/unified-vpn-panel-protocol-naive-caddy@sha256:1bedc66132c2e22782c9d8c58d28e5232d7757a1adfcce69fd475842796e36ff"},
 	}
 	for _, tc := range cases {
@@ -42,6 +42,12 @@ func TestDefaultDockerPlansUseImmutableRuntimeDigests(t *testing.T) {
 			}
 			if plan.ArtifactRef != tc.ref {
 				t.Fatalf("artifact ref = %q, want %q", plan.ArtifactRef, tc.ref)
+			}
+			if tc.kind == model.RuntimeAmneziaWG {
+				caps := strings.Join(plan.Capabilities, ",")
+				if plan.Version != AWG2RuntimeVersion || !strings.Contains(caps, "foreground") || !strings.Contains(caps, "hot-reconcile") || !strings.Contains(caps, "peer-traffic") || !strings.Contains(caps, "lossless-awg2") {
+					t.Fatalf("AWG2 provenance/capabilities = %+v", plan)
+				}
 			}
 			if strings.Contains(plan.ArtifactRef, ":latest") {
 				t.Fatalf("plan uses mutable latest ref: %+v", plan)
