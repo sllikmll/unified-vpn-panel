@@ -73,6 +73,18 @@ type ClientStatusResult struct {
 	Enabled     bool              `json:"enabled"`
 }
 
+type PeerStatusResult struct {
+	ClientID          string `json:"clientId"`
+	Enabled           bool   `json:"enabled"`
+	LastHandshakeUnix int64  `json:"lastHandshakeUnix,omitempty"`
+	RxBytes           int64  `json:"rxBytes,omitempty"`
+	TxBytes           int64  `json:"txBytes,omitempty"`
+}
+
+type PeerObserver interface {
+	PeerStatuses(ctx context.Context, inbound *model.Inbound) ([]PeerStatusResult, error)
+}
+
 type Driver interface {
 	Kind() model.RuntimeKind
 	Capabilities() Capabilities

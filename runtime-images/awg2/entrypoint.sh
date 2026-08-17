@@ -3,46 +3,37 @@ set -Eeuo pipefail
 
 readonly config="/opt/amnezia/awg/awg0.conf"
 readonly iface="awg0"
+awg_pid=""
 
 cleanup() {
   trap - TERM INT EXIT
-  if ip link show dev "${iface}" >/dev/null 2>&1; then
-    awg-quick down "${config}" || ip link delete dev "${iface}" || true
-  fi
-}
-
-require_root() {
-  if [[ "$(id -u)" != "0" ]]; then
-    echo "AWG tunnel setup requires root inside the container plus NET_ADMIN and /dev/net/tun." >&2
-    exit 1
+  awg2-reconcile down || true
+  if [[ -n "$awg_pid" ]] && kill -0 "$awg_pid" >/dev/null 2>&1; then
+    kill -TERM "$awg_pid" >/dev/null 2>&1 || true
+    wait "$awg_pid" || true
   fi
 }
 
 require_runtime_inputs() {
-  if [[ ! -r "${config}" ]]; then
-    echo "Missing readable AmneziaWG config at ${config}; mount it at /opt/amnezia/awg/awg0.conf." >&2
-    exit 1
-  fi
-  if [[ ! -c /dev/net/tun ]]; then
-    echo "Missing /dev/net/tun; run with --device /dev/net/tun and --cap-add NET_ADMIN." >&2
-    exit 1
-  fi
+  [[ "$(id -u)" == "0" ]] || { echo "AWG2 runtime requires root" >&2; exit 1; }
+  [[ -r "$config" ]] || { echo "missing readable AWG2 config" >&2; exit 1; }
+  [[ -c /dev/net/tun ]] || { echo "missing /dev/net/tun" >&2; exit 1; }
 }
 
-bring_up_once() {
-  if ip link show dev "${iface}" >/dev/null 2>&1; then
-    echo "${iface} already exists; leaving existing interface in place."
-    return
-  fi
-  awg-quick up "${config}"
+start_foreground_runtime() {
+  amneziawg-go -f "$iface" &
+  awg_pid=$!
+  for _ in $(seq 1 100); do
+    kill -0 "$awg_pid" >/dev/null 2>&1 || { wait "$awg_pid"; return 1; }
+    ip link show dev "$iface" >/dev/null 2>&1 && return 0
+    sleep 0.05
+  done
+  echo "amneziawg-go did not create $iface" >&2
+  return 1
 }
 
-require_root
 require_runtime_inputs
 trap cleanup TERM INT EXIT
-bring_up_once
-
-while :; do
-  sleep 3600 &
-  wait "$!"
-done
+start_foreground_runtime
+awg2-reconcile apply
+wait "$awg_pid"

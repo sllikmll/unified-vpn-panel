@@ -1068,7 +1068,8 @@ func TestManagedEndpointCapabilitiesManagedBackendsMutable(t *testing.T) {
 	}
 	for _, kind := range []model.RuntimeKind{model.RuntimeAmneziaWG, model.RuntimeMieru, model.RuntimeNaiveProxy} {
 		cap := byKind[kind]
-		if !cap.ServerLifecycle || !cap.ClientCRUD || !cap.Detect || cap.Traffic || cap.FirewallPolicy {
+		wantTraffic := kind == model.RuntimeAmneziaWG
+		if !cap.ServerLifecycle || !cap.ClientCRUD || !cap.Detect || cap.Traffic != wantTraffic || cap.FirewallPolicy {
 			t.Fatalf("%s managed capability mismatch: %#v", kind, cap)
 		}
 	}
@@ -1079,7 +1080,7 @@ func TestManagedEndpointInstallPlansUseExactPinnedDockerRefs(t *testing.T) {
 		kind model.RuntimeKind
 		ref  string
 	}{
-		{model.RuntimeAmneziaWG, "ghcr.io/sllikmll/unified-vpn-panel-protocol-awg2@sha256:538dfb80a24f4f18e84aadbadd98472ace726452e96b36441d422fba7c5e24d8"},
+		{model.RuntimeAmneziaWG, "ghcr.io/sllikmll/unified-vpn-panel-protocol-awg2@sha256:465febe1b4156b240b0b929b5f180a2696a2501f8bb787b24406034e0d96c059"},
 		{model.RuntimeNaiveProxy, "ghcr.io/sllikmll/unified-vpn-panel-protocol-naive-caddy@sha256:1bedc66132c2e22782c9d8c58d28e5232d7757a1adfcce69fd475842796e36ff"},
 	}
 	for _, tc := range cases {

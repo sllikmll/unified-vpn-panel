@@ -8,7 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -52,14 +55,20 @@ func NewCommandBackend() *CommandBackend {
 }
 
 func (b *CommandBackend) Detect(ctx context.Context) (SafeStatus, error) {
-	if err := b.run(ctx, "docker", "container", "inspect", b.dockerProfile().ContainerName); err == nil {
+	profile := b.dockerProfile()
+	if b.run(ctx, "docker", "container", "inspect", profile.ContainerName) == nil {
 		if err := b.verifyDockerMount(ctx); err != nil {
-			return SafeStatus{Backend: BackendDocker, Available: false, State: StateStopped}, err
+			return SafeStatus{Backend: BackendDocker, State: StateStopped}, err
 		}
-		return SafeStatus{Backend: BackendDocker, Available: true, State: StateRunning}, nil
-	}
-	if b.has("awg") && b.has("awg-quick") {
-		return SafeStatus{Backend: BackendNative, Available: true, State: StateStopped}, nil
+		state := StateStopped
+		running, err := b.output(ctx, "docker", "inspect", "--format", "{{.State.Running}}", profile.ContainerName)
+		if err != nil {
+			return SafeStatus{Backend: BackendDocker, State: StateStopped}, err
+		}
+		if strings.TrimSpace(string(running)) == "true" {
+			state = StateRunning
+		}
+		return SafeStatus{Backend: BackendDocker, Available: true, State: state}, nil
 	}
 	return SafeStatus{Backend: BackendNone, State: StateStopped}, nil
 }
@@ -71,9 +80,24 @@ func (b *CommandBackend) Up(ctx context.Context, iface string) error {
 	}
 	switch st.Backend {
 	case BackendDocker:
-		return b.run(ctx, "docker", "start", b.dockerProfile().ContainerName)
-	case BackendNative:
-		return b.run(ctx, "awg-quick", "up", iface)
+		container := b.dockerProfile().ContainerName
+		if err := b.run(ctx, "docker", "start", container); err != nil {
+			return err
+		}
+		var lastErr error
+		for attempt := 0; attempt < 50; attempt++ {
+			if err := b.run(ctx, "docker", "exec", container, "awg2-reconcile", "verify"); err == nil {
+				return nil
+			} else {
+				lastErr = err
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+		return fmt.Errorf("amneziawg runtime did not become ready: %w", lastErr)
 	default:
 		return ErrBackendUnavailable
 	}
@@ -92,10 +116,7 @@ func (b *CommandBackend) Apply(ctx context.Context, iface, config string) error 
 		if config == "" {
 			return fmt.Errorf("empty amneziawg config")
 		}
-		return b.run(ctx, "docker", "restart", b.dockerProfile().ContainerName)
-	case BackendNative:
-		_ = b.run(ctx, "awg-quick", "down", iface)
-		return b.run(ctx, "awg-quick", "up", iface)
+		return b.run(ctx, "docker", "exec", b.dockerProfile().ContainerName, "awg2-reconcile", "apply")
 	default:
 		return ErrBackendUnavailable
 	}
@@ -108,9 +129,7 @@ func (b *CommandBackend) Verify(ctx context.Context, iface string) error {
 	}
 	switch st.Backend {
 	case BackendDocker:
-		return b.run(ctx, "docker", "exec", b.dockerProfile().ContainerName, "awg", "show", iface)
-	case BackendNative:
-		return b.run(ctx, "awg", "show", iface)
+		return b.run(ctx, "docker", "exec", b.dockerProfile().ContainerName, "awg2-reconcile", "verify")
 	default:
 		return ErrBackendUnavailable
 	}
@@ -124,8 +143,6 @@ func (b *CommandBackend) Down(ctx context.Context, iface string) error {
 	switch st.Backend {
 	case BackendDocker:
 		return b.run(ctx, "docker", "stop", b.dockerProfile().ContainerName)
-	case BackendNative:
-		return b.run(ctx, "awg-quick", "down", iface)
 	default:
 		return ErrBackendUnavailable
 	}
@@ -142,6 +159,11 @@ func (b *CommandBackend) Status(ctx context.Context, iface string) (SafeStatus, 
 	}
 	if err := b.Verify(ctx, iface); err == nil {
 		st.State = StateRunning
+		raw, dumpErr := b.output(ctx, "docker", "exec", b.dockerProfile().ContainerName, "awg", "show", iface, "dump")
+		if dumpErr != nil {
+			return st, dumpErr
+		}
+		st.Peers = parsePeerDump(raw)
 	} else {
 		st.State = StateStopped
 	}
@@ -149,12 +171,36 @@ func (b *CommandBackend) Status(ctx context.Context, iface string) (SafeStatus, 
 }
 
 func (b *CommandBackend) Rollback(ctx context.Context, iface string, _ string) error {
-	return b.Apply(ctx, iface, "")
+	st, err := b.Detect(ctx)
+	if err != nil {
+		return err
+	}
+	if st.Backend == BackendDocker && st.State != StateRunning {
+		return b.Up(ctx, iface)
+	}
+	return b.Apply(ctx, iface, "rollback")
 }
 
-func (b *CommandBackend) has(name string) bool {
-	_, err := b.LookPath(name)
-	return err == nil
+func parsePeerDump(raw []byte) []PeerStatus {
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	if len(lines) < 2 {
+		return nil
+	}
+	out := make([]PeerStatus, 0, len(lines)-1)
+	for _, line := range lines[1:] {
+		fields := strings.Split(line, "	")
+		if len(fields) < 8 {
+			continue
+		}
+		handshake, err1 := strconv.ParseInt(fields[4], 10, 64)
+		rx, err2 := strconv.ParseInt(fields[5], 10, 64)
+		tx, err3 := strconv.ParseInt(fields[6], 10, 64)
+		if err1 != nil || err2 != nil || err3 != nil {
+			continue
+		}
+		out = append(out, PeerStatus{PublicKey: fields[0], Enabled: true, LastHandshakeUnix: handshake, RxBytes: rx, TxBytes: tx})
+	}
+	return out
 }
 
 func (b *CommandBackend) run(ctx context.Context, name string, args ...string) error {
@@ -331,15 +377,19 @@ func (r *Runtime) Apply(ctx context.Context, desired DesiredConfig) error {
 	if err != nil {
 		return err
 	}
+	restoreStopped := st.State != StateRunning
+	if st.State != StateRunning {
+		if err := r.backend.Up(ctx, desired.Server.InterfaceName); err != nil {
+			return errors.Join(err, r.rollback(ctx, store, desired.Server.InterfaceName, backup, restoreStopped))
+		}
+	}
 	if err := r.backend.Apply(ctx, desired.Server.InterfaceName, cfg); err != nil {
-		_ = r.rollback(ctx, store, desired.Server.InterfaceName, backup)
-		return err
+		return errors.Join(err, r.rollback(ctx, store, desired.Server.InterfaceName, backup, restoreStopped))
 	}
 	if err := r.backend.Verify(ctx, desired.Server.InterfaceName); err != nil {
-		_ = r.rollback(ctx, store, desired.Server.InterfaceName, backup)
-		return err
+		return errors.Join(err, r.rollback(ctx, store, desired.Server.InterfaceName, backup, restoreStopped))
 	}
-	r.current = DesiredConfig{Server: desired.Server}
+	r.current = desired
 	return nil
 }
 
@@ -352,7 +402,43 @@ func (r *Runtime) Stop(ctx context.Context, iface string) error {
 }
 
 func (r *Runtime) Observe(ctx context.Context, iface string) (SafeStatus, error) {
-	return r.backend.Status(ctx, iface)
+	st, err := r.backend.Status(ctx, iface)
+	if err != nil {
+		return st, err
+	}
+	ids := map[string]string{}
+	for _, client := range r.current.Clients {
+		ids[client.PublicKey] = client.ID
+	}
+	if len(ids) == 0 {
+		store, detectErr := r.backend.Detect(ctx)
+		if detectErr == nil {
+			raw, _ := r.storeFor(store.Backend).Load(iface)
+			ids = peerIDsFromConfig(raw)
+		}
+	}
+	for i := range st.Peers {
+		st.Peers[i].ClientID = ids[st.Peers[i].PublicKey]
+	}
+	return st, nil
+}
+
+func peerIDsFromConfig(raw string) map[string]string {
+	out := map[string]string{}
+	clientID := ""
+	for _, line := range strings.Split(raw, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "# ") {
+			clientID = strings.TrimSpace(strings.TrimPrefix(trimmed, "# "))
+			continue
+		}
+		key, value, ok := strings.Cut(trimmed, "=")
+		if ok && strings.EqualFold(strings.TrimSpace(key), "PublicKey") && clientID != "" {
+			out[strings.TrimSpace(value)] = clientID
+			clientID = ""
+		}
+	}
+	return out
 }
 
 func (r *Runtime) Delete(ctx context.Context, iface string) error {
@@ -366,8 +452,7 @@ func (r *Runtime) Delete(ctx context.Context, iface string) error {
 		return err
 	}
 	if err := r.backend.Delete(ctx, iface); err != nil {
-		_ = r.rollback(ctx, store, iface, backup)
-		return err
+		return errors.Join(err, r.rollback(ctx, store, iface, backup, false))
 	}
 	return nil
 }
@@ -392,11 +477,23 @@ func (r *Runtime) ExportPeer(_ context.Context, clientID string) (string, error)
 	return "", ErrPeerOperationsUnsupported
 }
 
-func (r *Runtime) rollback(ctx context.Context, store Store, iface, backup string) error {
+func (r *Runtime) rollback(ctx context.Context, store Store, iface, backup string, restoreStopped bool) error {
+	if strings.TrimSpace(backup) == "" {
+		_, deleteErr := store.Delete(iface)
+		stopErr := r.backend.Down(ctx, iface)
+		return errors.Join(deleteErr, stopErr)
+	}
 	if _, err := store.SaveAtomic(iface, backup); err != nil {
+		if restoreStopped {
+			return errors.Join(err, r.backend.Down(ctx, iface))
+		}
 		return err
 	}
-	return r.backend.Rollback(ctx, iface, backup)
+	restoreErr := r.backend.Rollback(ctx, iface, backup)
+	if restoreStopped {
+		return errors.Join(restoreErr, r.backend.Down(ctx, iface))
+	}
+	return restoreErr
 }
 
 func (r *Runtime) storeFor(kind BackendKind) Store {
@@ -442,13 +539,19 @@ type FakeBackend struct {
 	NativeAvailable bool
 	VerifyErr       error
 	RolledBack      bool
+	Stopped         bool
 	LastConfig      string
+	Peers           []PeerStatus
 }
 
 func (b *FakeBackend) Detect(context.Context) (SafeStatus, error) {
 	switch {
 	case b.DockerAvailable:
-		return SafeStatus{Backend: BackendDocker, Available: true, State: StateRunning}, nil
+		state := StateRunning
+		if b.Stopped {
+			state = StateStopped
+		}
+		return SafeStatus{Backend: BackendDocker, Available: true, State: state}, nil
 	case b.NativeAvailable:
 		return SafeStatus{Backend: BackendNative, Available: true, State: StateRunning}, nil
 	default:
@@ -456,16 +559,25 @@ func (b *FakeBackend) Detect(context.Context) (SafeStatus, error) {
 	}
 }
 
-func (b *FakeBackend) Up(context.Context, string) error { return nil }
+func (b *FakeBackend) Up(context.Context, string) error {
+	b.Stopped = false
+	return nil
+}
+
 func (b *FakeBackend) Apply(_ context.Context, _ string, config string) error {
 	b.LastConfig = config
 	return nil
 }
 func (b *FakeBackend) Verify(context.Context, string) error { return b.VerifyErr }
-func (b *FakeBackend) Down(context.Context, string) error   { return nil }
+func (b *FakeBackend) Down(context.Context, string) error {
+	b.Stopped = true
+	return nil
+}
 func (b *FakeBackend) Delete(context.Context, string) error { return nil }
 func (b *FakeBackend) Status(context.Context, string) (SafeStatus, error) {
-	return b.Detect(context.Background())
+	status, err := b.Detect(context.Background())
+	status.Peers = append([]PeerStatus(nil), b.Peers...)
+	return status, err
 }
 
 func (b *FakeBackend) Rollback(context.Context, string, string) error {

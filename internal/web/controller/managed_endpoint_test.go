@@ -77,7 +77,7 @@ func TestManagedEndpointInstallPlanRoute(t *testing.T) {
 		`"supported":true`,
 		`"blocked":false`,
 		`"requiresPinnedImage":true`,
-		`"artifactRef":"ghcr.io/sllikmll/unified-vpn-panel-protocol-awg2@sha256:538dfb80a24f4f18e84aadbadd98472ace726452e96b36441d422fba7c5e24d8"`,
+		`"artifactRef":"ghcr.io/sllikmll/unified-vpn-panel-protocol-awg2@sha256:465febe1b4156b240b0b929b5f180a2696a2501f8bb787b24406034e0d96c059"`,
 		"unified-vpn-awg2-runtime",
 	} {
 		if !strings.Contains(rec.Body.String(), want) {

@@ -21,7 +21,7 @@ func New(rt *awg.Runtime) *Driver {
 func (d *Driver) Kind() model.RuntimeKind { return model.RuntimeAmneziaWG }
 
 func (d *Driver) Capabilities() driver.Capabilities {
-	return driver.Capabilities{EndpointLifecycle: true, ClientCRUD: false, Detect: true, Status: true, Health: true}
+	return driver.Capabilities{EndpointLifecycle: true, ClientCRUD: true, Detect: true, Status: true, Health: true}
 }
 
 func (d *Driver) Create(ctx context.Context, inbound *model.Inbound) (driver.EndpointResult, error) {
@@ -109,6 +109,25 @@ func (d *Driver) Health(ctx context.Context, inbound *model.Inbound) (driver.Hea
 	return driver.HealthResult{RuntimeKind: model.RuntimeAmneziaWG, InboundId: inbound.Id, Tag: inbound.Tag, Status: st.Status}, nil
 }
 
+func (d *Driver) PeerStatuses(ctx context.Context, inbound *model.Inbound) ([]driver.PeerStatusResult, error) {
+	cfg, err := configFromInbound(inbound)
+	if err != nil {
+		return nil, err
+	}
+	st, err := d.rt.Observe(ctx, cfg.Server.InterfaceName)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]driver.PeerStatusResult, 0, len(st.Peers))
+	for _, peer := range st.Peers {
+		if peer.ClientID == "" {
+			continue
+		}
+		out = append(out, driver.PeerStatusResult{ClientID: peer.ClientID, Enabled: peer.Enabled, LastHandshakeUnix: peer.LastHandshakeUnix, RxBytes: peer.RxBytes, TxBytes: peer.TxBytes})
+	}
+	return out, nil
+}
+
 func (d *Driver) Clients() driver.ClientDriver { return clientDriver{d: d} }
 
 func (d *Driver) apply(ctx context.Context, inbound *model.Inbound) (driver.EndpointResult, error) {
@@ -128,27 +147,60 @@ func (d *Driver) apply(ctx context.Context, inbound *model.Inbound) (driver.Endp
 type clientDriver struct{ d *Driver }
 
 func (c clientDriver) Create(ctx context.Context, inbound *model.Inbound, client model.Client) (driver.ClientResult, error) {
-	return driver.ClientResult{}, awg.ErrPeerOperationsUnsupported
+	return c.reconcile(ctx, inbound, client.Email, client.Enable)
 }
 
-func (c clientDriver) Update(ctx context.Context, inbound *model.Inbound, oldEmail string, client model.Client) (driver.ClientResult, error) {
-	return driver.ClientResult{}, awg.ErrPeerOperationsUnsupported
+func (c clientDriver) Update(ctx context.Context, inbound *model.Inbound, _ string, client model.Client) (driver.ClientResult, error) {
+	return c.reconcile(ctx, inbound, client.Email, client.Enable)
 }
 
-func (c clientDriver) Delete(ctx context.Context, _ *model.Inbound, email string) (driver.ClientResult, error) {
-	return driver.ClientResult{}, awg.ErrPeerOperationsUnsupported
+func (c clientDriver) Delete(ctx context.Context, inbound *model.Inbound, email string) (driver.ClientResult, error) {
+	return c.reconcile(ctx, inbound, email, false)
 }
 
 func (c clientDriver) Enable(ctx context.Context, inbound *model.Inbound, client model.Client) (driver.ClientResult, error) {
-	return driver.ClientResult{}, awg.ErrPeerOperationsUnsupported
+	return c.reconcile(ctx, inbound, client.Email, true)
 }
 
-func (c clientDriver) Disable(ctx context.Context, _ *model.Inbound, email string) (driver.ClientResult, error) {
-	return driver.ClientResult{}, awg.ErrPeerOperationsUnsupported
+func (c clientDriver) Disable(ctx context.Context, inbound *model.Inbound, email string) (driver.ClientResult, error) {
+	return c.reconcile(ctx, inbound, email, false)
 }
 
-func (c clientDriver) Status(ctx context.Context, _ *model.Inbound, email string) (driver.ClientStatusResult, error) {
-	return driver.ClientStatusResult{}, awg.ErrPeerOperationsUnsupported
+func (c clientDriver) Status(ctx context.Context, inbound *model.Inbound, email string) (driver.ClientStatusResult, error) {
+	cfg, err := configFromInbound(inbound)
+	if err != nil {
+		return driver.ClientStatusResult{}, err
+	}
+	clientID := ""
+	enabled := false
+	for _, client := range cfg.Clients {
+		if client.Email == email {
+			clientID = client.ID
+			enabled = client.Enable
+			break
+		}
+	}
+	if clientID == "" {
+		return driver.ClientStatusResult{}, fmt.Errorf("amneziawg client %q not found", email)
+	}
+	peers, err := c.d.PeerStatuses(ctx, inbound)
+	if err != nil {
+		return driver.ClientStatusResult{}, err
+	}
+	for _, peer := range peers {
+		if peer.ClientID == clientID {
+			enabled = peer.Enabled
+			break
+		}
+	}
+	return driver.ClientStatusResult{RuntimeKind: model.RuntimeAmneziaWG, InboundId: inbound.Id, Tag: inbound.Tag, Email: email, Enabled: enabled}, nil
+}
+
+func (c clientDriver) reconcile(ctx context.Context, inbound *model.Inbound, email string, enabled bool) (driver.ClientResult, error) {
+	if _, err := c.d.apply(ctx, inbound); err != nil {
+		return driver.ClientResult{}, err
+	}
+	return driver.ClientResult{RuntimeKind: model.RuntimeAmneziaWG, InboundId: inbound.Id, Tag: inbound.Tag, Email: email, Enabled: enabled}, nil
 }
 
 func (c clientDriver) Export(ctx context.Context, clientID string) (string, error) {

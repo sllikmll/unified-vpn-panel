@@ -84,6 +84,10 @@ export interface ManagedEndpointClient {
   enable: boolean;
   enabled?: boolean;
   status?: string;
+  trafficUp?: number;
+  trafficDown?: number;
+  latestHandshake?: number;
+  lastOnline?: number;
   traffic?: { up?: number; down?: number; supported?: boolean };
   subscriptions?: Partial<Record<'raw' | 'json' | 'clash', string>>;
   hasCredential?: boolean;

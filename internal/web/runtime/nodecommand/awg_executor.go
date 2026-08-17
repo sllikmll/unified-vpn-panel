@@ -86,7 +86,13 @@ func (e AWGExecutor) execute(ctx context.Context, _ AuthenticatedSession, req Re
 		resp.Result = Result{RuntimeKind: req.RuntimeKind, EndpointID: req.EndpointID, State: ResultStateDeleted}
 		return resp, nil
 	case OperationEndpointStatus, OperationEndpointHealth:
-		inbound, err := inboundFromRefs(req)
+		var inbound *model.Inbound
+		var err error
+		if req.SecretInput != nil && len(req.SecretInput.Material) > 0 {
+			inbound, err = inboundFromRequest(req)
+		} else {
+			inbound, err = inboundFromRefs(req)
+		}
 		if err != nil {
 			return validationResponse(req), nil
 		}
@@ -103,7 +109,18 @@ func (e AWGExecutor) execute(ctx context.Context, _ AuthenticatedSession, req Re
 		}
 		resp.Status = StatusSucceeded
 		resp.SummaryCode = SummaryStatusAvailable
-		resp.Result = Result{RuntimeKind: req.RuntimeKind, EndpointID: req.EndpointID, State: state}
+		result := Result{RuntimeKind: req.RuntimeKind, EndpointID: req.EndpointID, State: state}
+		if observer, ok := d.(driver.PeerObserver); ok {
+			peers, peerErr := observer.PeerStatuses(ctx, inbound)
+			if peerErr != nil {
+				resp.Status = StatusFailed
+				resp.ErrorCode = ErrorCodeRuntimeFailed
+				resp.SummaryCode = SummaryRuntimeFailed
+				return resp, nil
+			}
+			result.Peers = peers
+		}
+		resp.Result = result
 		return resp, nil
 	case OperationEndpointDetect:
 		detect, err := d.Detect(ctx)

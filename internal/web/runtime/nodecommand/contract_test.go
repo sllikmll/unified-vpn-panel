@@ -12,7 +12,25 @@ import (
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver"
 )
+
+func TestPeerSnapshotResponseValidation(t *testing.T) {
+	valid := Response{Version: ProtocolV1, CommandID: "cmd-1", NodeID: 1, TargetGUID: "node-1", Status: StatusSucceeded, SummaryCode: SummaryStatusAvailable, Result: Result{
+		RuntimeKind: model.RuntimeAmneziaWG,
+		EndpointID:  1,
+		State:       "running",
+		Peers:       []driver.PeerStatusResult{{ClientID: "client-1", Enabled: true, LastHandshakeUnix: 100, RxBytes: 10, TxBytes: 20}},
+	}}
+	if err := valid.Validate(); err != nil {
+		t.Fatalf("valid peer response: %v", err)
+	}
+	invalid := valid
+	invalid.Result.Peers = []driver.PeerStatusResult{{ClientID: "client id with spaces", RxBytes: 1}}
+	if err := invalid.Validate(); !errors.Is(err, ErrUnsafeResponse) {
+		t.Fatalf("unsafe peer response error = %v", err)
+	}
+}
 
 func TestNegotiateVersion(t *testing.T) {
 	tests := []struct {

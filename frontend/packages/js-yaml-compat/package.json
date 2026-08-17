@@ -1,0 +1,16 @@
+{
+  "name": "js-yaml",
+  "version": "5.3.0-compat.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.mjs",
+      "default": "./index.mjs"
+    }
+  },
+  "dependencies": {
+    "js-yaml-upstream": "npm:js-yaml@5.3.0"
+  }
+}

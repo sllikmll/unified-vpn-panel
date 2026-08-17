@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	awg "github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
@@ -172,12 +174,16 @@ func (d remoteManagedDriver) Disable(ctx context.Context, inbound *model.Inbound
 }
 
 func (d remoteManagedDriver) Restart(ctx context.Context) error {
-	_, err := d.send(ctx, nodecommand.OperationEndpointRestart, nil, nil, 1)
+	_, err := d.send(ctx, nodecommand.OperationEndpointRestart, nil, nil, 0)
 	return err
 }
 
 func (d remoteManagedDriver) Status(ctx context.Context, inbound *model.Inbound) (driver.StatusResult, error) {
-	resp, err := d.send(ctx, nodecommand.OperationEndpointStatus, inbound, nil, 1)
+	material := []byte(nil)
+	if inbound != nil && strings.TrimSpace(inbound.Settings) != "" {
+		material = []byte(inbound.Settings)
+	}
+	resp, err := d.send(ctx, nodecommand.OperationEndpointStatus, inbound, material, 0)
 	if err != nil {
 		return driver.StatusResult{}, err
 	}
@@ -189,7 +195,7 @@ func (d remoteManagedDriver) Status(ctx context.Context, inbound *model.Inbound)
 }
 
 func (d remoteManagedDriver) Detect(ctx context.Context) (driver.DetectResult, error) {
-	resp, err := d.send(ctx, nodecommand.OperationEndpointDetect, nil, nil, 1)
+	resp, err := d.send(ctx, nodecommand.OperationEndpointDetect, nil, nil, 0)
 	return driver.DetectResult{RuntimeKind: d.kind, Available: err == nil && resp.Status == nodecommand.StatusSucceeded}, err
 }
 
@@ -199,6 +205,21 @@ func (d remoteManagedDriver) Health(ctx context.Context, inbound *model.Inbound)
 		return driver.HealthResult{}, err
 	}
 	return driver.HealthResult{RuntimeKind: d.kind, InboundId: inbound.Id, Tag: inbound.Tag, Status: st.Status}, nil
+}
+
+func (d remoteManagedDriver) PeerStatuses(ctx context.Context, inbound *model.Inbound) ([]driver.PeerStatusResult, error) {
+	material := []byte(nil)
+	if inbound != nil && strings.TrimSpace(inbound.Settings) != "" {
+		material = []byte(inbound.Settings)
+	}
+	resp, err := d.send(ctx, nodecommand.OperationEndpointStatus, inbound, material, 0)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Status != nodecommand.StatusSucceeded {
+		return nil, fmt.Errorf("remote managed runtime failed: %s", resp.SummaryCode)
+	}
+	return resp.Result.Peers, nil
 }
 
 func (d remoteManagedDriver) Clients() driver.ClientDriver { return remoteUnsupportedClient{} }
@@ -215,6 +236,8 @@ func (d remoteManagedDriver) apply(ctx context.Context, op nodecommand.Operation
 		if generation == 0 {
 			generation = 1
 		}
+	} else if op == nodecommand.OperationEndpointDelete {
+		generation = time.Now().UnixNano()
 	}
 	resp, err := d.send(ctx, op, inbound, material, generation)
 	if err != nil {
@@ -271,9 +294,28 @@ func (d remoteManagedDriver) send(ctx context.Context, op nodecommand.Operation,
 	}
 	if len(material) > 0 {
 		req.SecretInput = &nodecommand.SecretInput{Material: material}
+	} else if refs, err := managedSecretRefs(d.kind, inbound); err != nil {
+		return nodecommand.Response{}, err
+	} else if len(refs) > 0 {
+		req.SecretInput = &nodecommand.SecretInput{Refs: refs}
 	}
 	session := nodecommand.NewAuthenticatedSession(node.Id, node.Guid, fmt.Sprintf("node-%d", node.Id), "node-command-v1", now.Add(-time.Second), now.Add(10*time.Minute))
 	return d.remote.Send(ctx, session, req)
+}
+
+func managedSecretRefs(kind model.RuntimeKind, inbound *model.Inbound) (map[string]string, error) {
+	if kind != model.RuntimeAmneziaWG || inbound == nil {
+		return nil, nil
+	}
+	var desired awg.DesiredConfig
+	if err := json.Unmarshal([]byte(inbound.Settings), &desired); err != nil {
+		return nil, fmt.Errorf("decode amneziawg interface ref: %w", err)
+	}
+	iface := strings.TrimSpace(desired.Server.InterfaceName)
+	if iface == "" {
+		iface = "awg0"
+	}
+	return map[string]string{"interfaceName": iface}, nil
 }
 
 type remoteUnsupportedClient struct{}

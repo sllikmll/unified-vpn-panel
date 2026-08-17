@@ -21,8 +21,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/unified-vpn-panel
-  AWG_GO_COMMIT: cf9d2dd202821301f7039093b0a1b3d4b574c47c
-  AWG_TOOLS_COMMIT: d09ecc38425082e472368dd2bf8c4c42d10cae03
+  AWG_GO_COMMIT: 1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1
+  AWG_TOOLS_COMMIT: ee0f0a9aa34ff0a0da4b3433b9512781cfe02843
   CADDY_VERSION: v2.11.4
   XCADDY_VERSION: v0.4.5
   FORWARDPROXY_COMMIT: d62c80d3dd2c706b6b87579844d2397bddd18317
@@ -46,7 +46,7 @@ jobs:
           - id: awg2
             context: runtime-images/awg2
             image_suffix: protocol-awg2
-            tag_prefix: awg2-go-cf9d2dd-tools-d09ecc3
+            tag_prefix: awg2-go-v3.1.20260814-tools-v3.1.20260812
           - id: naive-caddy
             context: runtime-images/naive-caddy
             image_suffix: protocol-naive-caddy
