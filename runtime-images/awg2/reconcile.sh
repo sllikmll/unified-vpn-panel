@@ -5,7 +5,7 @@ readonly config="/opt/amnezia/awg/awg0.conf"
 readonly iface="awg0"
 readonly runtime_dir="/run/amneziawg"
 readonly runtime_config="${runtime_dir}/awg0.setconf"
-readonly state_address="${runtime_dir}/nat-address"
+readonly state_nat_source="${runtime_dir}/nat-source"
 
 config_value() {
   local key="$1"
@@ -24,6 +24,35 @@ config_value() {
       }
     }
   ' "$config"
+}
+
+comment_value() {
+  local key="$1"
+  awk -F= -v wanted="$key" '
+    BEGIN { section = "" }
+    /^\[Interface\][[:space:]]*$/ { section = "interface"; next }
+    /^\[/ { section = "other"; next }
+    section == "interface" {
+      line = $0
+      sub(/^[[:space:]]*#[[:space:]]*/, "", line)
+      name = line
+      sub(/[[:space:]]*=.*/, "", name)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", name)
+      if (tolower(name) == tolower(wanted)) {
+        value = substr(line, index(line, "=") + 1)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+        print value
+        exit
+      }
+    }
+  ' "$config"
+}
+
+nat_source() {
+  local source
+  source="$(comment_value IPv4Pool)"
+  [[ -n "$source" ]] || source="$(config_value Address)"
+  printf '%s\n' "$source"
 }
 
 render_setconf() {
@@ -49,11 +78,16 @@ render_setconf() {
 
 validate_inputs() {
   [[ -r "$config" ]] || { echo "missing readable AWG2 config" >&2; return 1; }
-  local address mtu
+  local address mtu source
   address="$(config_value Address)"
   mtu="$(config_value MTU)"
+  source="$(nat_source)"
   [[ "$address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$ ]] || {
     echo "invalid IPv4 Address in AWG2 config" >&2
+    return 1
+  }
+  [[ "$source" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$ ]] || {
+    echo "invalid IPv4Pool in AWG2 config" >&2
     return 1
   }
   if [[ -n "$mtu" && ! "$mtu" =~ ^[0-9]{3,4}$ ]]; then
@@ -63,23 +97,23 @@ validate_inputs() {
 }
 
 ensure_firewall() {
-  local address="$1"
+  local source="$1"
   iptables -C FORWARD -i "$iface" -j ACCEPT >/dev/null 2>&1 || iptables -I FORWARD 1 -i "$iface" -j ACCEPT
   iptables -C FORWARD -o "$iface" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT >/dev/null 2>&1 || iptables -I FORWARD 1 -o "$iface" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-  iptables -t nat -C POSTROUTING -s "$address" -j MASQUERADE >/dev/null 2>&1 || iptables -t nat -A POSTROUTING -s "$address" -j MASQUERADE
+  iptables -t nat -C POSTROUTING -s "$source" -j MASQUERADE >/dev/null 2>&1 || iptables -t nat -A POSTROUTING -s "$source" -j MASQUERADE
 }
 
 remove_firewall() {
-	local address
-	if [[ -r "$state_address" ]]; then
-		address="$(<"$state_address")"
-	else
-		address="$(config_value Address 2>/dev/null || true)"
-	fi
+  local source
+  if [[ -r "$state_nat_source" ]]; then
+    source="$(<"$state_nat_source")"
+  else
+    source="$(nat_source 2>/dev/null || true)"
+  fi
   iptables -D FORWARD -i "$iface" -j ACCEPT >/dev/null 2>&1 || true
   iptables -D FORWARD -o "$iface" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT >/dev/null 2>&1 || true
-  if [[ -n "$address" ]]; then
-    iptables -t nat -D POSTROUTING -s "$address" -j MASQUERADE >/dev/null 2>&1 || true
+  if [[ -n "$source" ]]; then
+    iptables -t nat -D POSTROUTING -s "$source" -j MASQUERADE >/dev/null 2>&1 || true
   fi
 }
 
@@ -89,12 +123,13 @@ apply_config() {
   render_setconf
   awg setconf "$iface" "$runtime_config"
 
-  local address mtu
+  local address mtu source
   address="$(config_value Address)"
   mtu="$(config_value MTU)"
+  source="$(nat_source)"
   remove_firewall
   while IFS= read -r route; do
-  	[[ -n "$route" ]] && ip route del "$route" dev "$iface" >/dev/null 2>&1 || true
+    [[ -n "$route" ]] && ip route del "$route" dev "$iface" >/dev/null 2>&1 || true
   done < <(ip -o route show dev "$iface" | awk '{print $1}')
   ip address flush dev "$iface"
   ip address add "$address" dev "$iface"
@@ -122,8 +157,8 @@ apply_config() {
       }
     }
   ' "$config")
-  ensure_firewall "$address"
-  printf '%s\n' "$address" > "$state_address"
+  ensure_firewall "$source"
+  printf '%s\n' "$source" > "$state_nat_source"
   awg show "$iface" >/dev/null
 }
 
@@ -138,7 +173,7 @@ case "${1:-}" in
   verify) verify_config ;;
   down)
     remove_firewall
-		rm -f "$state_address"
+    rm -f "$state_nat_source"
     ip link delete dev "$iface" >/dev/null 2>&1 || true
     ;;
   *) echo "usage: awg2-reconcile {apply|verify|down}" >&2; exit 2 ;;

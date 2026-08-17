@@ -352,6 +352,7 @@ func RenderServerConfig(server Server, clients []Client) (string, error) {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "[Interface]\nPrivateKey = %s\nAddress = %s\nListenPort = %d\n", server.PrivateKey, server.IPv4Address, server.ListenPort)
+	fmt.Fprintf(&b, "# IPv4Pool = %s\n", server.IPv4Pool)
 	if server.MTU > 0 {
 		fmt.Fprintf(&b, "MTU = %d\n", server.MTU)
 	}

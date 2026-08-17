@@ -84,6 +84,9 @@ for required in [
 for required in [
     'readonly config="/opt/amnezia/awg/awg0.conf"',
     'readonly iface="awg0"',
+    'comment_value IPv4Pool',
+    'state_nat_source',
+    'ensure_firewall "$source"',
     'awg setconf "$iface" "$runtime_config"',
     'awg show "$iface"',
 ]:

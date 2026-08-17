@@ -1248,7 +1248,7 @@ func (ManagedEndpointService) Capabilities() ManagedEndpointCapabilities {
 		phase0Capability(model.RuntimeXray, model.ManagedProtocol(model.VLESS), model.ManagedProtocol(model.VMESS), model.ManagedProtocol(model.Trojan), model.ManagedProtocol(model.Shadowsocks), model.ManagedProtocol(model.WireGuard), model.ManagedProtocol(model.Hysteria), model.ManagedProtocol(model.HTTP), model.ManagedProtocol(model.Mixed), model.ManagedProtocol(model.Tunnel)),
 		phase0Capability(model.RuntimeMTProto, model.ManagedProtocol(model.MTProto)),
 		phase0Capability(model.RuntimeWireGuard, "wireguard"),
-		managedCapability(model.RuntimeAmneziaWG, false, true, "amneziawg"),
+		managedCapability(model.RuntimeAmneziaWG, true, true, "amneziawg"),
 		managedCapability(model.RuntimeMieru, false, true, "mieru"),
 		managedCapability(model.RuntimeNaiveProxy, false, true, "naiveproxy"),
 	}}

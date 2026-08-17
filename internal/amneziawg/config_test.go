@@ -71,6 +71,8 @@ func TestRenderConfigsIPv4OnlyAndRedaction(t *testing.T) {
 	server.PrivateKey = "SERVER_PRIVATE"
 	server.PublicKey = "SERVER_PUBLIC"
 	server.Endpoint = "vpn.example.test"
+	server.IPv4Address = "10.66.66.1/32"
+	server.IPv4Pool = "10.66.66.0/24"
 	client := Client{
 		ID:                  "client-1",
 		Email:               "u@example.test",
@@ -94,7 +96,7 @@ func TestRenderConfigsIPv4OnlyAndRedaction(t *testing.T) {
 	if strings.Contains(cfg, "::") || strings.Contains(clientCfg, "::") {
 		t.Fatalf("rendered IPv6 content despite IPv6 out of scope:\n%s\n%s", cfg, clientCfg)
 	}
-	for _, want := range []string{"PostUp = iptables -C FORWARD", "iptables -t nat -A POSTROUTING -s 10.66.66.0/24 -j MASQUERADE", "PostDown = iptables -D FORWARD", "|| true", "Jc = ", "S3 = ", "S4 = ", "H1 = ", "I1 = ", "Endpoint = vpn.example.test:51820"} {
+	for _, want := range []string{"# IPv4Pool = 10.66.66.0/24", "Address = 10.66.66.1/32", "PostUp = iptables -C FORWARD", "iptables -t nat -A POSTROUTING -s 10.66.66.0/24 -j MASQUERADE", "PostDown = iptables -D FORWARD", "|| true", "Jc = ", "S3 = ", "S4 = ", "H1 = ", "I1 = ", "Endpoint = vpn.example.test:51820"} {
 		if !strings.Contains(cfg+"\n"+clientCfg, want) {
 			t.Fatalf("missing %q in rendered config", want)
 		}

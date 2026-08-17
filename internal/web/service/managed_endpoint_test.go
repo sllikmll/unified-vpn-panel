@@ -1068,7 +1068,8 @@ func TestManagedEndpointCapabilitiesManagedBackendsMutable(t *testing.T) {
 	}
 	for _, kind := range []model.RuntimeKind{model.RuntimeAmneziaWG, model.RuntimeMieru, model.RuntimeNaiveProxy} {
 		cap := byKind[kind]
-		if !cap.ServerLifecycle || !cap.ClientCRUD || !cap.Detect || cap.Traffic || cap.FirewallPolicy {
+		wantTraffic := kind == model.RuntimeAmneziaWG
+		if !cap.ServerLifecycle || !cap.ClientCRUD || !cap.Detect || cap.Traffic != wantTraffic || cap.FirewallPolicy {
 			t.Fatalf("%s managed capability mismatch: %#v", kind, cap)
 		}
 	}
