@@ -46,10 +46,16 @@ function protocolLabel(protocol: string): string {
 
 function trafficCell(client: ManagedEndpointClient, t: (key: string) => string): string {
   if (client.traffic?.supported === false) return t('managedProtocols.trafficUnavailable');
-  const up = client.traffic?.up;
-  const down = client.traffic?.down;
+  const up = client.trafficUp ?? client.traffic?.up;
+  const down = client.trafficDown ?? client.traffic?.down;
   if (typeof up !== 'number' || typeof down !== 'number') return t('managedProtocols.trafficUnknown');
   return `${SizeFormatter.sizeFormat(up)} / ${SizeFormatter.sizeFormat(down)}`;
+}
+
+function handshakeCell(client: ManagedEndpointClient, t: (key: string) => string): string {
+  const handshake = client.latestHandshake;
+  if (typeof handshake !== 'number' || handshake <= 0) return t('managedProtocols.never');
+  return new Date(handshake * 1000).toLocaleString();
 }
 
 function actionIcon(action: string) {
@@ -244,6 +250,7 @@ function ManagedClientsModal({ endpoint, open, onClose }: ClientModalProps) {
             { title: t('managedProtocols.enabled'), key: 'enable', render: (_v, row: ManagedEndpointClient) => <Tag color={(row.enable ?? row.enabled) ? 'green' : 'default'}>{(row.enable ?? row.enabled) ? t('managedProtocols.enabled') : t('managedProtocols.disabled')}</Tag> },
             { title: t('managedProtocols.status'), key: 'status', render: (_v, row: ManagedEndpointClient) => <Tag color={statusColor(row.status || 'unknown')}>{row.status || t('managedProtocols.unknown')}</Tag> },
             { title: t('managedProtocols.traffic'), key: 'traffic', render: (_v, row: ManagedEndpointClient) => trafficCell(row, t) },
+            { title: t('managedProtocols.latestHandshake'), key: 'latestHandshake', render: (_v, row: ManagedEndpointClient) => handshakeCell(row, t) },
             {
               title: t('managedProtocols.actions'),
               key: 'actions',

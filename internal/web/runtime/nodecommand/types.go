@@ -23,6 +23,7 @@ const (
 	MaxIdempotencyKeyLength = 128
 	MaxTargetGUIDLength     = 128
 	MaxClientIDLength       = 128
+	MaxPeerStatuses         = 10000
 	MaxEndpointTagLength    = 128
 	MaxEmailLength          = 254
 	MaxEndpointID           = 1<<31 - 1

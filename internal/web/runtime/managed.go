@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"strings"
 	"time"
 
 	awg "github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
@@ -177,7 +178,11 @@ func (d remoteManagedDriver) Restart(ctx context.Context) error {
 }
 
 func (d remoteManagedDriver) Status(ctx context.Context, inbound *model.Inbound) (driver.StatusResult, error) {
-	resp, err := d.send(ctx, nodecommand.OperationEndpointStatus, inbound, nil, 1)
+	material := []byte(nil)
+	if inbound != nil && strings.TrimSpace(inbound.Settings) != "" {
+		material = []byte(inbound.Settings)
+	}
+	resp, err := d.send(ctx, nodecommand.OperationEndpointStatus, inbound, material, 1)
 	if err != nil {
 		return driver.StatusResult{}, err
 	}
@@ -199,6 +204,21 @@ func (d remoteManagedDriver) Health(ctx context.Context, inbound *model.Inbound)
 		return driver.HealthResult{}, err
 	}
 	return driver.HealthResult{RuntimeKind: d.kind, InboundId: inbound.Id, Tag: inbound.Tag, Status: st.Status}, nil
+}
+
+func (d remoteManagedDriver) PeerStatuses(ctx context.Context, inbound *model.Inbound) ([]driver.PeerStatusResult, error) {
+	material := []byte(nil)
+	if inbound != nil && strings.TrimSpace(inbound.Settings) != "" {
+		material = []byte(inbound.Settings)
+	}
+	resp, err := d.send(ctx, nodecommand.OperationEndpointStatus, inbound, material, 1)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Status != nodecommand.StatusSucceeded {
+		return nil, fmt.Errorf("remote managed runtime failed: %s", resp.SummaryCode)
+	}
+	return resp.Result.Peers, nil
 }
 
 func (d remoteManagedDriver) Clients() driver.ClientDriver { return remoteUnsupportedClient{} }

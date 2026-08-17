@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime/driver"
 )
 
 type Status string
@@ -87,13 +88,14 @@ type Response struct {
 }
 
 type Result struct {
-	RuntimeKind     model.RuntimeKind `json:"runtimeKind,omitempty"`
-	EndpointID      int               `json:"endpointId,omitempty"`
-	ClientID        string            `json:"clientId,omitempty"`
-	Enabled         *bool             `json:"enabled,omitempty"`
-	State           ResultState       `json:"state,omitempty"`
-	ArtifactRef     string            `json:"artifactRef,omitempty"`
-	ArtifactVersion string            `json:"artifactVersion,omitempty"`
+	RuntimeKind     model.RuntimeKind         `json:"runtimeKind,omitempty"`
+	EndpointID      int                       `json:"endpointId,omitempty"`
+	ClientID        string                    `json:"clientId,omitempty"`
+	Enabled         *bool                     `json:"enabled,omitempty"`
+	State           ResultState               `json:"state,omitempty"`
+	ArtifactRef     string                    `json:"artifactRef,omitempty"`
+	ArtifactVersion string                    `json:"artifactVersion,omitempty"`
+	Peers           []driver.PeerStatusResult `json:"peers,omitempty"`
 }
 
 func (r Response) Validate() error {
@@ -296,11 +298,19 @@ func (r Result) Validate() error {
 	if r.ArtifactVersion != "" && !isSafeBoundedToken(r.ArtifactVersion, MaxArtifactRefLength) {
 		return fmt.Errorf("%w: result.artifactVersion", ErrUnsafeResponse)
 	}
+	if len(r.Peers) > MaxPeerStatuses {
+		return fmt.Errorf("%w: result.peers", ErrUnsafeResponse)
+	}
+	for _, peer := range r.Peers {
+		if !isSafeBoundedToken(peer.ClientID, MaxClientIDLength) || peer.LastHandshakeUnix < 0 || peer.RxBytes < 0 || peer.TxBytes < 0 {
+			return fmt.Errorf("%w: result.peers", ErrUnsafeResponse)
+		}
+	}
 	return nil
 }
 
 func (r Result) hasFields() bool {
-	return r.RuntimeKind != "" || r.EndpointID != 0 || r.ClientID != "" || r.Enabled != nil || r.State != ResultStateUnknown || r.ArtifactRef != "" || r.ArtifactVersion != ""
+	return r.RuntimeKind != "" || r.EndpointID != 0 || r.ClientID != "" || r.Enabled != nil || r.State != ResultStateUnknown || r.ArtifactRef != "" || r.ArtifactVersion != "" || len(r.Peers) > 0
 }
 
 func isAllowedResultState(state ResultState) bool {

@@ -119,6 +119,7 @@ type SafeStatus struct {
 
 type PeerStatus struct {
 	ClientID          string `json:"clientId"`
+	PublicKey         string `json:"-"`
 	Enabled           bool   `json:"enabled"`
 	LastHandshakeUnix int64  `json:"lastHandshakeUnix,omitempty"`
 	RxBytes           int64  `json:"rxBytes,omitempty"`

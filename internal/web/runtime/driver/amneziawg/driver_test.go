@@ -25,8 +25,9 @@ func TestDriverAppliesInboundSettingsAndRedactsResults(t *testing.T) {
 	if !strings.Contains(be.LastConfig, "PrivateKey = SERVER_PRIVATE") {
 		t.Fatal("backend did not receive rendered config")
 	}
-	if _, err := d.Clients().Status(context.Background(), in, "u@example.test"); !errors.Is(err, awg.ErrPeerOperationsUnsupported) {
-		t.Fatalf("client status err = %v, want ErrPeerOperationsUnsupported", err)
+	status, err := d.Clients().Status(context.Background(), in, "u@example.test")
+	if err != nil || !status.Enabled {
+		t.Fatalf("client status = %+v err=%v", status, err)
 	}
 }
 
@@ -45,11 +46,23 @@ func TestDriverCapabilities(t *testing.T) {
 		t.Fatalf("kind = %q", d.Kind())
 	}
 	caps := d.Capabilities()
-	if !caps.EndpointLifecycle || caps.ClientCRUD || !caps.Detect || !caps.Status {
+	if !caps.EndpointLifecycle || !caps.ClientCRUD || !caps.Detect || !caps.Status {
 		t.Fatalf("capabilities = %+v", caps)
 	}
 	if err := d.Restart(context.Background()); !errors.Is(err, driver.ErrUnsupportedOperation) {
 		t.Fatalf("Restart err = %v, want unsupported", err)
+	}
+}
+
+func TestClientCRUDPropagatesRuntimeFailure(t *testing.T) {
+	be := &awg.FakeBackend{DockerAvailable: true, VerifyErr: errors.New("runtime verify failed")}
+	d := New(awg.NewRuntime(be, awg.MemoryStore{}))
+	_, err := d.Clients().Create(context.Background(), inboundFixture(), model.Client{Email: "u@example.test", Enable: true})
+	if err == nil || !strings.Contains(err.Error(), "runtime verify failed") {
+		t.Fatalf("Create error = %v", err)
+	}
+	if !be.Stopped {
+		t.Fatal("first client reconcile failure did not stop runtime")
 	}
 }
 

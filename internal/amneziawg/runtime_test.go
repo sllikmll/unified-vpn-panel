@@ -22,7 +22,7 @@ func TestRuntimeDetectPrefersDockerThenNative(t *testing.T) {
 	}
 }
 
-func TestRuntimeApplyRollsBackOnVerifyFailure(t *testing.T) {
+func TestRuntimeFirstApplyFailureRemovesStateAndStops(t *testing.T) {
 	store := MemoryStore{}
 	be := &FakeBackend{DockerAvailable: true, VerifyErr: errors.New("verify failed")}
 	rt := NewRuntime(be, store)
@@ -33,11 +33,11 @@ func TestRuntimeApplyRollsBackOnVerifyFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("Apply succeeded, want verify error")
 	}
-	if !be.RolledBack {
-		t.Fatal("backend did not rollback after verify failure")
+	if !be.Stopped {
+		t.Fatal("backend did not stop after first verify failure")
 	}
-	if got, _ := store.Load("awg0"); got != "" {
-		t.Fatalf("store config after failed apply = %q, want empty", got)
+	if _, ok := store["awg0"]; ok {
+		t.Fatalf("store retained failed first config = %q", store["awg0"])
 	}
 }
 
@@ -75,19 +75,15 @@ func TestRuntimePeerLifecycle(t *testing.T) {
 func TestCommandBackendUsesFixedArgvAndDoesNotPassConfigAsArg(t *testing.T) {
 	var calls []string
 	be := &CommandBackend{
-		LookPath: func(name string) (string, error) {
-			if name == "awg" || name == "awg-quick" {
-				return "/usr/bin/" + name, nil
-			}
-			return "", errors.New("missing")
-		},
 		Run: func(_ context.Context, name string, args ...string) error {
-			call := name + " " + strings.Join(args, " ")
-			calls = append(calls, call)
-			if name == "docker" {
-				return errors.New("no docker")
-			}
+			calls = append(calls, name+" "+strings.Join(args, " "))
 			return nil
+		},
+		Output: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			if strings.Contains(strings.Join(args, " "), ".State.Running") {
+				return []byte("true\n"), nil
+			}
+			return []byte(`[{"Source":"/opt/amnezia/state/amnezia-awg2","Destination":"/opt/amnezia/awg"}]`), nil
 		},
 	}
 
@@ -100,10 +96,9 @@ func TestCommandBackendUsesFixedArgvAndDoesNotPassConfigAsArg(t *testing.T) {
 	}
 	want := []string{
 		"docker container inspect amnezia-awg2",
-		"awg-quick down awg0",
-		"awg-quick up awg0",
+		"docker exec amnezia-awg2 awg2-reconcile apply",
 		"docker container inspect amnezia-awg2",
-		"awg show awg0",
+		"docker exec amnezia-awg2 awg2-reconcile verify",
 	}
 	if fmt.Sprint(calls) != fmt.Sprint(want) {
 		t.Fatalf("calls = %#v, want %#v", calls, want)
@@ -133,11 +128,11 @@ func TestCommandBackendRejectsDockerMountMismatch(t *testing.T) {
 	}
 }
 
-func TestRuntimeDockerApplyPersistsNewConfigBeforeRestart(t *testing.T) {
+func TestRuntimeDockerApplyPersistsNewConfigBeforeReconcile(t *testing.T) {
 	dir := t.TempDir()
 	profile := DockerBackendProfile()
 	profile.HostConfigDir = dir
-	var sawNewConfigAtRestart bool
+	var sawNewConfigAtReconcile bool
 	be := &CommandBackend{
 		DockerProfile: profile,
 		Run: func(_ context.Context, name string, args ...string) error {
@@ -145,20 +140,23 @@ func TestRuntimeDockerApplyPersistsNewConfigBeforeRestart(t *testing.T) {
 			switch call {
 			case "docker container inspect amnezia-awg2":
 				return nil
-			case "docker restart amnezia-awg2":
+			case "docker exec amnezia-awg2 awg2-reconcile apply":
 				raw, err := os.ReadFile(filepath.Join(dir, "awg0.conf"))
 				if err != nil {
 					return err
 				}
-				sawNewConfigAtRestart = strings.Contains(string(raw), "PrivateKey = SERVER_PRIVATE_NEW")
+				sawNewConfigAtReconcile = strings.Contains(string(raw), "PrivateKey = SERVER_PRIVATE_NEW")
 				return nil
-			case "docker exec amnezia-awg2 awg show awg0":
+			case "docker exec amnezia-awg2 awg2-reconcile verify":
 				return nil
 			default:
 				return fmt.Errorf("unexpected command %q", call)
 			}
 		},
-		Output: func(_ context.Context, name string, args ...string) ([]byte, error) {
+		Output: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			if strings.Contains(strings.Join(args, " "), ".State.Running") {
+				return []byte("true\n"), nil
+			}
 			return []byte(`[{"Source":"` + filepath.ToSlash(dir) + `","Destination":"/opt/amnezia/awg"}]`), nil
 		},
 	}
@@ -169,8 +167,8 @@ func TestRuntimeDockerApplyPersistsNewConfigBeforeRestart(t *testing.T) {
 	if err := rt.Apply(context.Background(), DesiredConfig{Server: server}); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
-	if !sawNewConfigAtRestart {
-		t.Fatal("docker restart happened before awg0.conf contained the supplied config")
+	if !sawNewConfigAtReconcile {
+		t.Fatal("reconcile happened before awg0.conf contained the supplied config")
 	}
 	info, err := os.Stat(filepath.Join(dir, "awg0.conf"))
 	if err != nil {
@@ -178,5 +176,25 @@ func TestRuntimeDockerApplyPersistsNewConfigBeforeRestart(t *testing.T) {
 	}
 	if got := info.Mode().Perm(); got != 0o600 {
 		t.Fatalf("mode = %o, want 0600", got)
+	}
+}
+
+func TestParsePeerDumpKeepsHandshakeAndCounters(t *testing.T) {
+	raw := []byte("priv	pub	51820	0\nCLIENT_PUBLIC	PSK	198.51.100.1:1234	10.66.66.2/32	1720000000	123	456	25\n")
+	peers := parsePeerDump(raw)
+	if len(peers) != 1 {
+		t.Fatalf("peers = %d, want 1", len(peers))
+	}
+	got := peers[0]
+	if got.PublicKey != "CLIENT_PUBLIC" || got.LastHandshakeUnix != 1720000000 || got.RxBytes != 123 || got.TxBytes != 456 {
+		t.Fatalf("peer = %+v", got)
+	}
+}
+
+func TestPeerIDsFromPersistedConfig(t *testing.T) {
+	raw := "[Peer]\n# client-1\nPublicKey = CLIENT_PUBLIC\nAllowedIPs = 10.66.66.2/32\n"
+	ids := peerIDsFromConfig(raw)
+	if ids["CLIENT_PUBLIC"] != "client-1" {
+		t.Fatalf("ids = %#v", ids)
 	}
 }

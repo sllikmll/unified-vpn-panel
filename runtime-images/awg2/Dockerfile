@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 ARG GO_VERSION=1.26-alpine
 ARG ALPINE_VERSION=3.22
-ARG AMNEZIAWG_GO_COMMIT=cf9d2dd202821301f7039093b0a1b3d4b574c47c
-ARG AMNEZIAWG_TOOLS_COMMIT=d09ecc38425082e472368dd2bf8c4c42d10cae03
+ARG AMNEZIAWG_GO_COMMIT=1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1
+ARG AMNEZIAWG_TOOLS_COMMIT=ee0f0a9aa34ff0a0da4b3433b9512781cfe02843
 
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS awg-go-builder
 ARG AMNEZIAWG_GO_COMMIT
@@ -78,8 +78,9 @@ RUN apk add --no-cache \
 COPY --from=awg-go-builder /out/ /
 COPY --from=awg-tools-builder /out/ /
 COPY entrypoint.sh /usr/local/bin/awg2-entrypoint
+COPY reconcile.sh /usr/local/bin/awg2-reconcile
 
-RUN chmod 0755 /usr/local/bin/awg2-entrypoint
+RUN chmod 0755 /usr/local/bin/awg2-entrypoint /usr/local/bin/awg2-reconcile
 
 ENV AWG_QUICK_USERSPACE_IMPLEMENTATION=amneziawg-go \
     WG_QUICK_USERSPACE_IMPLEMENTATION=amneziawg-go

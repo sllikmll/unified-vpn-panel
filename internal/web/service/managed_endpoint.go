@@ -888,7 +888,42 @@ func (s ManagedEndpointMutationService) ListClients(userId, endpointID int) ([]m
 			return nil, err
 		}
 	}
+	if err := hydrateManagedClientTraffic(db, endpointID, rows); err != nil {
+		return nil, err
+	}
 	return rows, nil
+}
+
+func hydrateManagedClientTraffic(db *gorm.DB, endpointID int, clients []model.ManagedEndpointClient) error {
+	if len(clients) == 0 {
+		return nil
+	}
+	type aggregate struct {
+		Email           string
+		Up              int64
+		Down            int64
+		LatestHandshake int64
+		LastOnline      int64
+	}
+	var rows []aggregate
+	if err := db.Model(&model.ManagedEndpointClientTraffic{}).
+		Select("email, COALESCE(SUM(up), 0) AS up, COALESCE(SUM(down), 0) AS down, COALESCE(MAX(latest_handshake), 0) AS latest_handshake, COALESCE(MAX(last_online), 0) AS last_online").
+		Where("endpoint_id = ?", endpointID).
+		Group("email").Scan(&rows).Error; err != nil {
+		return err
+	}
+	byEmail := make(map[string]aggregate, len(rows))
+	for _, row := range rows {
+		byEmail[row.Email] = row
+	}
+	for i := range clients {
+		row := byEmail[clients[i].Email]
+		clients[i].TrafficUp = row.Up
+		clients[i].TrafficDown = row.Down
+		clients[i].LatestHandshake = row.LatestHandshake
+		clients[i].LastOnline = row.LastOnline
+	}
+	return nil
 }
 
 func (s ManagedEndpointMutationService) UpdateClient(ctx context.Context, userId int, endpointRef string, clientID int, req ManagedEndpointClientUpdateRequest) (model.ManagedEndpointClient, error) {

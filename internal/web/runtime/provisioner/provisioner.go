@@ -72,6 +72,7 @@ const (
 	MieruMitaVersion     = "v3.35.0"
 	MieruManifestPath    = "runtime-images/mieru/mita-v3.35.0.manifest.json"
 	AWG2ContainerName    = "unified-vpn-awg2-runtime"
+	AWG2RuntimeVersion   = "amneziawg-go/v3.1.20260814+tools/v3.1.20260812"
 	NaiveContainerName   = naiveproxy.DockerContainerName
 	AWG2HostConfigDir    = awg.DockerHostStateDir
 	AWG2GuestConfigDir   = awg.DockerContainerConfigDir
@@ -300,7 +301,10 @@ func NewLocal(cfg Config) *LocalProvisioner {
 func (p *LocalProvisioner) Plan(kind model.RuntimeKind) Plan {
 	switch kind {
 	case model.RuntimeAmneziaWG:
-		return dockerPlan(kind, p.cfg.AWG2ImageRef, "docker-awg2")
+		plan := dockerPlan(kind, p.cfg.AWG2ImageRef, "docker-awg2")
+		plan.Version = AWG2RuntimeVersion
+		plan.Capabilities = append(plan.Capabilities, "foreground", "hot-reconcile", "peer-traffic", "lossless-awg2")
+		return plan
 	case model.RuntimeNaiveProxy:
 		return dockerPlan(kind, p.cfg.NaiveProxyImageRef, "docker-naiveproxy")
 	case model.RuntimeMieru:

@@ -1,5 +1,7 @@
 # Multi-Protocol Inbound Control Plane Plan
 
+> Historical design note. The AWG2 runtime assumptions below are superseded by `docs/architecture-amneziawg2.md`; production uses the official pinned `amneziawg-go`/`awg` image and `unified-vpn-awg2-runtime`.
+
 Date: 2026-08-04
 
 ## Goal

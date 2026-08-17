@@ -13,10 +13,10 @@ These artifacts are install prerequisites for future protocol support in unified
 
 Pinned inputs:
 
-- `amnezia-vpn/amneziawg-go` commit `cf9d2dd202821301f7039093b0a1b3d4b574c47c`, MIT.
-- `amnezia-vpn/amneziawg-tools` commit `d09ecc38425082e472368dd2bf8c4c42d10cae03`, GPL-2.0-only.
+- `amnezia-vpn/amneziawg-go` tag `v3.1.20260814`, commit `1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1`, MIT.
+- `amnezia-vpn/amneziawg-tools` tag `v3.1.20260812`, commit `ee0f0a9aa34ff0a0da4b3433b9512781cfe02843`, GPL-2.0-only.
 
-The image builds `amneziawg-go`, `awg`, and `awg-quick` from source in separate build stages and copies only the runtime outputs into Alpine. Runtime configuration is fixed at `/opt/amnezia/awg/awg0.conf`; no keys or configs are embedded in the image.
+The image builds official `amneziawg-go` and `awg` from source. The entrypoint supervises `amneziawg-go -f awg0` directly; a fixed reconcile helper losslessly applies the mounted AWG2 config without converting profiles to AWG3 or accepting arbitrary paths and commands.
 
 The container must run as root inside the container because creating and configuring the tunnel requires network administration privileges. Use the narrow capabilities required for the tunnel:
 
@@ -25,7 +25,7 @@ docker run --rm \
   --cap-add NET_ADMIN \
   --device /dev/net/tun \
   -v "$PWD/awg0.conf:/opt/amnezia/awg/awg0.conf:ro" \
-  ghcr.io/OWNER/unified-vpn-panel-protocol-awg2:awg2-go-cf9d2dd-tools-d09ecc3-SHORTSHA
+  ghcr.io/OWNER/unified-vpn-panel-protocol-awg2:awg2-go-v3.1.20260814-tools-v3.1.20260812-SHORTSHA
 ```
 
 Do not run the container as privileged unless a target host has a documented, unavoidable TUN setup limitation. The entrypoint is idempotent: it leaves an already-present `awg0` interface in place and cleans it up on `SIGTERM` or `SIGINT`.
@@ -101,7 +101,7 @@ The verifier never installs or executes downloaded packages.
 
 The workflow does not publish `latest` tags and does not alter product version `0.0.1` or Xray `26.6.27`. Image tags include pinned source versions and the short repository SHA, for example:
 
-- `protocol-awg2:awg2-go-cf9d2dd-tools-d09ecc3-SHORTSHA`
+- `protocol-awg2:awg2-go-v3.1.20260814-tools-v3.1.20260812-SHORTSHA`
 - `protocol-naive-caddy:naive-caddy-v2.11.4-xcaddy-v0.4.5-forwardproxy-d62c80d-SHORTSHA`
 
 Each matrix build uploads its own digest artifact containing immutable `image@sha256:...` references after publication. Downstream integration must consume those artifact files rather than aggregate matrix job outputs. Build outputs include image digests, BuildKit provenance, SBOMs, and GitHub build provenance attestations where supported by the runner and registry.

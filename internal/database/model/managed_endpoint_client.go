@@ -20,6 +20,10 @@ type ManagedEndpointClient struct {
 	Enable          bool                `json:"enable" gorm:"index"`
 	State           EndpointClientState `json:"state" gorm:"index" example:"applied"`
 	Status          EndpointClientState `json:"status,omitempty" gorm:"-"`
+	TrafficUp       int64               `json:"trafficUp" gorm:"-"`
+	TrafficDown     int64               `json:"trafficDown" gorm:"-"`
+	LatestHandshake int64               `json:"latestHandshake,omitempty" gorm:"-"`
+	LastOnline      int64               `json:"lastOnline,omitempty" gorm:"-"`
 	PublicIdentity  string              `json:"publicIdentity,omitempty" gorm:"index"`
 	Address         string              `json:"address,omitempty"`
 	CredentialRef   string              `json:"-" gorm:"index"`

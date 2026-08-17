@@ -1,51 +1,124 @@
-# AmneziaWG 2.0 Backend Tracer Bullet
-
-This backend tracer bullet adds an IPv4-only AmneziaWG 2.0 runtime path for managed endpoints. It is intentionally backend-only: no frontend flows, subscriptions, fleet deployment automation, Mieru, or NaiveProxy support are included here.
+# Managed AmneziaWG 2.0 architecture
 
 ## Scope
 
-- Runtime kind: `amneziawg`.
-- Inbound protocol carried by the managed runtime driver: `amneziawg`.
-- Addressing: IPv4 only. Server and peer validation rejects IPv6 server mode and IPv6 client allowed IPs.
-- Config shape: native WireGuard-style config with AmneziaWG 2.0 obfuscation fields `Jc`, `Jmin`, `Jmax`, `S1`, `S2`, `S3`, `S4`, `H1`-`H4`, and `I1`.
-- Lifecycle operations: endpoint apply, observe/status/health/detect, and delete. The v1 contract defines start/stop/restart verbs, but this repository has not yet wired typed AWG start/stop/restart methods through the managed driver interface; those verbs remain unsupported for AWG node-command execution.
-- Client operations: AWG client create, update, delete, enable/disable, status, and export are intentionally not advertised. The node process cannot safely reconstruct client private-key export or per-peer desired state from process memory after a panel/node restart. These operations remain blocked until the control plane can send an atomically persisted complete desired endpoint config after its durable transaction.
+Managed AmneziaWG is a server-side protocol runtime. It is not an Xray inbound and it is not implemented by Mihomo's legacy WireGuard outbound. The panel owns endpoint lifecycle, encrypted server/client material, client CRUD, runtime reconciliation, traffic observation, export, and subscription inclusion.
 
-## Behavioral Attribution
+Canonical upstream inputs are pinned to immutable official Amnezia VPN revisions:
 
-The AmneziaWG 2.0 parameter model and operational behavior are attributed to the `coinman-dev/3ax-ui` AmneziaWG work. This implementation adapts the backend control-plane behavior to this codebase's managed runtime abstraction, strict typed node-command contract, replay guard, and existing authenticated HTTPS node transport.
+- `amnezia-vpn/amneziawg-go` tag `v3.1.20260814`, commit `1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1`;
+- `amnezia-vpn/amneziawg-tools` tag `v3.1.20260812`, commit `ee0f0a9aa34ff0a0da4b3433b9512781cfe02843`.
 
-The implementation is not a wholesale import of `coinman-dev/3ax-ui`; it keeps Xray behavior unchanged and preserves the existing node-management transport boundaries.
+The runtime image is built from these sources and consumed by immutable GHCR digest. Mutable tags and third-party AWG images are rejected by the provisioner.
 
-## Backend Selection
+## Data model and secret boundary
 
-The command backend detects and uses one of two allowlisted execution modes:
+`managed_endpoints` is durable endpoint state. `managed_endpoint_clients` is the client registry. Private keys and preshared keys are encrypted in `managed_secrets`; public API projections contain only redacted summaries and safe runtime observations.
 
-- Docker: existing `amnezia-awg2` container, operated only through fixed `docker container inspect`, `docker start`, `docker restart`, `docker exec ... awg show`, and `docker stop` argv forms. The fixed Docker profile writes `0600` configs atomically to host `/opt/amnezia/state/amnezia-awg2`; the container must mount that directory at `/opt/amnezia/awg` and read `/opt/amnezia/awg/awg0.conf`. Almaty custom entrypoint deployments are compatible only when they use that same mount and config destination.
-- Native: host `awg` and `awg-quick`, operated only through fixed `awg show` and `awg-quick up/down` argv forms. Native config is written under `/etc/amnezia/amneziawg`.
+A client mutation follows this sequence:
 
-No node-command request accepts raw shell commands, raw argv, environment variables, file paths, container names, image names, or arbitrary config paths. Docker mount verification rejects a container whose `/opt/amnezia/awg` destination is not backed by the fixed host state directory when `docker inspect` output is available. The file store writes interface config atomically under the selected fixed backend store root and rolls back on apply or verify failure.
+1. lock endpoint state;
+2. update the client row and encrypted secret material;
+3. rebuild complete desired AWG2 state from the database;
+4. atomically persist the host config with mode `0600`;
+5. reconcile the running runtime;
+6. verify interface health;
+7. commit observed/applied hashes and client state;
+8. on any runtime failure, restore the previous config and reconcile it again.
 
-## Compatibility With awg-web-gui Docker Fleets
+The desired state is complete. Add, update, enable, disable, and delete-by-ID never infer missing private material from the running interface.
 
-The Docker backend assumes an existing `amnezia-awg2` container name, matching the common awg-web-gui deployment pattern. The panel does not create or mutate Docker Compose definitions in this tracer bullet. It writes the rendered AmneziaWG config to `/opt/amnezia/state/amnezia-awg2/awg0.conf`, restarts the fixed container, and verifies the active `awg0` interface, allowing current Docker fleets to continue owning image versioning, networking, volumes, and host firewall policy.
+## Lossless AWG2 contract
 
-If a fleet uses a different container name or config mount, that remains outside this tracer bullet. The contract should be extended with explicit typed fleet metadata before supporting those variants.
+The following values are preserved exactly through desired state, native export, raw/JSON/Clash subscription projections, and runtime rendering:
 
-## Install Plan
+- server and client private/public keys;
+- preshared keys;
+- addresses, endpoints, and allowed IPs;
+- `Jc`, `Jmin`, `Jmax`;
+- `S1`, `S2`, `S3`, `S4`;
+- `H1`, `H2`, `H3`, `H4`;
+- `I1` through `I5` when present.
 
-The managed endpoint API exposes a typed install-plan surface, but AWG2 runtime installation is blocked. Current fleets use local `amnezia-awg2:latest` images with inconsistent image IDs and no canonical digest. This repo must first build and publish a reproducible GHCR AWG2 runtime image pinned by digest; until then the API must not execute an unpinned latest image, `curl | bash`, arbitrary image names, arbitrary paths, or arbitrary environment variables.
+A profile containing `S3` or `S4` remains AWG2. The panel must not add `Name =`, convert it to AWG3, regenerate keys, or normalize obfuscation values during import/export or apply.
 
-## Node Command Security
+## Runtime process model
 
-Remote execution uses the existing authenticated HTTPS node transport and a strict node-command envelope:
+The official userspace data plane runs in the foreground:
 
-- `targetGuid` must match the receiving panel GUID.
-- Requests carry bounded `commandId`, `idempotencyKey`, `nodeId`, `endpointId`, runtime, operation, generation, and validity timestamps.
-- A replay guard stores completed responses by idempotency key and rejects conflicting replays.
-- Sealed v1 request material requires an explicitly presented non-empty Bearer token that has already passed API-token validation. Cookie-authenticated browser sessions and mTLS-only requests can use generic panel APIs, but they cannot execute sealed node-command v1 requests. This remains true until a dedicated command key exists.
-- Secret request material is accepted only as `sealedPayload`, decrypted with the validated node API bearer token, and never serialized back in request JSON.
-- Client export material is not supported for AWG node commands because node-side private client keys are not retained solely for export.
-- Responses expose summary/status codes and typed result metadata only. Raw stdout, stderr, rollback tokens, private keys, preshared keys, and full config text are not returned in public response fields.
+```text
+amneziawg-go -f awg0
+```
 
-If future secret transport needs cross-node recipients or rotating keys independent of node API tokens, the current contract should fail closed rather than adding plaintext fields.
+The container entrypoint is PID-level supervisor logic. It starts the official process, waits for `awg0`, invokes the fixed `awg2-reconcile` helper, propagates process exit, and removes owned interface/firewall state on termination. There is no `sleep infinity`, background daemon hidden behind `awg-quick`, or arbitrary command evaluation.
+
+`awg2-reconcile` accepts only:
+
+```text
+awg2-reconcile apply
+awg2-reconcile verify
+awg2-reconcile down
+```
+
+It reads only `/opt/amnezia/awg/awg0.conf`, strips userspace-only interface fields into a `0600` setconf file, applies AWG parameters with official `awg`, configures address/MTU/routes/NAT, and verifies `awg show awg0`. Imported keys and obfuscation fields are passed through unchanged.
+
+The Docker backend uses host networking, `NET_ADMIN`, and `/dev/net/tun`, with the host state directory mounted read-only into the runtime. The provisioner sets `--restart unless-stopped` and uses transactional `next`/`previous` containers for image updates.
+
+## Reconcile and rollback
+
+For an already-running endpoint, apply uses:
+
+```text
+docker exec unified-vpn-awg2-runtime awg2-reconcile apply
+```
+
+The container is not restarted for each client mutation. If it is stopped, the panel writes the new atomic config first, starts the owned container, then reconciles and verifies it. This makes `disable -> enable` deterministic.
+
+Failure is never reported as success. A failed reconcile or verify restores the previous config and reapplies it. With no previous state, the failed desired config is not retained as an applied state.
+
+The runtime is singleton per node (`awg0`) but supports multiple clients. Client deletion is by durable client row ID and rebuilds the complete peer set, so deleting one client cannot erase unrelated peers.
+
+## Health and traffic
+
+`awg show awg0 dump` is parsed as bounded typed data. Only safe fields leave the node:
+
+- panel-generated client ID;
+- enabled state;
+- latest handshake timestamp;
+- receive and transmit byte counters.
+
+No keys, PSKs, raw configs, or command output are returned by node-command responses.
+
+The managed AWG traffic job runs every ten seconds through the same local/remote driver contract. Server RX is client upload; server TX is client download. Monotonic deltas survive normal polling, and a runtime counter reset starts a new baseline instead of producing negative traffic. Aggregated traffic and latest handshake are exposed in the managed client UI.
+
+## Export and subscriptions
+
+Native export is generated from encrypted durable state, not by scraping a running process. The server public key is derived and checked against stored public material. Exported profiles retain AWG2 parameters including `S3/S4`.
+
+Subscription rendering may emit Mihomo-compatible metadata for client consumption, but Mihomo is not the managed server data plane. The official runtime remains `amneziawg-go` plus `awg`.
+
+## Security invariants
+
+- fixed interface, container, config, and state paths;
+- immutable image digest in install/update plans;
+- no shell interpolation of user paths or arbitrary commands;
+- `0600` host/runtime configs;
+- encrypted private key and PSK storage;
+- typed and bounded remote command requests/responses;
+- no secrets in status, traffic, logs, API errors, release assets, or image layers;
+- rollback before reporting an apply failure;
+- no automatic AWG2-to-AWG3 conversion.
+
+## Required verification
+
+Before release:
+
+1. Go unit/integration suite and race detector;
+2. frontend lint, typecheck, tests, and production build on Node 24;
+3. shell syntax and runtime-image static checks;
+4. real Docker/TUN smoke with foreground process verification;
+5. hot add/delete peer without PID change;
+6. failed apply followed by exact rollback verification;
+7. restart persistence;
+8. immutable multi-arch image publication with provenance and SBOM;
+9. secret scan, `git diff --check`, and independent exact-HEAD review.

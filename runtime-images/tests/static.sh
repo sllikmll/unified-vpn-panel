@@ -12,6 +12,7 @@ run() {
 }
 
 run bash -n runtime-images/awg2/entrypoint.sh
+run bash -n runtime-images/awg2/reconcile.sh
 run bash -n runtime-images/naive-caddy/entrypoint.sh
 run bash -n runtime-images/mieru/verify-mieru-manifest.sh
 
@@ -43,6 +44,7 @@ from pathlib import Path
 
 awg_dockerfile = Path("runtime-images/awg2/Dockerfile").read_text(encoding="utf-8")
 awg_entrypoint = Path("runtime-images/awg2/entrypoint.sh").read_text(encoding="utf-8")
+awg_reconcile = Path("runtime-images/awg2/reconcile.sh").read_text(encoding="utf-8")
 naive_dockerfile = Path("runtime-images/naive-caddy/Dockerfile").read_text(encoding="utf-8")
 naive_entrypoint = Path("runtime-images/naive-caddy/entrypoint.sh").read_text(encoding="utf-8")
 naive_example = Path("runtime-images/naive-caddy/Caddyfile.naiveproxy").read_text(encoding="utf-8")
@@ -72,6 +74,24 @@ if 'readonly config="/opt/amnezia/awg/awg0.conf"' not in awg_entrypoint:
     raise SystemExit("AWG config path is not fixed")
 if 'readonly iface="awg0"' not in awg_entrypoint:
     raise SystemExit("AWG interface is not fixed")
+for required in [
+    'amneziawg-go -f "$iface"',
+    'awg2-reconcile apply',
+    'wait "$awg_pid"',
+]:
+    if required not in awg_entrypoint:
+        raise SystemExit(f"missing foreground AWG supervision contract: {required}")
+for required in [
+    'readonly config="/opt/amnezia/awg/awg0.conf"',
+    'readonly iface="awg0"',
+    'awg setconf "$iface" "$runtime_config"',
+    'awg show "$iface"',
+]:
+    if required not in awg_reconcile:
+        raise SystemExit(f"missing AWG reconcile contract: {required}")
+for forbidden in ["eval ", "awg-quick up", "awg-quick down"]:
+    if forbidden in awg_entrypoint or forbidden in awg_reconcile:
+        raise SystemExit(f"forbidden legacy/arbitrary AWG runtime token: {forbidden}")
 
 for token in [
     "NAIVE_" + "USER",

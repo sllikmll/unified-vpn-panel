@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -52,14 +54,20 @@ func NewCommandBackend() *CommandBackend {
 }
 
 func (b *CommandBackend) Detect(ctx context.Context) (SafeStatus, error) {
-	if err := b.run(ctx, "docker", "container", "inspect", b.dockerProfile().ContainerName); err == nil {
+	profile := b.dockerProfile()
+	if b.run(ctx, "docker", "container", "inspect", profile.ContainerName) == nil {
 		if err := b.verifyDockerMount(ctx); err != nil {
-			return SafeStatus{Backend: BackendDocker, Available: false, State: StateStopped}, err
+			return SafeStatus{Backend: BackendDocker, State: StateStopped}, err
 		}
-		return SafeStatus{Backend: BackendDocker, Available: true, State: StateRunning}, nil
-	}
-	if b.has("awg") && b.has("awg-quick") {
-		return SafeStatus{Backend: BackendNative, Available: true, State: StateStopped}, nil
+		state := StateStopped
+		running, err := b.output(ctx, "docker", "inspect", "--format", "{{.State.Running}}", profile.ContainerName)
+		if err != nil {
+			return SafeStatus{Backend: BackendDocker, State: StateStopped}, err
+		}
+		if strings.TrimSpace(string(running)) == "true" {
+			state = StateRunning
+		}
+		return SafeStatus{Backend: BackendDocker, Available: true, State: state}, nil
 	}
 	return SafeStatus{Backend: BackendNone, State: StateStopped}, nil
 }
@@ -72,8 +80,6 @@ func (b *CommandBackend) Up(ctx context.Context, iface string) error {
 	switch st.Backend {
 	case BackendDocker:
 		return b.run(ctx, "docker", "start", b.dockerProfile().ContainerName)
-	case BackendNative:
-		return b.run(ctx, "awg-quick", "up", iface)
 	default:
 		return ErrBackendUnavailable
 	}
@@ -92,10 +98,7 @@ func (b *CommandBackend) Apply(ctx context.Context, iface, config string) error 
 		if config == "" {
 			return fmt.Errorf("empty amneziawg config")
 		}
-		return b.run(ctx, "docker", "restart", b.dockerProfile().ContainerName)
-	case BackendNative:
-		_ = b.run(ctx, "awg-quick", "down", iface)
-		return b.run(ctx, "awg-quick", "up", iface)
+		return b.run(ctx, "docker", "exec", b.dockerProfile().ContainerName, "awg2-reconcile", "apply")
 	default:
 		return ErrBackendUnavailable
 	}
@@ -108,9 +111,7 @@ func (b *CommandBackend) Verify(ctx context.Context, iface string) error {
 	}
 	switch st.Backend {
 	case BackendDocker:
-		return b.run(ctx, "docker", "exec", b.dockerProfile().ContainerName, "awg", "show", iface)
-	case BackendNative:
-		return b.run(ctx, "awg", "show", iface)
+		return b.run(ctx, "docker", "exec", b.dockerProfile().ContainerName, "awg2-reconcile", "verify")
 	default:
 		return ErrBackendUnavailable
 	}
@@ -124,8 +125,6 @@ func (b *CommandBackend) Down(ctx context.Context, iface string) error {
 	switch st.Backend {
 	case BackendDocker:
 		return b.run(ctx, "docker", "stop", b.dockerProfile().ContainerName)
-	case BackendNative:
-		return b.run(ctx, "awg-quick", "down", iface)
 	default:
 		return ErrBackendUnavailable
 	}
@@ -142,6 +141,11 @@ func (b *CommandBackend) Status(ctx context.Context, iface string) (SafeStatus, 
 	}
 	if err := b.Verify(ctx, iface); err == nil {
 		st.State = StateRunning
+		raw, dumpErr := b.output(ctx, "docker", "exec", b.dockerProfile().ContainerName, "awg", "show", iface, "dump")
+		if dumpErr != nil {
+			return st, dumpErr
+		}
+		st.Peers = parsePeerDump(raw)
 	} else {
 		st.State = StateStopped
 	}
@@ -149,7 +153,29 @@ func (b *CommandBackend) Status(ctx context.Context, iface string) (SafeStatus, 
 }
 
 func (b *CommandBackend) Rollback(ctx context.Context, iface string, _ string) error {
-	return b.Apply(ctx, iface, "")
+	return b.Apply(ctx, iface, "rollback")
+}
+
+func parsePeerDump(raw []byte) []PeerStatus {
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	if len(lines) < 2 {
+		return nil
+	}
+	out := make([]PeerStatus, 0, len(lines)-1)
+	for _, line := range lines[1:] {
+		fields := strings.Split(line, "	")
+		if len(fields) < 8 {
+			continue
+		}
+		handshake, err1 := strconv.ParseInt(fields[4], 10, 64)
+		rx, err2 := strconv.ParseInt(fields[5], 10, 64)
+		tx, err3 := strconv.ParseInt(fields[6], 10, 64)
+		if err1 != nil || err2 != nil || err3 != nil {
+			continue
+		}
+		out = append(out, PeerStatus{PublicKey: fields[0], Enabled: true, LastHandshakeUnix: handshake, RxBytes: rx, TxBytes: tx})
+	}
+	return out
 }
 
 func (b *CommandBackend) has(name string) bool {
@@ -331,6 +357,12 @@ func (r *Runtime) Apply(ctx context.Context, desired DesiredConfig) error {
 	if err != nil {
 		return err
 	}
+	if st.State != StateRunning {
+		if err := r.backend.Up(ctx, desired.Server.InterfaceName); err != nil {
+			_ = r.rollback(ctx, store, desired.Server.InterfaceName, backup)
+			return err
+		}
+	}
 	if err := r.backend.Apply(ctx, desired.Server.InterfaceName, cfg); err != nil {
 		_ = r.rollback(ctx, store, desired.Server.InterfaceName, backup)
 		return err
@@ -339,7 +371,7 @@ func (r *Runtime) Apply(ctx context.Context, desired DesiredConfig) error {
 		_ = r.rollback(ctx, store, desired.Server.InterfaceName, backup)
 		return err
 	}
-	r.current = DesiredConfig{Server: desired.Server}
+	r.current = desired
 	return nil
 }
 
@@ -352,7 +384,43 @@ func (r *Runtime) Stop(ctx context.Context, iface string) error {
 }
 
 func (r *Runtime) Observe(ctx context.Context, iface string) (SafeStatus, error) {
-	return r.backend.Status(ctx, iface)
+	st, err := r.backend.Status(ctx, iface)
+	if err != nil {
+		return st, err
+	}
+	ids := map[string]string{}
+	for _, client := range r.current.Clients {
+		ids[client.PublicKey] = client.ID
+	}
+	if len(ids) == 0 {
+		store, detectErr := r.backend.Detect(ctx)
+		if detectErr == nil {
+			raw, _ := r.storeFor(store.Backend).Load(iface)
+			ids = peerIDsFromConfig(raw)
+		}
+	}
+	for i := range st.Peers {
+		st.Peers[i].ClientID = ids[st.Peers[i].PublicKey]
+	}
+	return st, nil
+}
+
+func peerIDsFromConfig(raw string) map[string]string {
+	out := map[string]string{}
+	clientID := ""
+	for _, line := range strings.Split(raw, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "# ") {
+			clientID = strings.TrimSpace(strings.TrimPrefix(trimmed, "# "))
+			continue
+		}
+		key, value, ok := strings.Cut(trimmed, "=")
+		if ok && strings.EqualFold(strings.TrimSpace(key), "PublicKey") && clientID != "" {
+			out[strings.TrimSpace(value)] = clientID
+			clientID = ""
+		}
+	}
+	return out
 }
 
 func (r *Runtime) Delete(ctx context.Context, iface string) error {
@@ -393,6 +461,11 @@ func (r *Runtime) ExportPeer(_ context.Context, clientID string) (string, error)
 }
 
 func (r *Runtime) rollback(ctx context.Context, store Store, iface, backup string) error {
+	if strings.TrimSpace(backup) == "" {
+		_, deleteErr := store.Delete(iface)
+		stopErr := r.backend.Down(ctx, iface)
+		return errors.Join(deleteErr, stopErr)
+	}
 	if _, err := store.SaveAtomic(iface, backup); err != nil {
 		return err
 	}
@@ -442,6 +515,7 @@ type FakeBackend struct {
 	NativeAvailable bool
 	VerifyErr       error
 	RolledBack      bool
+	Stopped         bool
 	LastConfig      string
 }
 
@@ -462,7 +536,10 @@ func (b *FakeBackend) Apply(_ context.Context, _ string, config string) error {
 	return nil
 }
 func (b *FakeBackend) Verify(context.Context, string) error { return b.VerifyErr }
-func (b *FakeBackend) Down(context.Context, string) error   { return nil }
+func (b *FakeBackend) Down(context.Context, string) error {
+	b.Stopped = true
+	return nil
+}
 func (b *FakeBackend) Delete(context.Context, string) error { return nil }
 func (b *FakeBackend) Status(context.Context, string) (SafeStatus, error) {
 	return b.Detect(context.Background())
