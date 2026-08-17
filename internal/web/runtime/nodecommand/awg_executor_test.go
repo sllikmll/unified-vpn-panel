@@ -42,6 +42,16 @@ func TestAWGExecutorEndpointAndClientLifecycle(t *testing.T) {
 		t.Fatalf("endpoint apply response = %+v", resp)
 	}
 
+	endpointDeleteReq := awgRequest(now, OperationEndpointDelete, nil, nil)
+	endpointDeleteReq.SecretInput = &SecretInput{Refs: map[string]string{"interfaceName": "awg0"}}
+	resp, err = exec.Execute(context.Background(), session, endpointDeleteReq)
+	if err != nil {
+		t.Fatalf("endpoint delete execute: %v", err)
+	}
+	if resp.Status != StatusSucceeded || resp.Result.State != ResultStateDeleted {
+		t.Fatalf("endpoint delete response = %+v", resp)
+	}
+
 	statusReq := awgRequest(now, OperationClientStatus, ClientPayload{ClientID: "client-1"}, nil)
 	resp, err = exec.Execute(context.Background(), session, statusReq)
 	if err != nil {

@@ -1,7 +1,9 @@
 package runtime
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -50,6 +52,22 @@ func TestLocalManagedRuntimeDrivers(t *testing.T) {
 	}
 	if _, err := local.Driver(model.RuntimeWireGuard); !errors.Is(err, driver.ErrUnsupportedRuntime) {
 		t.Fatalf("wireguard driver err = %v, want ErrUnsupportedRuntime", err)
+	}
+}
+
+func TestManagedSecretRefsForRemoteAWGDelete(t *testing.T) {
+	const private = "SHOULD_NOT_LEAVE_MASTER"
+	inbound := &model.Inbound{Settings: `{"server":{"interfaceName":"awg0","privateKey":"` + private + `"}}`}
+	refs, err := managedSecretRefs(model.RuntimeAmneziaWG, inbound)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(refs) != 1 || refs["interfaceName"] != "awg0" {
+		t.Fatalf("refs = %#v", refs)
+	}
+	raw, _ := json.Marshal(refs)
+	if strings.Contains(string(raw), private) {
+		t.Fatalf("secret leaked into refs: %s", raw)
 	}
 }
 

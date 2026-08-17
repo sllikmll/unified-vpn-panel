@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -293,9 +294,28 @@ func (d remoteManagedDriver) send(ctx context.Context, op nodecommand.Operation,
 	}
 	if len(material) > 0 {
 		req.SecretInput = &nodecommand.SecretInput{Material: material}
+	} else if refs, err := managedSecretRefs(d.kind, inbound); err != nil {
+		return nodecommand.Response{}, err
+	} else if len(refs) > 0 {
+		req.SecretInput = &nodecommand.SecretInput{Refs: refs}
 	}
 	session := nodecommand.NewAuthenticatedSession(node.Id, node.Guid, fmt.Sprintf("node-%d", node.Id), "node-command-v1", now.Add(-time.Second), now.Add(10*time.Minute))
 	return d.remote.Send(ctx, session, req)
+}
+
+func managedSecretRefs(kind model.RuntimeKind, inbound *model.Inbound) (map[string]string, error) {
+	if kind != model.RuntimeAmneziaWG || inbound == nil {
+		return nil, nil
+	}
+	var desired awg.DesiredConfig
+	if err := json.Unmarshal([]byte(inbound.Settings), &desired); err != nil {
+		return nil, fmt.Errorf("decode amneziawg interface ref: %w", err)
+	}
+	iface := strings.TrimSpace(desired.Server.InterfaceName)
+	if iface == "" {
+		iface = "awg0"
+	}
+	return map[string]string{"interfaceName": iface}, nil
 }
 
 type remoteUnsupportedClient struct{}
