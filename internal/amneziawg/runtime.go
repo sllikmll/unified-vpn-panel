@@ -382,19 +382,17 @@ func (r *Runtime) Apply(ctx context.Context, desired DesiredConfig) error {
 	if err != nil {
 		return err
 	}
+	restoreStopped := st.State != StateRunning
 	if st.State != StateRunning {
 		if err := r.backend.Up(ctx, desired.Server.InterfaceName); err != nil {
-			_ = r.rollback(ctx, store, desired.Server.InterfaceName, backup)
-			return err
+			return errors.Join(err, r.rollback(ctx, store, desired.Server.InterfaceName, backup, restoreStopped))
 		}
 	}
 	if err := r.backend.Apply(ctx, desired.Server.InterfaceName, cfg); err != nil {
-		_ = r.rollback(ctx, store, desired.Server.InterfaceName, backup)
-		return err
+		return errors.Join(err, r.rollback(ctx, store, desired.Server.InterfaceName, backup, restoreStopped))
 	}
 	if err := r.backend.Verify(ctx, desired.Server.InterfaceName); err != nil {
-		_ = r.rollback(ctx, store, desired.Server.InterfaceName, backup)
-		return err
+		return errors.Join(err, r.rollback(ctx, store, desired.Server.InterfaceName, backup, restoreStopped))
 	}
 	r.current = desired
 	return nil
@@ -459,8 +457,7 @@ func (r *Runtime) Delete(ctx context.Context, iface string) error {
 		return err
 	}
 	if err := r.backend.Delete(ctx, iface); err != nil {
-		_ = r.rollback(ctx, store, iface, backup)
-		return err
+		return errors.Join(err, r.rollback(ctx, store, iface, backup, false))
 	}
 	return nil
 }
@@ -485,16 +482,23 @@ func (r *Runtime) ExportPeer(_ context.Context, clientID string) (string, error)
 	return "", ErrPeerOperationsUnsupported
 }
 
-func (r *Runtime) rollback(ctx context.Context, store Store, iface, backup string) error {
+func (r *Runtime) rollback(ctx context.Context, store Store, iface, backup string, restoreStopped bool) error {
 	if strings.TrimSpace(backup) == "" {
 		_, deleteErr := store.Delete(iface)
 		stopErr := r.backend.Down(ctx, iface)
 		return errors.Join(deleteErr, stopErr)
 	}
 	if _, err := store.SaveAtomic(iface, backup); err != nil {
+		if restoreStopped {
+			return errors.Join(err, r.backend.Down(ctx, iface))
+		}
 		return err
 	}
-	return r.backend.Rollback(ctx, iface, backup)
+	restoreErr := r.backend.Rollback(ctx, iface, backup)
+	if restoreStopped {
+		return errors.Join(restoreErr, r.backend.Down(ctx, iface))
+	}
+	return restoreErr
 }
 
 func (r *Runtime) storeFor(kind BackendKind) Store {
@@ -548,7 +552,11 @@ type FakeBackend struct {
 func (b *FakeBackend) Detect(context.Context) (SafeStatus, error) {
 	switch {
 	case b.DockerAvailable:
-		return SafeStatus{Backend: BackendDocker, Available: true, State: StateRunning}, nil
+		state := StateRunning
+		if b.Stopped {
+			state = StateStopped
+		}
+		return SafeStatus{Backend: BackendDocker, Available: true, State: state}, nil
 	case b.NativeAvailable:
 		return SafeStatus{Backend: BackendNative, Available: true, State: StateRunning}, nil
 	default:
@@ -556,7 +564,10 @@ func (b *FakeBackend) Detect(context.Context) (SafeStatus, error) {
 	}
 }
 
-func (b *FakeBackend) Up(context.Context, string) error { return nil }
+func (b *FakeBackend) Up(context.Context, string) error {
+	b.Stopped = false
+	return nil
+}
 func (b *FakeBackend) Apply(_ context.Context, _ string, config string) error {
 	b.LastConfig = config
 	return nil

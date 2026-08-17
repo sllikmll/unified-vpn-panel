@@ -41,6 +41,24 @@ func TestRuntimeFirstApplyFailureRemovesStateAndStops(t *testing.T) {
 	}
 }
 
+func TestRuntimeFailedUpdateRestoresStoppedState(t *testing.T) {
+	store := MemoryStore{"awg0": "old-working-config"}
+	be := &FakeBackend{DockerAvailable: true, Stopped: true, VerifyErr: errors.New("verify failed")}
+	rt := NewRuntime(be, store)
+	server := DefaultServer("awg0", 51820)
+	server.PrivateKey = "SERVER_PRIVATE"
+	server.PublicKey = "SERVER_PUBLIC"
+	if err := rt.Apply(context.Background(), DesiredConfig{Server: server}); err == nil {
+		t.Fatal("Apply succeeded")
+	}
+	if got := store["awg0"]; got != "old-working-config" {
+		t.Fatalf("restored config = %q", got)
+	}
+	if !be.RolledBack || !be.Stopped {
+		t.Fatalf("rollback state rolledBack=%v stopped=%v", be.RolledBack, be.Stopped)
+	}
+}
+
 func TestRuntimePeerLifecycle(t *testing.T) {
 	store := MemoryStore{}
 	be := &FakeBackend{DockerAvailable: true}
